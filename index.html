@@ -37,11 +37,21 @@
                     <li class="nav-item">
                         <a class="nav-link" href="#" onclick="showPage('quiz')">Quiz</a>
                     </li>
-                    <li class="nav-item">
+                    <li class="nav-item" id="admin-nav-item" style="display: none;">
                         <a class="nav-link" href="#" onclick="showPage('admin')">Verwaltung</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="#" onclick="showPage('stats')">Statistiken</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" onclick="app.showAdminLogin()" id="admin-login-link">
+                            <i class="bi bi-shield-lock"></i> Admin
+                        </a>
+                    </li>
+                    <li class="nav-item" id="admin-logout-item" style="display: none;">
+                        <a class="nav-link" href="#" onclick="app.logoutAdmin()">
+                            <i class="bi bi-box-arrow-right"></i> Logout
+                        </a>
                     </li>
                 </ul>
             </div>

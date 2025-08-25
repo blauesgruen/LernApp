@@ -39,31 +39,98 @@ class LernApp {
     // Admin-Zugang überprüfen
     checkAdminAccess() {
         const adminAccess = sessionStorage.getItem('lernapp_admin_access');
-        if (!adminAccess) {
-            this.lockAdminFeatures();
+        if (adminAccess) {
+            this.showAdminInterface();
+        } else {
+            this.hideAdminInterface();
         }
     }
 
+    showAdminInterface() {
+        // Admin-Navigation anzeigen
+        document.getElementById('admin-nav-item').style.display = 'block';
+        document.getElementById('admin-logout-item').style.display = 'block';
+        document.getElementById('admin-login-link').style.display = 'none';
+        
+        // Admin-Seite normal anzeigen (nicht gesperrt)
+        const adminPage = document.getElementById('admin-page');
+        if (adminPage && adminPage.querySelector('.container.mt-5')) {
+            // Admin-Seite ist gesperrt, neu laden um entsperrt zu zeigen
+            location.reload();
+        }
+    }
+
+    hideAdminInterface() {
+        // Admin-Navigation verstecken
+        document.getElementById('admin-nav-item').style.display = 'none';
+        document.getElementById('admin-logout-item').style.display = 'none';
+        document.getElementById('admin-login-link').style.display = 'block';
+    }
+
+    showAdminLogin() {
+        // Erstelle ein Modal für Admin-Login
+        const modalHtml = `
+            <div class="modal fade" id="adminLoginModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">
+                                <i class="bi bi-shield-lock"></i> Admin-Anmeldung
+                            </h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p>Geben Sie das Admin-Passwort ein, um Zugang zur Verwaltung zu erhalten:</p>
+                            <div class="mb-3">
+                                <input type="password" id="modal-admin-password" class="form-control" 
+                                       placeholder="Admin-Passwort" onkeypress="if(event.key==='Enter') app.unlockAdminAccess()">
+                            </div>
+                            <div id="login-error" class="text-danger" style="display: none;"></div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                            <button type="button" class="btn btn-primary" onclick="app.unlockAdminAccess()">
+                                <i class="bi bi-unlock"></i> Anmelden
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Modal in DOM einfügen falls nicht vorhanden
+        if (!document.getElementById('adminLoginModal')) {
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+        }
+        
+        // Modal anzeigen
+        const modal = new bootstrap.Modal(document.getElementById('adminLoginModal'));
+        modal.show();
+        
+        // Focus auf Passwort-Feld
+        setTimeout(() => {
+            document.getElementById('modal-admin-password').focus();
+        }, 500);
+    }
+
     lockAdminFeatures() {
-        // Admin-Bereiche ausblenden
-        const adminElements = document.querySelectorAll('#admin-page, [onclick*="admin"]');
+        // Wenn Admin-Seite aufgerufen wird ohne Login, Sperre anzeigen
+        const adminElements = document.querySelectorAll('#admin-page');
         adminElements.forEach(element => {
             if (element.id === 'admin-page') {
                 element.innerHTML = `
                     <div class="container mt-5">
                         <div class="row justify-content-center">
                             <div class="col-md-6">
-                                <div class="card">
-                                    <div class="card-header">
-                                        <h5><i class="bi bi-shield-lock"></i> Admin-Zugang</h5>
+                                <div class="card border-warning">
+                                    <div class="card-header bg-warning text-dark">
+                                        <h5><i class="bi bi-shield-lock"></i> Zugang verweigert</h5>
                                     </div>
                                     <div class="card-body">
-                                        <p>Für den Admin-Bereich ist ein Passwort erforderlich.</p>
-                                        <div class="mb-3">
-                                            <input type="password" id="admin-password" class="form-control" placeholder="Admin-Passwort">
-                                        </div>
-                                        <button onclick="app.unlockAdminAccess()" class="btn btn-primary">
-                                            <i class="bi bi-unlock"></i> Freischalten
+                                        <p>Sie haben keinen Zugang zum Admin-Bereich.</p>
+                                        <p class="text-muted">Klicken Sie auf "Admin" in der Navigation, um sich anzumelden.</p>
+                                        <button onclick="showPage('home')" class="btn btn-primary">
+                                            <i class="bi bi-house"></i> Zur Startseite
                                         </button>
                                     </div>
                                 </div>
@@ -76,17 +143,41 @@ class LernApp {
     }
 
     unlockAdminAccess() {
-        const password = document.getElementById('admin-password').value;
+        const password = document.getElementById('modal-admin-password').value;
         const correctPassword = 'LernApp2025Admin'; // In Produktion: Sicheres Passwort verwenden
         
         if (password === correctPassword) {
             sessionStorage.setItem('lernapp_admin_access', 'granted');
-            this.showAlert('Admin-Zugang gewährt!', 'success');
-            // Seite neu laden um Admin-Interface zu aktivieren
-            setTimeout(() => location.reload(), 1000);
+            this.showAlert('Admin-Anmeldung erfolgreich!', 'success');
+            
+            // Modal schließen
+            const modal = bootstrap.Modal.getInstance(document.getElementById('adminLoginModal'));
+            if (modal) {
+                modal.hide();
+            }
+            
+            // Admin-Interface aktivieren
+            this.showAdminInterface();
+            
+            // Zur Admin-Seite wechseln
+            setTimeout(() => {
+                showPage('admin');
+            }, 1000);
         } else {
-            this.showAlert('Falsches Passwort!', 'danger');
-            document.getElementById('admin-password').value = '';
+            const errorDiv = document.getElementById('login-error');
+            errorDiv.textContent = 'Falsches Passwort!';
+            errorDiv.style.display = 'block';
+            document.getElementById('modal-admin-password').value = '';
+            document.getElementById('modal-admin-password').focus();
+        }
+    }
+
+    logoutAdmin() {
+        if (confirm('Möchten Sie sich als Admin abmelden?')) {
+            sessionStorage.removeItem('lernapp_admin_access');
+            this.hideAdminInterface();
+            this.showAlert('Admin-Abmeldung erfolgreich!', 'success');
+            showPage('home');
         }
     }
 
