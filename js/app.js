@@ -19,6 +19,9 @@ class LernApp {
             answers: []
         };
 
+        // Daten-Integrität prüfen
+        this.validateDataIntegrity();
+        
         this.init();
     }
 
@@ -30,6 +33,61 @@ class LernApp {
         this.renderQuestionsList();
         this.renderStatistics();
         this.setupEventListeners();
+        this.checkAdminAccess();
+    }
+
+    // Admin-Zugang überprüfen
+    checkAdminAccess() {
+        const adminAccess = sessionStorage.getItem('lernapp_admin_access');
+        if (!adminAccess) {
+            this.lockAdminFeatures();
+        }
+    }
+
+    lockAdminFeatures() {
+        // Admin-Bereiche ausblenden
+        const adminElements = document.querySelectorAll('#admin-page, [onclick*="admin"]');
+        adminElements.forEach(element => {
+            if (element.id === 'admin-page') {
+                element.innerHTML = `
+                    <div class="container mt-5">
+                        <div class="row justify-content-center">
+                            <div class="col-md-6">
+                                <div class="card">
+                                    <div class="card-header">
+                                        <h5><i class="bi bi-shield-lock"></i> Admin-Zugang</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <p>Für den Admin-Bereich ist ein Passwort erforderlich.</p>
+                                        <div class="mb-3">
+                                            <input type="password" id="admin-password" class="form-control" placeholder="Admin-Passwort">
+                                        </div>
+                                        <button onclick="app.unlockAdminAccess()" class="btn btn-primary">
+                                            <i class="bi bi-unlock"></i> Freischalten
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+        });
+    }
+
+    unlockAdminAccess() {
+        const password = document.getElementById('admin-password').value;
+        const correctPassword = 'LernApp2025Admin'; // In Produktion: Sicheres Passwort verwenden
+        
+        if (password === correctPassword) {
+            sessionStorage.setItem('lernapp_admin_access', 'granted');
+            this.showAlert('Admin-Zugang gewährt!', 'success');
+            // Seite neu laden um Admin-Interface zu aktivieren
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            this.showAlert('Falsches Passwort!', 'danger');
+            document.getElementById('admin-password').value = '';
+        }
     }
 
     // Beispieldaten laden (nur beim ersten Start)
@@ -188,11 +246,14 @@ class LernApp {
         }
     }
 
-    // Lokaler Speicher
+    // Lokaler Speicher mit Verschlüsselung
     loadFromStorage(key) {
         try {
-            const data = localStorage.getItem(`lernapp_${key}`);
-            return data ? JSON.parse(data) : null;
+            const encryptedData = localStorage.getItem(`lernapp_${key}`);
+            if (!encryptedData) return null;
+            
+            const decryptedData = this.decryptData(encryptedData);
+            return decryptedData ? JSON.parse(decryptedData) : null;
         } catch (error) {
             console.error('Fehler beim Laden der Daten:', error);
             return null;
@@ -201,10 +262,45 @@ class LernApp {
 
     saveToStorage(key, data) {
         try {
-            localStorage.setItem(`lernapp_${key}`, JSON.stringify(data));
+            const jsonData = JSON.stringify(data);
+            const encryptedData = this.encryptData(jsonData);
+            localStorage.setItem(`lernapp_${key}`, encryptedData);
         } catch (error) {
             console.error('Fehler beim Speichern der Daten:', error);
             this.showAlert('Fehler beim Speichern der Daten!', 'danger');
+        }
+    }
+
+    // Einfache Verschlüsselung (Base64 + XOR)
+    encryptData(data) {
+        const key = 'LernApp2025SecureKey'; // In Produktion: Zufälliger Key pro Session
+        let encrypted = '';
+        
+        for (let i = 0; i < data.length; i++) {
+            encrypted += String.fromCharCode(
+                data.charCodeAt(i) ^ key.charCodeAt(i % key.length)
+            );
+        }
+        
+        return btoa(encrypted); // Base64 kodieren
+    }
+
+    decryptData(encryptedData) {
+        try {
+            const key = 'LernApp2025SecureKey';
+            const encrypted = atob(encryptedData); // Base64 dekodieren
+            let decrypted = '';
+            
+            for (let i = 0; i < encrypted.length; i++) {
+                decrypted += String.fromCharCode(
+                    encrypted.charCodeAt(i) ^ key.charCodeAt(i % key.length)
+                );
+            }
+            
+            return decrypted;
+        } catch (error) {
+            console.error('Entschlüsselung fehlgeschlagen:', error);
+            return null;
         }
     }
 
@@ -1357,6 +1453,69 @@ class LernApp {
         document.getElementById(`${type}-image-preview`).innerHTML = '';
         
         this.showAlert('Bild entfernt', 'info');
+    }
+
+    // Sicherheitsfunktionen
+    validateDataIntegrity() {
+        // Kategorien validieren
+        if (!Array.isArray(this.categories)) {
+            console.warn('Kategorien-Daten beschädigt, setze Standardwerte');
+            this.categories = ['Allgemein', 'Ordne zu'];
+            this.saveToStorage('categories', this.categories);
+        }
+
+        // Fragen validieren
+        if (!Array.isArray(this.questions)) {
+            console.warn('Fragen-Daten beschädigt, setze Standardwerte');
+            this.questions = [];
+            this.saveToStorage('questions', this.questions);
+        } else {
+            // Jede Frage validieren
+            this.questions = this.questions.filter(q => this.validateQuestion(q));
+        }
+
+        // Statistiken validieren
+        if (!this.statistics || typeof this.statistics !== 'object') {
+            console.warn('Statistik-Daten beschädigt, setze Standardwerte');
+            this.statistics = {
+                totalQuestions: 0,
+                correctAnswers: 0,
+                categoriesPlayed: {},
+                lastPlayed: null
+            };
+            this.saveToStorage('statistics', this.statistics);
+        }
+    }
+
+    validateQuestion(question) {
+        if (!question || typeof question !== 'object') return false;
+        if (typeof question.id !== 'number') return false;
+        if (typeof question.category !== 'string') return false;
+        if (!['text', 'image'].includes(question.answerType)) return false;
+        
+        // Weitere Validierungen je nach Typ
+        if (question.answerType === 'text' && !question.answer) return false;
+        if (question.answerType === 'image' && !question.answerImage) return false;
+        
+        return true;
+    }
+
+    // Checksum für wichtige Daten
+    generateChecksum(data) {
+        const str = JSON.stringify(data);
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+            const char = str.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash; // 32-bit integer
+        }
+        return hash.toString(36);
+    }
+
+    // Überprüfe Daten-Integrität mit Checksum
+    verifyDataIntegrity(data, expectedChecksum) {
+        const currentChecksum = this.generateChecksum(data);
+        return currentChecksum === expectedChecksum;
     }
 }
 
