@@ -2,14 +2,16 @@
 
 class LernApp {
     constructor() {
-        this.categories = this.loadFromStorage('categories') || ['Allgemein', 'Ordne zu'];
-        this.questions = this.loadFromStorage('questions') || [];
-        this.statistics = this.loadFromStorage('statistics') || {
-            totalQuestions: 0,
-            correctAnswers: 0,
-            categoriesPlayed: {},
-            lastPlayed: null
-        };
+        // User Management System
+        this.currentUser = null;
+        this.isDemo = false;
+        this.users = this.loadFromStorage('users', true) || {}; // Global users storage
+        this.sharedData = this.loadFromStorage('shared_data', true) || {}; // Global shared data storage
+        
+        // Current user's data (wird dynamisch geladen)
+        this.categories = [];
+        this.questions = [];
+        this.statistics = {};
         
         this.currentQuiz = {
             questions: [],
@@ -19,22 +21,624 @@ class LernApp {
             answers: []
         };
 
-        // Daten-Integrität prüfen
-        this.validateDataIntegrity();
-        
         this.init();
     }
 
     init() {
-        this.loadSampleData();
+        // Prüfen ob User eingeloggt ist
+        this.checkUserSession();
+        
+        if (this.currentUser || this.isDemo) {
+            this.loadUserData();
+            this.updateCategorySelects();
+            this.renderCategories();
+            this.renderCategoriesList();
+            this.renderQuestionsList();
+            this.renderStatistics();
+            this.updateDashboard();
+        }
+        
+        this.setupEventListeners();
+        this.checkAdminAccess();
+        this.updateUIForLoginState();
+    }
+
+    // ==================== USER MANAGEMENT ====================
+
+    checkUserSession() {
+        const sessionUser = sessionStorage.getItem('lernapp_current_user');
+        const sessionDemo = sessionStorage.getItem('lernapp_demo_mode');
+        
+        if (sessionDemo) {
+            this.isDemo = true;
+            this.currentUser = 'demo';
+        } else if (sessionUser) {
+            this.currentUser = sessionUser;
+        }
+    }
+
+    updateUIForLoginState() {
+        const userElements = document.querySelectorAll('.user-only');
+        const guestElements = document.querySelectorAll('.guest-only');
+        
+        if (this.currentUser || this.isDemo) {
+            // User ist eingeloggt
+            userElements.forEach(el => el.style.display = 'block');
+            guestElements.forEach(el => el.style.display = 'none');
+            
+            if (this.currentUser && !this.isDemo) {
+                const userData = this.users[this.currentUser];
+                document.getElementById('current-username').textContent = 
+                    userData.displayName || this.currentUser;
+                document.getElementById('dashboard-username').textContent = 
+                    userData.displayName || this.currentUser;
+            } else if (this.isDemo) {
+                document.getElementById('current-username').textContent = 'Demo-Modus';
+                document.getElementById('dashboard-username').textContent = 'Demo-Benutzer';
+            }
+            
+            showPage('home');
+        } else {
+            // User ist nicht eingeloggt
+            userElements.forEach(el => el.style.display = 'none');
+            guestElements.forEach(el => el.style.display = 'block');
+            showPage('login');
+        }
+    }
+
+    showUserLogin(mode = 'login') {
+        showPage('login');
+        if (mode === 'register') {
+            this.switchAuthMode('register');
+        } else {
+            this.switchAuthMode('login');
+        }
+    }
+
+    switchAuthMode(mode) {
+        const loginTab = document.getElementById('login-tab');
+        const registerTab = document.getElementById('register-tab');
+        const loginForm = document.getElementById('login-form');
+        const registerForm = document.getElementById('register-form');
+
+        if (mode === 'login') {
+            loginTab.classList.add('active');
+            registerTab.classList.remove('active');
+            loginForm.classList.remove('d-none');
+            registerForm.classList.add('d-none');
+        } else {
+            loginTab.classList.remove('active');
+            registerTab.classList.add('active');
+            loginForm.classList.add('d-none');
+            registerForm.classList.remove('d-none');
+        }
+    }
+
+    registerUser(event) {
+        event.preventDefault();
+        
+        const username = document.getElementById('register-username').value.trim();
+        const password = document.getElementById('register-password').value;
+        const confirmPassword = document.getElementById('register-password-confirm').value;
+        const displayName = document.getElementById('register-display-name').value.trim();
+
+        // Validierung
+        if (username.length < 3 || username.length > 20) {
+            this.showAlert('Benutzername muss zwischen 3 und 20 Zeichen lang sein!', 'danger');
+            return;
+        }
+
+        if (!/^[a-zA-Z0-9]+$/.test(username)) {
+            this.showAlert('Benutzername darf nur Buchstaben und Zahlen enthalten!', 'danger');
+            return;
+        }
+
+        if (password.length < 6) {
+            this.showAlert('Passwort muss mindestens 6 Zeichen lang sein!', 'danger');
+            return;
+        }
+
+        if (password !== confirmPassword) {
+            this.showAlert('Passwörter stimmen nicht überein!', 'danger');
+            return;
+        }
+
+        if (this.users[username]) {
+            this.showAlert('Benutzername bereits vergeben!', 'danger');
+            return;
+        }
+
+        // Benutzer erstellen
+        const newUser = {
+            username: username,
+            password: this.hashPassword(password),
+            displayName: displayName || username,
+            createdAt: new Date().toISOString(),
+            lastLogin: null
+        };
+
+        this.users[username] = newUser;
+        this.saveToStorage('users', this.users, true);
+
+        this.showAlert('Registrierung erfolgreich! Sie können sich jetzt anmelden.', 'success');
+        this.switchAuthMode('login');
+        document.getElementById('login-username').value = username;
+    }
+
+    loginUser(event) {
+        event.preventDefault();
+        
+        const username = document.getElementById('login-username').value.trim();
+        const password = document.getElementById('login-password').value;
+
+        if (!this.users[username]) {
+            this.showAlert('Benutzername nicht gefunden!', 'danger');
+            return;
+        }
+
+        const user = this.users[username];
+        if (user.password !== this.hashPassword(password)) {
+            this.showAlert('Falsches Passwort!', 'danger');
+            return;
+        }
+
+        // Login erfolgreich
+        user.lastLogin = new Date().toISOString();
+        this.users[username] = user;
+        this.saveToStorage('users', this.users, true);
+
+        this.currentUser = username;
+        this.isDemo = false;
+        sessionStorage.setItem('lernapp_current_user', username);
+        sessionStorage.removeItem('lernapp_demo_mode');
+
+        this.loadUserData();
+        this.updateUIForLoginState();
+        this.updateDashboard();
+        this.showAlert(`Willkommen zurück, ${user.displayName}!`, 'success');
+    }
+
+    startDemoMode() {
+        this.isDemo = true;
+        this.currentUser = 'demo';
+        sessionStorage.setItem('lernapp_demo_mode', 'true');
+        sessionStorage.removeItem('lernapp_current_user');
+
+        this.loadUserData();
+        this.updateUIForLoginState();
+        this.updateDashboard();
+        this.showAlert('Demo-Modus gestartet! Ihre Daten werden nicht dauerhaft gespeichert.', 'info');
+    }
+
+    logoutUser() {
+        if (confirm('Möchten Sie sich wirklich abmelden?')) {
+            this.currentUser = null;
+            this.isDemo = false;
+            sessionStorage.removeItem('lernapp_current_user');
+            sessionStorage.removeItem('lernapp_demo_mode');
+            sessionStorage.removeItem('lernapp_admin_access');
+            
+            this.updateUIForLoginState();
+            this.showAlert('Erfolgreich abgemeldet!', 'success');
+        }
+    }
+
+    updateProfile(event) {
+        event.preventDefault();
+        
+        if (this.isDemo) {
+            this.showAlert('Im Demo-Modus können keine Profil-Änderungen vorgenommen werden!', 'warning');
+            return;
+        }
+
+        const displayName = document.getElementById('profile-display-name').value.trim();
+        const newPassword = document.getElementById('profile-new-password').value;
+        const confirmPassword = document.getElementById('profile-confirm-password').value;
+
+        if (newPassword && newPassword !== confirmPassword) {
+            this.showAlert('Passwörter stimmen nicht überein!', 'danger');
+            return;
+        }
+
+        if (newPassword && newPassword.length < 6) {
+            this.showAlert('Passwort muss mindestens 6 Zeichen lang sein!', 'danger');
+            return;
+        }
+
+        // Profil aktualisieren
+        const user = this.users[this.currentUser];
+        user.displayName = displayName || user.username;
+        
+        if (newPassword) {
+            user.password = this.hashPassword(newPassword);
+        }
+
+        this.users[this.currentUser] = user;
+        this.saveToStorage('users', this.users, true);
+
+        this.updateUIForLoginState();
+        this.showAlert('Profil erfolgreich aktualisiert!', 'success');
+        
+        // Formular zurücksetzen
+        document.getElementById('profile-new-password').value = '';
+        document.getElementById('profile-confirm-password').value = '';
+    }
+
+    loadUserData() {
+        if (this.isDemo) {
+            // Demo-Daten
+            this.categories = ['Allgemein', 'Ordne zu', 'Demo'];
+            this.questions = this.generateDemoQuestions();
+            this.statistics = {
+                totalQuestions: 0,
+                correctAnswers: 0,
+                categoriesPlayed: {},
+                lastPlayed: null
+            };
+        } else if (this.currentUser) {
+            // User-spezifische Daten laden
+            const userKey = `user_${this.currentUser}`;
+            this.categories = this.loadFromStorage(`${userKey}_categories`) || ['Allgemein', 'Ordne zu'];
+            this.questions = this.loadFromStorage(`${userKey}_questions`) || [];
+            this.statistics = this.loadFromStorage(`${userKey}_statistics`) || {
+                totalQuestions: 0,
+                correctAnswers: 0,
+                categoriesPlayed: {},
+                lastPlayed: null
+            };
+
+            // Wenn neue User keine Daten haben, Beispieldaten laden
+            if (this.questions.length === 0) {
+                this.loadSampleData();
+            }
+        }
+
+        // Daten-Integrität prüfen
+        this.validateDataIntegrity();
+    }
+
+    generateDemoQuestions() {
+        return [
+            {
+                id: 'demo1',
+                category: 'Demo',
+                question: 'Was ist 2 + 2?',
+                answerType: 'text',
+                answer: '4',
+                questionImage: null,
+                answerImage: null
+            },
+            {
+                id: 'demo2',
+                category: 'Demo',
+                question: 'Wie viele Beine hat eine Spinne?',
+                answerType: 'text',
+                answer: '8',
+                questionImage: null,
+                answerImage: null
+            },
+            {
+                id: 'demo3',
+                category: 'Demo',
+                question: 'Was ist die Hauptstadt von Deutschland?',
+                answerType: 'text',
+                answer: 'Berlin',
+                questionImage: null,
+                answerImage: null
+            },
+            {
+                id: 'demo4',
+                category: 'Demo',
+                question: 'Welches Jahr haben wir aktuell?',
+                answerType: 'text',
+                answer: '2025',
+                questionImage: null,
+                answerImage: null
+            }
+        ];
+    }
+
+    // ==================== DATA SHARING ====================
+
+    generateShareCode() {
+        if (this.isDemo) {
+            this.showAlert('Im Demo-Modus können keine Daten geteilt werden!', 'warning');
+            return;
+        }
+
+        const shareCategories = document.getElementById('share-categories').checked;
+        const shareQuestions = document.getElementById('share-questions').checked;
+
+        if (!shareCategories && !shareQuestions) {
+            this.showAlert('Bitte wählen Sie aus, was Sie teilen möchten!', 'warning');
+            return;
+        }
+
+        const shareData = {
+            username: this.currentUser,
+            displayName: this.users[this.currentUser].displayName,
+            timestamp: new Date().toISOString(),
+            categories: shareCategories ? this.categories : [],
+            questions: shareQuestions ? this.questions : []
+        };
+
+        // Generate unique share code
+        const shareCode = this.generateUniqueCode();
+        this.sharedData[shareCode] = shareData;
+        this.saveToStorage('shared_data', this.sharedData, true);
+
+        document.getElementById('share-code-display').value = shareCode;
+        this.updateSharedContentList();
+        this.showAlert('Teilungs-Code erfolgreich erstellt!', 'success');
+    }
+
+    generateUniqueCode() {
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        let code = '';
+        for (let i = 0; i < 8; i++) {
+            code += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        
+        // Prüfen ob Code bereits existiert
+        if (this.sharedData[code]) {
+            return this.generateUniqueCode();
+        }
+        
+        return code;
+    }
+
+    copyShareCode() {
+        const codeField = document.getElementById('share-code-display');
+        codeField.select();
+        codeField.setSelectionRange(0, 99999);
+        navigator.clipboard.writeText(codeField.value);
+        this.showAlert('Code in Zwischenablage kopiert!', 'success');
+    }
+
+    previewImportData() {
+        const importCode = document.getElementById('import-code').value.trim().toUpperCase();
+        
+        if (!importCode) {
+            this.showAlert('Bitte geben Sie einen Teilungs-Code ein!', 'warning');
+            return;
+        }
+
+        if (!this.sharedData[importCode]) {
+            this.showAlert('Ungültiger Teilungs-Code!', 'danger');
+            return;
+        }
+
+        const shareData = this.sharedData[importCode];
+        const previewContent = document.getElementById('import-preview-content');
+        
+        previewContent.innerHTML = `
+            <p><strong>Von:</strong> ${shareData.displayName} (${shareData.username})</p>
+            <p><strong>Erstellt am:</strong> ${new Date(shareData.timestamp).toLocaleDateString('de-DE')}</p>
+            <p><strong>Kategorien:</strong> ${shareData.categories.length} (${shareData.categories.join(', ')})</p>
+            <p><strong>Fragen:</strong> ${shareData.questions.length}</p>
+        `;
+
+        document.getElementById('import-preview').classList.remove('d-none');
+        this.pendingImportData = shareData;
+    }
+
+    confirmImportData() {
+        if (this.isDemo) {
+            this.showAlert('Im Demo-Modus können keine Daten importiert werden!', 'warning');
+            return;
+        }
+
+        if (!this.pendingImportData) {
+            this.showAlert('Keine Daten zum Importieren verfügbar!', 'danger');
+            return;
+        }
+
+        const mergeCategories = document.getElementById('merge-categories').checked;
+        const mergeQuestions = document.getElementById('merge-questions').checked;
+        const importData = this.pendingImportData;
+
+        let importedCategories = 0;
+        let importedQuestions = 0;
+
+        // Kategorien importieren
+        if (mergeCategories && importData.categories) {
+            importData.categories.forEach(category => {
+                if (!this.categories.includes(category)) {
+                    this.categories.push(category);
+                    importedCategories++;
+                }
+            });
+        }
+
+        // Fragen importieren
+        if (mergeQuestions && importData.questions) {
+            importData.questions.forEach(question => {
+                // Prüfen ob Frage bereits existiert (basierend auf Text und Antwort)
+                const exists = this.questions.some(q => 
+                    q.question === question.question && 
+                    q.answer === question.answer &&
+                    q.category === question.category
+                );
+                
+                if (!exists) {
+                    // Neue ID generieren
+                    const newQuestion = {
+                        ...question,
+                        id: Date.now() + Math.random(),
+                        importedFrom: importData.username
+                    };
+                    this.questions.push(newQuestion);
+                    importedQuestions++;
+                }
+            });
+        }
+
+        // Daten speichern
+        this.saveUserData();
         this.updateCategorySelects();
         this.renderCategories();
         this.renderCategoriesList();
         this.renderQuestionsList();
-        this.renderStatistics();
-        this.setupEventListeners();
-        this.checkAdminAccess();
+
+        this.showAlert(`Import erfolgreich! ${importedCategories} Kategorien und ${importedQuestions} Fragen importiert.`, 'success');
+        this.cancelImport();
     }
+
+    cancelImport() {
+        document.getElementById('import-preview').classList.add('d-none');
+        document.getElementById('import-code').value = '';
+        this.pendingImportData = null;
+    }
+
+    updateSharedContentList() {
+        const container = document.getElementById('shared-content-list');
+        if (!container) return;
+
+        const userShares = Object.entries(this.sharedData)
+            .filter(([code, data]) => data.username === this.currentUser)
+            .sort(([,a], [,b]) => new Date(b.timestamp) - new Date(a.timestamp));
+
+        if (userShares.length === 0) {
+            container.innerHTML = '<p class="text-muted">Sie haben noch keine Inhalte geteilt.</p>';
+            return;
+        }
+
+        container.innerHTML = userShares.map(([code, data]) => `
+            <div class="card mb-2">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="mb-1">Code: <code>${code}</code></h6>
+                            <small class="text-muted">
+                                ${data.categories.length} Kategorien, ${data.questions.length} Fragen
+                                • Erstellt: ${new Date(data.timestamp).toLocaleDateString('de-DE')}
+                            </small>
+                        </div>
+                        <button class="btn btn-sm btn-outline-danger" onclick="app.deleteSharedContent('${code}')">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    deleteSharedContent(code) {
+        if (confirm('Möchten Sie diesen geteilten Inhalt wirklich löschen?')) {
+            delete this.sharedData[code];
+            this.saveToStorage('shared_data', this.sharedData, true);
+            this.updateSharedContentList();
+            this.showAlert('Geteilter Inhalt gelöscht!', 'success');
+        }
+    }
+
+    // ==================== DATA MANAGEMENT ====================
+
+    saveUserData() {
+        if (this.isDemo) {
+            // Demo-Daten nicht speichern
+            return;
+        }
+
+        if (this.currentUser) {
+            const userKey = `user_${this.currentUser}`;
+            this.saveToStorage(`${userKey}_categories`, this.categories);
+            this.saveToStorage(`${userKey}_questions`, this.questions);
+            this.saveToStorage(`${userKey}_statistics`, this.statistics);
+        }
+    }
+
+    exportUserData() {
+        if (this.isDemo) {
+            this.showAlert('Demo-Daten können nicht exportiert werden!', 'warning');
+            return;
+        }
+
+        const exportData = {
+            username: this.currentUser,
+            displayName: this.users[this.currentUser].displayName,
+            exportDate: new Date().toISOString(),
+            categories: this.categories,
+            questions: this.questions,
+            statistics: this.statistics
+        };
+
+        const dataStr = JSON.stringify(exportData, null, 2);
+        const dataBlob = new Blob([dataStr], {type: 'application/json'});
+        
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(dataBlob);
+        link.download = `lernapp-export-${this.currentUser}-${new Date().toISOString().split('T')[0]}.json`;
+        link.click();
+
+        this.showAlert('Daten erfolgreich exportiert!', 'success');
+    }
+
+    resetUserData() {
+        if (this.isDemo) {
+            this.showAlert('Demo-Daten können nicht zurückgesetzt werden!', 'warning');
+            return;
+        }
+
+        if (confirm('Möchten Sie wirklich ALLE Ihre Daten löschen? Diese Aktion kann nicht rückgängig gemacht werden!')) {
+            if (confirm('Sind Sie sich wirklich sicher? Alle Kategorien, Fragen und Statistiken werden gelöscht!')) {
+                const userKey = `user_${this.currentUser}`;
+                localStorage.removeItem(`lernapp_${userKey}_categories`);
+                localStorage.removeItem(`lernapp_${userKey}_questions`);
+                localStorage.removeItem(`lernapp_${userKey}_statistics`);
+
+                this.loadUserData();
+                this.updateDashboard();
+                this.renderCategories();
+                this.renderCategoriesList();
+                this.renderQuestionsList();
+                this.renderStatistics();
+
+                this.showAlert('Alle Daten wurden zurückgesetzt!', 'success');
+            }
+        }
+    }
+
+    updateDashboard() {
+        if (!this.currentUser && !this.isDemo) return;
+
+        // Profil-Seite aktualisieren
+        const profileUsername = document.getElementById('profile-username');
+        const profileDisplayName = document.getElementById('profile-display-name');
+        
+        if (profileUsername && !this.isDemo) {
+            profileUsername.value = this.currentUser;
+            profileDisplayName.value = this.users[this.currentUser].displayName;
+        }
+
+        // Dashboard-Statistiken aktualisieren
+        document.getElementById('dashboard-categories').textContent = this.categories.length;
+        document.getElementById('dashboard-questions').textContent = this.questions.length;
+        
+        const totalQuizzes = Object.values(this.statistics.categoriesPlayed || {})
+            .reduce((sum, cat) => sum + (cat.gamesPlayed || 0), 0);
+        document.getElementById('dashboard-total-played').textContent = totalQuizzes;
+        
+        const successRate = this.statistics.totalQuestions > 0 ? 
+            Math.round((this.statistics.correctAnswers / this.statistics.totalQuestions) * 100) : 0;
+        document.getElementById('dashboard-success-rate').textContent = `${successRate}%`;
+
+        // Sharing-Seite aktualisieren
+        document.getElementById('my-categories-count').textContent = this.categories.length;
+        document.getElementById('my-questions-count').textContent = this.questions.length;
+        this.updateSharedContentList();
+
+        // Last login time
+        const lastLoginElement = document.getElementById('last-login-time');
+        if (lastLoginElement && !this.isDemo && this.users[this.currentUser]) {
+            const lastLogin = this.users[this.currentUser].lastLogin;
+            if (lastLogin) {
+                lastLoginElement.textContent = new Date(lastLogin).toLocaleDateString('de-DE');
+            }
+        }
+    }
+
+    // ==================== EXISTING FUNCTIONALITY ====================
 
     // Admin-Zugang überprüfen
     checkAdminAccess() {
@@ -50,7 +654,10 @@ class LernApp {
         // Admin-Navigation anzeigen
         document.getElementById('admin-nav-item').style.display = 'block';
         document.getElementById('admin-logout-item').style.display = 'block';
-        document.getElementById('admin-login-link').style.display = 'none';
+        const adminLoginLink = document.getElementById('admin-login-link');
+        if (adminLoginLink) {
+            adminLoginLink.style.display = 'none';
+        }
         
         // Admin-Seite normal anzeigen (nicht gesperrt)
         const adminPage = document.getElementById('admin-page');
@@ -64,7 +671,10 @@ class LernApp {
         // Admin-Navigation verstecken
         document.getElementById('admin-nav-item').style.display = 'none';
         document.getElementById('admin-logout-item').style.display = 'none';
-        document.getElementById('admin-login-link').style.display = 'block';
+        const adminLoginLink = document.getElementById('admin-login-link');
+        if (adminLoginLink) {
+            adminLoginLink.style.display = 'block';
+        }
     }
 
     showAdminLogin() {
@@ -113,35 +723,6 @@ class LernApp {
         }, 500);
     }
 
-    lockAdminFeatures() {
-        // Wenn Admin-Seite aufgerufen wird ohne Login, Sperre anzeigen
-        const adminElements = document.querySelectorAll('#admin-page');
-        adminElements.forEach(element => {
-            if (element.id === 'admin-page') {
-                element.innerHTML = `
-                    <div class="container mt-5">
-                        <div class="row justify-content-center">
-                            <div class="col-md-6">
-                                <div class="card border-warning">
-                                    <div class="card-header bg-warning text-dark">
-                                        <h5><i class="bi bi-shield-lock"></i> Zugang verweigert</h5>
-                                    </div>
-                                    <div class="card-body">
-                                        <p>Sie haben keinen Zugang zum Admin-Bereich.</p>
-                                        <p class="text-muted">Klicken Sie auf "Admin" in der Navigation, um sich anzumelden.</p>
-                                        <button onclick="showPage('home')" class="btn btn-primary">
-                                            <i class="bi bi-house"></i> Zur Startseite
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            }
-        });
-    }
-
     unlockAdminAccess() {
         const password = document.getElementById('modal-admin-password').value;
         const correctPassword = 'LernApp2025Admin'; // In Produktion: Sicheres Passwort verwenden
@@ -178,6 +759,211 @@ class LernApp {
             this.hideAdminInterface();
             this.showAlert('Admin-Abmeldung erfolgreich!', 'success');
             showPage('home');
+        }
+    }
+
+    // Einfache Passwort-Hash-Funktion (für Demo-Zwecke)
+    hashPassword(password) {
+        // In einer echten Anwendung sollte eine sichere Hash-Funktion verwendet werden
+        let hash = 0;
+        for (let i = 0; i < password.length; i++) {
+            const char = password.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash; // Convert to 32-bit integer
+        }
+        return 'simple_' + Math.abs(hash).toString(16);
+    }
+
+    // Daten-Integrität prüfen
+    validateDataIntegrity() {
+        try {
+            // Kategorien validieren
+            if (!Array.isArray(this.categories)) {
+                this.categories = ['Allgemein', 'Ordne zu'];
+            }
+
+            // Fragen validieren
+            if (!Array.isArray(this.questions)) {
+                this.questions = [];
+            }
+
+            // Statistiken validieren
+            if (!this.statistics || typeof this.statistics !== 'object') {
+                this.statistics = {
+                    totalQuestions: 0,
+                    correctAnswers: 0,
+                    categoriesPlayed: {},
+                    lastPlayed: null
+                };
+            }
+
+            return true;
+        } catch (error) {
+            console.error('Datenvalidierung fehlgeschlagen:', error);
+            this.showAlert('Fehler bei der Datenvalidierung. Daten werden zurückgesetzt.', 'warning');
+            
+            // Daten zurücksetzen
+            this.categories = ['Allgemein', 'Ordne zu'];
+            this.questions = [];
+            this.statistics = {
+                totalQuestions: 0,
+                correctAnswers: 0,
+                categoriesPlayed: {},
+                lastPlayed: null
+            };
+            
+            return false;
+        }
+    }
+
+    // Beispieldaten laden (nur beim ersten Start)
+    loadSampleData() {
+        if (this.questions.length === 0) {
+            const sampleQuestions = [
+                // Geografie - Text-Fragen mit Text-Antworten
+                {
+                    id: 1,
+                    category: 'Geografie',
+                    question: 'Was ist die Hauptstadt von Deutschland?',
+                    answerType: 'text',
+                    answer: 'Berlin',
+                    questionImage: null,
+                    answerImage: null
+                },
+                {
+                    id: 2,
+                    category: 'Geografie', 
+                    question: 'Was ist die Hauptstadt von Frankreich?',
+                    answerType: 'text',
+                    answer: 'Paris',
+                    questionImage: null,
+                    answerImage: null
+                },
+                {
+                    id: 3,
+                    category: 'Geografie',
+                    question: 'Was ist die Hauptstadt von Italien?',
+                    answerType: 'text',
+                    answer: 'Rom',
+                    questionImage: null,
+                    answerImage: null
+                },
+                {
+                    id: 4,
+                    category: 'Geografie',
+                    question: 'Was ist die Hauptstadt von Spanien?',
+                    answerType: 'text',
+                    answer: 'Madrid',
+                    questionImage: null,
+                    answerImage: null
+                },
+                {
+                    id: 5,
+                    category: 'Geografie',
+                    question: 'Was ist die Hauptstadt von England?',
+                    answerType: 'text',
+                    answer: 'London',
+                    questionImage: null,
+                    answerImage: null
+                },
+                // Beispiel für "Ordne zu" - Text-Fragen mit Bild-Antworten
+                {
+                    id: 6,
+                    category: 'Ordne zu',
+                    question: 'Finde den Apfel',
+                    answerType: 'image',
+                    answer: null,
+                    questionImage: null,
+                    answerImage: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iNTAiIGN5PSI1MCIgcj0iNDAiIGZpbGw9InJlZCIvPjx0ZXh0IHg9IjUwIiB5PSI1NSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0id2hpdGUiIGZvbnQtc2l6ZT0iMTQiPkFwZmVsPC90ZXh0Pjwvc3ZnPg=='
+                },
+                {
+                    id: 7,
+                    category: 'Ordne zu',
+                    question: 'Finde die Banane',
+                    answerType: 'image',
+                    answer: null,
+                    questionImage: null,
+                    answerImage: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGVsbGlwc2UgY3g9IjUwIiBjeT0iNTAiIHJ4PSI0MCIgcnk9IjE1IiBmaWxsPSJ5ZWxsb3ciLz48dGV4dCB4PSI1MCIgeT0iNTUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9ImJsYWNrIiBmb250LXNpemU9IjEyIj5CYW5hbmU8L3RleHQ+PC9zdmc+'
+                },
+                {
+                    id: 8,
+                    category: 'Ordne zu',
+                    question: 'Finde die Orange',
+                    answerType: 'image',
+                    answer: null,
+                    questionImage: null,
+                    answerImage: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iNTAiIGN5PSI1MCIgcj0iNDAiIGZpbGw9Im9yYW5nZSIvPjx0ZXh0IHg9IjUwIiB5PSI1NSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iYmxhY2siIGZvbnQtc2l6ZT0iMTIiPk9yYW5nZTwvdGV4dD48L3N2Zz4='
+                },
+                {
+                    id: 9,
+                    category: 'Ordne zu',
+                    question: 'Finde die Traube',
+                    answerType: 'image',
+                    answer: null,
+                    questionImage: null,
+                    answerImage: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGVsbGlwc2UgY3g9IjUwIiBjeT0iNTAiIHJ4PSIzNSIgcnk9IjQ1IiBmaWxsPSJwdXJwbGUiLz48dGV4dCB4PSI1MCIgeT0iNTUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IndoaXRlIiBmb250LXNpemU9IjEyIj5UcmF1YmU8L3RleHQ+PC9zdmc+'
+                }
+            ];
+
+            this.questions = sampleQuestions;
+            this.saveUserData();
+        }
+
+        // Beispiel-Kategorien hinzufügen
+        if (!this.categories.includes('Geografie')) {
+            this.categories.push('Geografie');
+            this.saveUserData();
+        }
+    }
+
+    setupEventListeners() {
+        // Frage-Formular
+        const questionForm = document.getElementById('question-form');
+        if (questionForm) {
+            questionForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.addQuestion();
+            });
+        }
+
+        // Neue Kategorie
+        const newCategoryInput = document.getElementById('new-category');
+        if (newCategoryInput) {
+            newCategoryInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    this.addCategory();
+                }
+            });
+        }
+
+        // Antwort-Typ-Wechsel
+        document.querySelectorAll('input[name="answer-type"]').forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                this.toggleAnswerTypeSection(e.target.value);
+            });
+        });
+
+        // Bild-Upload mit Vorschau
+        const sharedImageInput = document.getElementById('shared-image-input');
+        if (sharedImageInput) {
+            sharedImageInput.addEventListener('change', (e) => {
+                this.handleImageUpload(e, 'shared');
+            });
+        }
+        
+        const answerImageInput = document.getElementById('answer-image-input');
+        if (answerImageInput) {
+            answerImageInput.addEventListener('change', (e) => {
+                this.handleImageUpload(e, 'answer');
+            });
+        }
+
+        // Filter für Fragen-Liste
+        const filterCategory = document.getElementById('filter-category');
+        if (filterCategory) {
+            filterCategory.addEventListener('change', () => {
+                this.renderQuestionsList();
+            });
         }
     }
 
