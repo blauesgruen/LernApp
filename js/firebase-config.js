@@ -37,12 +37,12 @@ import {
 // Firebase Konfiguration
 const firebaseConfig = {
     // WICHTIG: Diese Werte müssen durch Ihre echten Firebase-Werte ersetzt werden
-    apiKey: "YOUR_FIREBASE_API_KEY_HERE",
-    authDomain: "ihr-projekt.firebaseapp.com",
-    projectId: "ihr-projekt-id",
-    storageBucket: "ihr-projekt.appspot.com",
-    messagingSenderId: "123456789012",
-    appId: "1:123456789012:web:ihre-app-id-hier"
+    apiKey: "YOUR_API_KEY_HERE",
+    authDomain: "lernapp-demo.firebaseapp.com",
+    projectId: "lernapp-demo",
+    storageBucket: "lernapp-demo.appspot.com",
+    messagingSenderId: "123456789",
+    appId: "1:123456789:web:abcdef123456"
 };
 
 // Firebase initialisieren

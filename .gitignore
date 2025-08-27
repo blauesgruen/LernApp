@@ -25,16 +25,3 @@ Thumbs.db
 # Backup files
 *.bak
 *~
-
-# Firebase-Konfigurationsdateien mit echten API-Keys
-js/firebase-config-real.js
-js/firebase-config-prod.js
-
-# Environment-Dateien
-.env
-.env.local
-.env.production
-
-# Temporäre Dateien
-.tmp/
-temp/
