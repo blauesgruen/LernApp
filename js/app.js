@@ -1,6 +1,21 @@
 // LernApp - Hauptlogik
 
 class LernApp {
+    // Umschalten der Felder je nach Kategorie
+    onCategorySelectChange() {
+        const select = document.getElementById('question-category');
+        const imageOnlyFields = document.getElementById('imageonly-fields');
+        const defaultFields = document.getElementById('default-fields');
+        const catName = select.value;
+        const catObj = this.getCategoryObj ? this.getCategoryObj(catName) : null;
+        if (catObj && catObj.nurBildAntworten) {
+            imageOnlyFields.style.display = '';
+            defaultFields.style.display = 'none';
+        } else {
+            imageOnlyFields.style.display = 'none';
+            defaultFields.style.display = '';
+        }
+    }
     // Zeigt den aktuellen Speicherort im Header an (sofern Cloud/Ordner gewählt)
     updateStorageLocationInfo() {
         const infoElem = document.getElementById('storage-location-info');
@@ -1255,10 +1270,25 @@ class LernApp {
         
         const category = document.getElementById('question-category').value;
         const questionText = document.getElementById('question-input').value.trim();
-        const answerType = document.querySelector('input[name="answer-type"]:checked').value;
-        const answerText = document.getElementById('answer-input').value.trim();
-        const sharedImageInput = document.getElementById('shared-image-input');
-        const answerImageInput = document.getElementById('answer-image-input');
+        const select = document.getElementById('question-category');
+        const catName = select.value;
+        const catObj = this.getCategoryObj ? this.getCategoryObj(catName) : null;
+        let qText, answerType, answerText, answerImageInput, descriptionInput, sharedImageInput;
+        if (catObj && catObj.nurBildAntworten) {
+            qText = document.getElementById('question-input').value.trim();
+            answerImageInput = document.getElementById('answer-image-input');
+            descriptionInput = document.getElementById('ordnezu-description-input');
+            answerType = 'image';
+            answerText = null;
+            sharedImageInput = null;
+        } else {
+            qText = document.getElementById('default-question-input').value.trim();
+            answerType = document.querySelector('input[name="answer-type"]:checked').value;
+            answerText = document.getElementById('answer-input').value.trim();
+            sharedImageInput = document.getElementById('shared-image-input');
+            answerImageInput = document.getElementById('default-answer-image-input');
+            descriptionInput = null;
+        }
 
         // Validierung
         if (!category) {
@@ -1266,45 +1296,42 @@ class LernApp {
             return;
         }
 
-        // Validierung: Entweder Frage-Text oder Frage-Bild muss vorhanden sein
-        if (!questionText && !sharedImageInput.files[0]) {
-            this.showAlert('Bitte geben Sie entweder einen Frage-Text ein oder laden Sie ein Frage-Bild hoch!', 'danger');
-            return;
-        }
-
-        // Validierung: Je nach Antwort-Typ
-        if (answerType === 'text' && !answerText) {
-            this.showAlert('Bitte geben Sie einen Antwort-Text ein!', 'danger');
-            return;
-        }
-        
-        if (answerType === 'image' && !answerImageInput.files[0]) {
-            this.showAlert('Bitte laden Sie ein Antwort-Bild hoch!', 'danger');
-            return;
-        }
-
-        // Spezielle Validierung für "Ordne zu" Kategorie
-        if (category && category.startsWith('Ordne zu')) {
-            if (!questionText) {
-                this.showAlert('Für die Kategorie "Ordne zu" ist ein Frage-Text erforderlich (z.B. "Finde den Apfel")!', 'danger');
+        // Nur für "Ordne zu": Pflichtfelder prüfen
+        if (catObj && catObj.nurBildAntworten) {
+            if (!qText) {
+                this.showAlert('Für diese Kategorie ist ein Frage-Text erforderlich!', 'danger');
                 return;
             }
-            if (answerType !== 'image' || !answerImageInput.files[0]) {
-                this.showAlert('Für die Kategorie "Ordne zu" ist ein Antwort-Bild erforderlich!', 'danger');
+            if (!answerImageInput.files[0]) {
+                this.showAlert('Für diese Kategorie ist ein Antwort-Bild erforderlich!', 'danger');
                 return;
             }
         }
 
         // Neue Frage erstellen
-        const newQuestion = {
-            id: Date.now(),
-            category: category,
-            question: questionText || null,
-            answerType: answerType,
-            answer: answerType === 'text' ? answerText : null,
-            questionImage: null,
-            answerImage: null
-        };
+        let newQuestion;
+        if (catObj && catObj.nurBildAntworten) {
+            newQuestion = {
+                id: Date.now(),
+                category: catName,
+                question: qText || null,
+                answerType: 'image',
+                answer: null,
+                questionImage: null,
+                answerImage: null,
+                description: descriptionInput ? descriptionInput.value.trim() : ''
+            };
+        } else {
+            newQuestion = {
+                id: Date.now(),
+                category: catName,
+                question: qText || null,
+                answerType: answerType,
+                answer: answerType === 'text' ? answerText : null,
+                questionImage: null,
+                answerImage: null
+            };
+        }
 
         // Bilder verarbeiten
         const processImages = () => {
@@ -1318,26 +1345,37 @@ class LernApp {
                 }
             };
 
-            // Frage-Bild verarbeiten
-            if (sharedImageInput.files[0]) {
-                imagesToProcess++;
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    newQuestion.questionImage = e.target.result;
-                    checkComplete();
-                };
-                reader.readAsDataURL(sharedImageInput.files[0]);
-            }
-
-            // Antwort-Bild verarbeiten (nur bei answerType === 'image')
-            if (answerType === 'image' && answerImageInput.files[0]) {
-                imagesToProcess++;
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    newQuestion.answerImage = e.target.result;
-                    checkComplete();
-                };
-                reader.readAsDataURL(answerImageInput.files[0]);
+            if (catObj && catObj.nurBildAntworten) {
+                if (answerImageInput.files[0]) {
+                    imagesToProcess++;
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        newQuestion.answerImage = e.target.result;
+                        checkComplete();
+                    };
+                    reader.readAsDataURL(answerImageInput.files[0]);
+                }
+            } else {
+                // Frage-Bild verarbeiten
+                if (sharedImageInput && sharedImageInput.files[0]) {
+                    imagesToProcess++;
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        newQuestion.questionImage = e.target.result;
+                        checkComplete();
+                    };
+                    reader.readAsDataURL(sharedImageInput.files[0]);
+                }
+                // Antwort-Bild verarbeiten (nur bei answerType === 'image')
+                if (answerType === 'image' && answerImageInput.files[0]) {
+                    imagesToProcess++;
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        newQuestion.answerImage = e.target.result;
+                        checkComplete();
+                    };
+                    reader.readAsDataURL(answerImageInput.files[0]);
+                }
             }
 
             // Wenn keine Bilder zu verarbeiten sind
@@ -1383,19 +1421,18 @@ class LernApp {
         const container = document.getElementById('category-buttons');
         if (!container) return;
 
-        const nonSpecialCategories = this.categories.filter(cat => cat !== 'Ordne zu');
-        
-        container.innerHTML = nonSpecialCategories.map(category => {
-            const questionCount = this.questions.filter(q => q.category === category).length;
+        const normalCategories = this.categories.filter(cat => !cat.nurBildAntworten);
+        container.innerHTML = normalCategories.map(cat => {
+            const name = cat.name || cat;
+            const questionCount = this.questions.filter(q => q.category === name).length;
             const isDisabled = questionCount < 4 ? 'disabled' : '';
             const disabledClass = questionCount < 4 ? 'btn-outline-secondary' : 'btn-outline-primary';
-            
             return `
                 <button class="btn ${disabledClass} m-2 px-4 py-3" 
-                        onclick="window.app.startQuiz('${category}')" ${isDisabled}>
+                        onclick="window.app.startQuiz('${name}')" ${isDisabled}>
                     <div class="d-flex flex-column align-items-center">
                         <i class="bi bi-folder fs-4 mb-2"></i>
-                        <span class="fw-bold">${category}</span>
+                        <span class="fw-bold">${name}</span>
                         <small class="text-muted">${questionCount} Fragen</small>
                         ${questionCount < 4 ? '<small class="text-danger">Min. 4 Fragen nötig</small>' : ''}
                     </div>
@@ -1403,37 +1440,20 @@ class LernApp {
             `;
         }).join('');
 
-        // Spezielle "Ordne zu" Kategorie - sammelt alle Fragen mit Bild-Antworten
-        const allImageQuestions = this.questions.filter(q => q.answerType === 'image');
-        const imageQuestionsByCategory = {};
-        
-        // Gruppiere Bild-Fragen nach Kategorien
-        allImageQuestions.forEach(q => {
-            if (q.category !== 'Ordne zu') { // Ausschließlich normale Kategorien
-                if (!imageQuestionsByCategory[q.category]) {
-                    imageQuestionsByCategory[q.category] = [];
-                }
-                imageQuestionsByCategory[q.category].push(q);
-            }
+        // Spezial-Quiz: Alle Fragen aus nurBildAntworten-Kategorien
+        const imageOnlyQuestions = this.questions.filter(q => {
+            const catObj = this.getCategoryObj ? this.getCategoryObj(q.category) : null;
+            return catObj && catObj.nurBildAntworten;
         });
-        
-        // Nur anzeigen wenn mindestens eine Kategorie 4+ Bild-Fragen hat
-        const availableImageCategories = Object.keys(imageQuestionsByCategory).filter(
-            cat => imageQuestionsByCategory[cat].length >= 4
-        );
-        
-        if (availableImageCategories.length > 0) {
-            const totalImageQuestions = Object.values(imageQuestionsByCategory)
-                .reduce((sum, questions) => sum + questions.length, 0);
-                
+        if (imageOnlyQuestions.length >= 4) {
             container.innerHTML += `
                 <button class="btn btn-outline-success m-2 px-4 py-3" 
-                        onclick="window.app.startOrderQuiz()">
+                        onclick="window.app.startImageOnlyQuiz()">
                     <div class="d-flex flex-column align-items-center">
-                        <i class="bi bi-search fs-4 mb-2"></i>
-                        <span class="fw-bold">Ordne zu</span>
-                        <small class="text-muted">${totalImageQuestions} Bild-Fragen aus ${availableImageCategories.length} Kategorien</small>
-                        <small class="text-success">Mischt alle Kategorien</small>
+                        <i class="bi bi-images fs-4 mb-2"></i>
+                        <span class="fw-bold">Bild-Zuordnung</span>
+                        <small class="text-muted">${imageOnlyQuestions.length} Bild-Fragen</small>
+                        <small class="text-success">Alle Bild-Kategorien</small>
                     </div>
                 </button>
             `;
@@ -1441,10 +1461,9 @@ class LernApp {
             container.innerHTML += `
                 <button class="btn btn-outline-secondary m-2 px-4 py-3" disabled>
                     <div class="d-flex flex-column align-items-center">
-                        <i class="bi bi-search fs-4 mb-2"></i>
-                        <span class="fw-bold">Ordne zu</span>
-                        <small class="text-muted">Keine Bild-Fragen verfügbar</small>
-                        <small class="text-danger">Min. 4 Bild-Fragen in einer Kategorie nötig</small>
+                        <i class="bi bi-images fs-4 mb-2"></i>
+                        <span class="fw-bold">Bild-Zuordnung</span>
+                        <small class="text-muted">Mind. 4 Bild-Fragen nötig</small>
                     </div>
                 </button>
             `;
@@ -1551,35 +1570,11 @@ class LernApp {
         const modal = new bootstrap.Modal(document.getElementById('edit-question-modal'));
         // Felder befüllen
         document.getElementById('edit-question-input').value = q.question || '';
-        document.getElementById('edit-answer-input').value = q.answer || '';
-        document.getElementById('edit-explanation-input').value = q.explanation || '';
-        // Antworttyp
-        const answerTypeSelect = document.getElementById('edit-answer-type-select');
-        answerTypeSelect.value = q.answerType || 'text';
+        document.getElementById('edit-answer-image-input').value = '';
+        document.getElementById('edit-explanation-input').value = q.description || '';
         // Kategorie-Auswahl
         const select = document.getElementById('edit-category-select');
         select.innerHTML = this.categories.map(cat => `<option value="${cat}"${cat === q.category ? ' selected' : ''}>${cat}</option>`).join('');
-        // Frage-Bild
-        const questionImageInput = document.getElementById('edit-question-image-input');
-        const questionImagePreview = document.getElementById('edit-question-image-preview');
-        questionImageInput.value = '';
-        if (q.questionImage) {
-            questionImagePreview.innerHTML = `<img src="${q.questionImage}" alt="Frage-Bild" style="max-width:100px;max-height:100px;">`;
-        } else {
-            questionImagePreview.innerHTML = '';
-        }
-        questionImageInput.onchange = (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = ev => {
-                    questionImagePreview.innerHTML = `<img src="${ev.target.result}" alt="Frage-Bild" style="max-width:100px;max-height:100px;">`;
-                };
-                reader.readAsDataURL(file);
-            } else {
-                questionImagePreview.innerHTML = '';
-            }
-        };
         // Antwort-Bild
         const answerImageInput = document.getElementById('edit-answer-image-input');
         const answerImagePreview = document.getElementById('edit-answer-image-preview');
@@ -1604,45 +1599,20 @@ class LernApp {
         // Speichern-Button
         document.getElementById('save-question-edit').onclick = () => {
             const newQ = document.getElementById('edit-question-input').value.trim();
-            const newA = document.getElementById('edit-answer-input').value.trim();
             const newC = select.value;
-            const newType = answerTypeSelect.value;
-            const newExplanation = document.getElementById('edit-explanation-input').value.trim();
-            // Bilder ggf. übernehmen
-            const qImgFile = questionImageInput.files[0];
+            const newDescription = document.getElementById('edit-explanation-input').value.trim();
             const aImgFile = answerImageInput.files[0];
             const updateAndSave = () => {
                 q.question = newQ;
                 q.category = newC;
-                q.answerType = newType;
-                q.explanation = newExplanation;
-                if (newType === 'text') {
-                    q.answer = newA;
-                    q.answerImage = '';
-                } else {
-                    q.answer = '';
-                }
+                q.answerType = 'image';
+                q.answer = null;
+                q.description = newDescription;
                 this.saveToStorage('questions', this.questions);
                 this.renderQuestionsList();
                 modal.hide();
             };
-            if (qImgFile) {
-                const reader = new FileReader();
-                reader.onload = ev => {
-                    q.questionImage = ev.target.result;
-                    if (newType === 'image' && aImgFile) {
-                        const reader2 = new FileReader();
-                        reader2.onload = ev2 => {
-                            q.answerImage = ev2.target.result;
-                            updateAndSave();
-                        };
-                        reader2.readAsDataURL(aImgFile);
-                    } else {
-                        updateAndSave();
-                    }
-                };
-                reader.readAsDataURL(qImgFile);
-            } else if (newType === 'image' && aImgFile) {
+            if (aImgFile) {
                 const reader2 = new FileReader();
                 reader2.onload = ev2 => {
                     q.answerImage = ev2.target.result;
@@ -1650,8 +1620,7 @@ class LernApp {
                 };
                 reader2.readAsDataURL(aImgFile);
             } else {
-                if (!qImgFile) q.questionImage = q.questionImage || '';
-                if (newType === 'image' && !aImgFile) q.answerImage = q.answerImage || '';
+                if (!aImgFile) q.answerImage = q.answerImage || '';
                 updateAndSave();
             }
         };

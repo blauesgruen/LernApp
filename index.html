@@ -673,74 +673,73 @@
                                     <form id="question-form">
                                         <div class="mb-3">
                                             <label for="question-category" class="form-label">Kategorie</label>
-                                            <select class="form-select" id="question-category" required>
+                                            <select class="form-select" id="question-category" required onchange="app.onCategorySelectChange && app.onCategorySelectChange()">
                                                 <option value="">Kategorie wählen...</option>
                                             </select>
                                         </div>
                                         
-                                        <div class="mb-3">
-                                            <label class="form-label">Frage</label>
-                                            <div class="row">
-                                                <div class="col-md-12">
-                                                    <label for="question-input" class="form-label text-muted">Frage-Text (optional)</label>
-                                                    <textarea class="form-control" id="question-input" rows="2" placeholder="z.B. Was ist die Hauptstadt von Deutschland?"></textarea>
-                                                </div>
+                                        <div id="imageonly-fields" style="display:none">
+                                            <div class="mb-3">
+                                                <label class="form-label">Frage</label>
+                                                <textarea class="form-control" id="question-input" rows="2" placeholder="z.B. Finde den Apfel" required></textarea>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="answer-image-input" class="form-label">Antwort-Bild</label>
+                                                <input type="file" class="form-control" id="answer-image-input" accept="image/*" required>
+                                                <div id="answer-image-preview" class="mt-2"></div>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="ordnezu-description-input" class="form-label">Beschreibung (optional)</label>
+                                                <textarea class="form-control" id="ordnezu-description-input" rows="2" placeholder="z.B. Zusatzinfo zur Antwort"></textarea>
                                             </div>
                                         </div>
-
-                                        <div class="mb-3">
-                                            <label for="shared-image-input" class="form-label">Frage-Bild (optional)</label>
-                                            <input type="file" class="form-control" id="shared-image-input" accept="image/*">
-                                            <div id="shared-image-preview" class="mt-2"></div>
-                                            <small class="form-text text-muted">Wird bei der Frage angezeigt</small>
-                                        </div>
-
-                                        <div class="mb-3">
-                                            <label class="form-label">Antwort-Typ wählen</label>
-                                            <div class="row">
-                                                <div class="col-md-6">
-                                                    <div class="card">
-                                                        <div class="card-body text-center">
-                                                            <input type="radio" class="form-check-input" name="answer-type" id="text-answer" value="text" checked>
-                                                            <label for="text-answer" class="form-check-label d-block">
-                                                                <i class="bi bi-fonts fs-2 d-block mb-2"></i>
-                                                                <strong>Text-Antwort</strong>
-                                                            </label>
+                                        <div id="default-fields">
+                                            <div class="mb-3">
+                                                <label class="form-label">Frage</label>
+                                                <textarea class="form-control" id="default-question-input" rows="2" placeholder="z.B. Was ist die Hauptstadt von Deutschland?"></textarea>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="shared-image-input" class="form-label">Frage-Bild (optional)</label>
+                                                <input type="file" class="form-control" id="shared-image-input" accept="image/*">
+                                                <div id="shared-image-preview" class="mt-2"></div>
+                                                <small class="form-text text-muted">Wird bei der Frage angezeigt</small>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label">Antwort-Typ wählen</label>
+                                                <div class="row">
+                                                    <div class="col-md-6">
+                                                        <div class="card">
+                                                            <div class="card-body text-center">
+                                                                <input type="radio" class="form-check-input" name="answer-type" id="text-answer" value="text" checked>
+                                                                <label for="text-answer" class="form-check-label d-block">
+                                                                    <i class="bi bi-fonts fs-2 d-block mb-2"></i>
+                                                                    <strong>Text-Antwort</strong>
+                                                                </label>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <div class="card">
+                                                            <div class="card-body text-center">
+                                                                <input type="radio" class="form-check-input" name="answer-type" id="image-answer" value="image">
+                                                                <label for="image-answer" class="form-check-label d-block">
+                                                                    <i class="bi bi-image fs-2 d-block mb-2"></i>
+                                                                    <strong>Bild-Antwort</strong>
+                                                                </label>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
-                                                <div class="col-md-6">
-                                                    <div class="card">
-                                                        <div class="card-body text-center">
-                                                            <input type="radio" class="form-check-input" name="answer-type" id="image-answer" value="image">
-                                                            <label for="image-answer" class="form-check-label d-block">
-                                                                <i class="bi bi-image fs-2 d-block mb-2"></i>
-                                                                <strong>Bild-Antwort</strong>
-                                                            </label>
-                                                        </div>
-                                                    </div>
-                                                </div>
                                             </div>
-                                        </div>
-
-                                        <div id="text-answer-section" class="mb-3">
-                                            <label for="answer-input" class="form-label">Antwort-Text</label>
-                                            <input type="text" class="form-control" id="answer-input" placeholder="z.B. Berlin">
-                                        </div>
-
-                                        <div id="image-answer-section" class="mb-3 d-none">
-                                            <label for="answer-image-input" class="form-label">Antwort-Bild</label>
-                                            <input type="file" class="form-control" id="answer-image-input" accept="image/*">
-                                            <div id="answer-image-preview" class="mt-2"></div>
-                                        </div>
-
-                                        <div class="alert alert-info">
-                                            <h6><i class="bi bi-info-circle"></i> Antwort-Typen:</h6>
-                                            <ul class="mb-0 small">
-                                                <li><strong>Text-Antwort:</strong> Antwort wird als Text angezeigt</li>
-                                                <li><strong>Bild-Antwort:</strong> Antwort wird als Bild angezeigt</li>
-                                                <li><strong>Kategorie "Ordne zu":</strong> Text-Frage mit Bild-Antworten (z.B. "Finde den Apfel" → verschiedene Bilder zur Auswahl)</li>
-                                            </ul>
+                                            <div id="text-answer-section" class="mb-3">
+                                                <label for="answer-input" class="form-label">Antwort-Text</label>
+                                                <input type="text" class="form-control" id="answer-input" placeholder="z.B. Berlin">
+                                            </div>
+                                            <div id="image-answer-section" class="mb-3 d-none">
+                                                <label for="default-answer-image-input" class="form-label">Antwort-Bild</label>
+                                                <input type="file" class="form-control" id="default-answer-image-input" accept="image/*">
+                                                <div id="default-answer-image-preview" class="mt-2"></div>
+                                            </div>
                                         </div>
 
                                         <button type="submit" class="btn btn-success">
