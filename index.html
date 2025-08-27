@@ -352,6 +352,17 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- Speicherort & Synchronisation -->
+                    <div class="card mt-4">
+                        <div class="card-header">Speicherort & Synchronisation</div>
+                        <div class="card-body">
+                            <button class="btn btn-outline-primary mb-2" onclick="chooseLernAppStorageDir()">Speicherort wählen (z.B. Cloud-Ordner)</button>
+                            <div class="mb-2 text-muted" id="cloud-hint"> <script>document.write(getLernAppCloudHint())</script> </div>
+                            <button class="btn btn-outline-secondary mb-2" onclick="exportLernAppData(window.app?.getUserData ? window.app.getUserData() : window.app?.userData)">Datenbank exportieren</button>
+                            <button class="btn btn-outline-secondary mb-2" onclick="importLernAppData().then(data => { if(data && window.app?.setUserData) window.app.setUserData(data); })">Datenbank importieren</button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

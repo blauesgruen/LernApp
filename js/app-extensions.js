@@ -551,3 +551,133 @@ const quizStyles = `
 
 // Styles zum Head hinzufügen
 document.head.insertAdjacentHTML('beforeend', quizStyles);
+
+import { LocalCloudStorage, getCloudHint } from './local-cloud-storage.js';
+
+// Instanz für lokalen/Cloud-Speicher
+window.lernappCloudStorage = new LocalCloudStorage();
+
+// UI: Speicherort wählen
+window.chooseLernAppStorageDir = async function() {
+    const ok = await window.lernappCloudStorage.chooseDirectory();
+    if (ok) {
+        alert('Speicherort gewählt! Ihre Daten werden ab sofort dort gespeichert.\n' + getCloudHint());
+    }
+};
+
+// UI: Datenbank speichern
+window.saveLernAppDataToCloud = async function(data) {
+    try {
+        await window.lernappCloudStorage.saveData(data);
+        alert('Datenbank erfolgreich gespeichert!');
+    } catch (e) {
+        alert('Fehler beim Speichern: ' + e.message);
+    }
+};
+
+// UI: Datenbank laden
+window.loadLernAppDataFromCloud = async function() {
+    try {
+        const data = await window.lernappCloudStorage.loadData();
+        alert('Datenbank erfolgreich geladen!');
+        return data;
+    } catch (e) {
+        alert('Fehler beim Laden: ' + e.message);
+        return null;
+    }
+};
+
+// UI: Export/Import (Fallback)
+window.exportLernAppData = function(data) {
+    LocalCloudStorage.exportData(data);
+};
+window.importLernAppData = async function() {
+    try {
+        const data = await LocalCloudStorage.importData();
+        alert('Daten erfolgreich importiert!');
+        return data;
+    } catch (e) {
+        alert('Fehler beim Import: ' + e);
+        return null;
+    }
+};
+
+// Cloud-Hinweis für UI
+window.getLernAppCloudHint = getCloudHint;
+
+// Automatisches Speichern nach jeder Änderung
+window.lernappAutoSave = function(data) {
+    if (window.lernappCloudStorage && window.lernappCloudStorage.dirHandle) {
+        window.lernappCloudStorage.saveDataAuto(data);
+    }
+};
+// Beispiel: Nach jeder Änderung in der App aufrufen:
+// window.lernappAutoSave(app.getUserData());
+
+// Beispielintegration für automatisches Speichern:
+// Diese Funktionen sollten in Ihrer App nach jeder relevanten Änderung aufgerufen werden.
+
+// Nach Hinzufügen einer Frage
+window.lernappAddQuestion = function(questionObj) {
+    if (!window.app || !window.app.questions) return;
+    window.app.questions.push(questionObj);
+    if (window.app.getUserData) {
+        window.lernappAutoSave(window.app.getUserData());
+    }
+};
+
+// Nach Bearbeiten einer Frage
+window.lernappEditQuestion = function(index, newQuestionObj) {
+    if (!window.app || !window.app.questions) return;
+    window.app.questions[index] = newQuestionObj;
+    if (window.app.getUserData) {
+        window.lernappAutoSave(window.app.getUserData());
+    }
+};
+
+// Nach Löschen einer Frage
+window.lernappDeleteQuestion = function(index) {
+    if (!window.app || !window.app.questions) return;
+    window.app.questions.splice(index, 1);
+    if (window.app.getUserData) {
+        window.lernappAutoSave(window.app.getUserData());
+    }
+};
+
+// Nach Hinzufügen einer Kategorie
+window.lernappAddCategory = function(category) {
+    if (!window.app || !window.app.categories) return;
+    window.app.categories.push(category);
+    if (window.app.getUserData) {
+        window.lernappAutoSave(window.app.getUserData());
+    }
+};
+
+// Nach Bearbeiten von Einstellungen
+window.lernappUpdateSettings = function(settingsObj) {
+    if (!window.app || !window.app.userData) return;
+    window.app.userData.settings = settingsObj;
+    if (window.app.getUserData) {
+        window.lernappAutoSave(window.app.getUserData());
+    }
+};
+
+// Komfortabler Ordner-Dialog nach Login
+window.lernappCheckUserFolder = async function(username) {
+    if (!username) return;
+    const lastFolder = window.LocalCloudStorage.getUserFolderName(username);
+    if (lastFolder) {
+        if (confirm(`Für dieses Konto wurde zuletzt der Ordner "${lastFolder}" verwendet.\nMöchten Sie diesen Ordner erneut auswählen, um die Synchronisation zu aktivieren?`)) {
+            const ok = await window.lernappCloudStorage.chooseDirectory();
+            if (ok && window.lernappCloudStorage.dirHandle && window.lernappCloudStorage.dirHandle.name === lastFolder) {
+                alert('Ordner erfolgreich bestätigt! Automatische Synchronisation ist aktiv.');
+                window.lernappCloudStorage.setUserFolderName(username);
+            } else if (ok) {
+                alert('Sie haben einen anderen Ordner gewählt. Die Synchronisation ist jetzt mit diesem Ordner aktiv.');
+                window.lernappCloudStorage.setUserFolderName(username);
+            } else {
+                alert('Keine Synchronisation aktiviert.');
+            }
+        }
+    }
+};
