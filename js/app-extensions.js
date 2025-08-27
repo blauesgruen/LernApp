@@ -564,9 +564,16 @@ window.lernappCloudStorage = new LocalCloudStorage();
 
 // UI: Speicherort wählen
 window.chooseLernAppStorageDir = async function() {
-    const ok = await window.lernappCloudStorage.chooseDirectory();
-    if (ok) {
-        alert('Speicherort gewählt! Ihre Daten werden ab sofort dort gespeichert.\n' + getCloudHint());
+    if (!window.lernappCloudStorage) {
+        window.lernappCloudStorage = new LocalCloudStorage();
+    }
+    if (typeof window.lernappCloudStorage.chooseDirectory === 'function') {
+        const ok = await window.lernappCloudStorage.chooseDirectory();
+        if (ok) {
+            alert('Speicherort gewählt! Ihre Daten werden ab sofort dort gespeichert.\n' + getCloudHint());
+        }
+    } else {
+        alert('Speicherfunktion nicht verfügbar.');
     }
 };
 
