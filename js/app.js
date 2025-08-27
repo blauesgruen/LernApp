@@ -1,6 +1,20 @@
 // LernApp - Hauptlogik
 
 class LernApp {
+    // Zeigt den aktuellen Speicherort im Header an (sofern Cloud/Ordner gewählt)
+    updateStorageLocationInfo() {
+        const infoElem = document.getElementById('storage-location-info');
+        const nameElem = document.getElementById('storage-location-name');
+        if (!window.lernappCloudStorage || !infoElem || !nameElem) return;
+        const dirHandle = window.lernappCloudStorage.dirHandle;
+        if (dirHandle && dirHandle.name) {
+            nameElem.textContent = dirHandle.name;
+            infoElem.classList.remove('d-none');
+        } else {
+            nameElem.textContent = '';
+            infoElem.classList.add('d-none');
+        }
+    }
     // ========== ADMIN USER MANAGEMENT ==========
     renderAdminUsersList() {
         const container = document.getElementById('admin-users-list');
@@ -2547,4 +2561,7 @@ function restartQuiz() {
 // App initialisieren
 document.addEventListener('DOMContentLoaded', () => {
     window.app = new LernApp();
+    if (window.app.updateStorageLocationInfo) {
+        window.app.updateStorageLocationInfo();
+    }
 });

@@ -19,9 +19,15 @@ export class LocalCloudStorage {
         try {
             this.dirHandle = await window.showDirectoryPicker();
             await this.saveDirHandle();
+            if (window.app && window.app.updateStorageLocationInfo) {
+                window.app.updateStorageLocationInfo();
+            }
             return true;
         } catch (e) {
             alert('Ordnerauswahl abgebrochen oder nicht erlaubt.');
+            if (window.app && window.app.updateStorageLocationInfo) {
+                window.app.updateStorageLocationInfo();
+            }
             return false;
         }
     }
@@ -69,6 +75,9 @@ export class LocalCloudStorage {
             } catch (e) {
                 this.dirHandle = null;
             }
+        }
+        if (window.app && window.app.updateStorageLocationInfo) {
+            window.app.updateStorageLocationInfo();
         }
     }
 
