@@ -771,9 +771,25 @@
                                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                             </div>
                             <div class="modal-body">
+                                <label class="form-label">Fragetext</label>
                                 <input type="text" class="form-control mb-2" id="edit-question-input">
+                                <label class="form-label">Antwort</label>
                                 <input type="text" class="form-control mb-2" id="edit-answer-input">
+                                <label class="form-label">Antworttyp</label>
+                                <select class="form-select mb-2" id="edit-answer-type-select">
+                                    <option value="text">Text</option>
+                                    <option value="image">Bild</option>
+                                </select>
+                                <label class="form-label">Kategorie</label>
                                 <select class="form-select mb-2" id="edit-category-select"></select>
+                                <label class="form-label">Frage-Bild (optional)</label>
+                                <input type="file" class="form-control mb-2" id="edit-question-image-input" accept="image/*">
+                                <div id="edit-question-image-preview" class="mb-2"></div>
+                                <label class="form-label">Antwort-Bild (optional, falls Antworttyp Bild)</label>
+                                <input type="file" class="form-control mb-2" id="edit-answer-image-input" accept="image/*">
+                                <div id="edit-answer-image-preview" class="mb-2"></div>
+                                <label class="form-label">Erklärung/Beschreibung (optional)</label>
+                                <textarea class="form-control mb-2" id="edit-explanation-input" rows="2"></textarea>
                             </div>
                             <div class="modal-footer">
                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>

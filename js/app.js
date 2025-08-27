@@ -1663,22 +1663,111 @@ class LernApp {
         const q = this.questions.find(q => q.id === id);
         if (!q) return;
         const modal = new bootstrap.Modal(document.getElementById('edit-question-modal'));
+        // Felder befüllen
         document.getElementById('edit-question-input').value = q.question || '';
         document.getElementById('edit-answer-input').value = q.answer || '';
-        // Kategorie-Auswahl füllen
+        document.getElementById('edit-explanation-input').value = q.explanation || '';
+        // Antworttyp
+        const answerTypeSelect = document.getElementById('edit-answer-type-select');
+        answerTypeSelect.value = q.answerType || 'text';
+        // Kategorie-Auswahl
         const select = document.getElementById('edit-category-select');
         select.innerHTML = this.categories.map(cat => `<option value="${cat}"${cat === q.category ? ' selected' : ''}>${cat}</option>`).join('');
+        // Frage-Bild
+        const questionImageInput = document.getElementById('edit-question-image-input');
+        const questionImagePreview = document.getElementById('edit-question-image-preview');
+        questionImageInput.value = '';
+        if (q.questionImage) {
+            questionImagePreview.innerHTML = `<img src="${q.questionImage}" alt="Frage-Bild" style="max-width:100px;max-height:100px;">`;
+        } else {
+            questionImagePreview.innerHTML = '';
+        }
+        questionImageInput.onchange = (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = ev => {
+                    questionImagePreview.innerHTML = `<img src="${ev.target.result}" alt="Frage-Bild" style="max-width:100px;max-height:100px;">`;
+                };
+                reader.readAsDataURL(file);
+            } else {
+                questionImagePreview.innerHTML = '';
+            }
+        };
+        // Antwort-Bild
+        const answerImageInput = document.getElementById('edit-answer-image-input');
+        const answerImagePreview = document.getElementById('edit-answer-image-preview');
+        answerImageInput.value = '';
+        if (q.answerImage) {
+            answerImagePreview.innerHTML = `<img src="${q.answerImage}" alt="Antwort-Bild" style="max-width:100px;max-height:100px;">`;
+        } else {
+            answerImagePreview.innerHTML = '';
+        }
+        answerImageInput.onchange = (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = ev => {
+                    answerImagePreview.innerHTML = `<img src="${ev.target.result}" alt="Antwort-Bild" style="max-width:100px;max-height:100px;">`;
+                };
+                reader.readAsDataURL(file);
+            } else {
+                answerImagePreview.innerHTML = '';
+            }
+        };
+        // Speichern-Button
         document.getElementById('save-question-edit').onclick = () => {
             const newQ = document.getElementById('edit-question-input').value.trim();
             const newA = document.getElementById('edit-answer-input').value.trim();
             const newC = select.value;
-            if (!newC) { alert('Kategorie wählen!'); return; }
-            q.question = newQ;
-            if (q.answerType === 'text') q.answer = newA;
-            q.category = newC;
-            this.saveToStorage('questions', this.questions);
-            this.renderQuestionsList();
-            modal.hide();
+            const newType = answerTypeSelect.value;
+            const newExplanation = document.getElementById('edit-explanation-input').value.trim();
+            // Bilder ggf. übernehmen
+            const qImgFile = questionImageInput.files[0];
+            const aImgFile = answerImageInput.files[0];
+            const updateAndSave = () => {
+                q.question = newQ;
+                q.category = newC;
+                q.answerType = newType;
+                q.explanation = newExplanation;
+                if (newType === 'text') {
+                    q.answer = newA;
+                    q.answerImage = '';
+                } else {
+                    q.answer = '';
+                }
+                this.saveToStorage('questions', this.questions);
+                this.renderQuestionsList();
+                modal.hide();
+            };
+            if (qImgFile) {
+                const reader = new FileReader();
+                reader.onload = ev => {
+                    q.questionImage = ev.target.result;
+                    if (newType === 'image' && aImgFile) {
+                        const reader2 = new FileReader();
+                        reader2.onload = ev2 => {
+                            q.answerImage = ev2.target.result;
+                            updateAndSave();
+                        };
+                        reader2.readAsDataURL(aImgFile);
+                    } else {
+                        updateAndSave();
+                    }
+                };
+                reader.readAsDataURL(qImgFile);
+            } else if (newType === 'image' && aImgFile) {
+                const reader2 = new FileReader();
+                reader2.onload = ev2 => {
+                    q.answerImage = ev2.target.result;
+                    updateAndSave();
+                };
+                reader2.readAsDataURL(aImgFile);
+            } else {
+                if (!qImgFile) q.questionImage = q.questionImage || '';
+                if (newType === 'image' && !aImgFile) q.answerImage = q.answerImage || '';
+                updateAndSave();
+            }
         };
         modal.show();
     }
