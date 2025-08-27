@@ -620,27 +620,44 @@
 
                     <div class="row">
                         <!-- Kategorie-Verwaltung -->
-                        <div class="col-md-6 mb-4">
-                            <div class="card">
-                                <div class="card-header">
-                                    <h5 class="mb-0">Kategorien verwalten</h5>
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Kategorien verwalten</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="new-category" class="form-label">Neue Kategorie</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="new-category" placeholder="Kategorie-Name">
+                            <button class="btn btn-primary" onclick="addCategory()">
+                                <i class="bi bi-plus-lg"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="categories-list">
+                        <!-- Kategorien-Liste wird hier angezeigt -->
+                    </div>
+                    <div id="edit-category-modal" class="modal fade" tabindex="-1">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Kategorie bearbeiten</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                                 </div>
-                                <div class="card-body">
-                                    <div class="mb-3">
-                                        <label for="new-category" class="form-label">Neue Kategorie</label>
-                                        <div class="input-group">
-                                            <input type="text" class="form-control" id="new-category" placeholder="Kategorie-Name">
-                                            <button class="btn btn-primary" onclick="addCategory()">
-                                                <i class="bi bi-plus-lg"></i>
-                                            </button>
-                                        </div>
-                                    </div>
-                                    <div id="categories-list">
-                                        <!-- Kategorien-Liste wird hier angezeigt -->
-                                    </div>
+                                <div class="modal-body">
+                                    <input type="text" class="form-control" id="edit-category-input">
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                                    <button type="button" class="btn btn-primary" id="save-category-edit">Speichern</button>
                                 </div>
                             </div>
                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
                         <!-- Frage und Antwort hinzufügen -->
                         <div class="col-md-6 mb-4">
@@ -732,22 +749,41 @@
                     </div>
 
                     <!-- Fragen-Übersicht -->
-                    <div class="card">
-                        <div class="card-header">
-                            <h5 class="mb-0">Vorhandene Fragen und Antworten</h5>
-                        </div>
-                        <div class="card-body">
-                            <div class="mb-3">
-                                <label for="filter-category" class="form-label">Nach Kategorie filtern:</label>
-                                <select class="form-select" id="filter-category">
-                                    <option value="">Alle Kategorien</option>
-                                </select>
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Vorhandene Fragen und Antworten</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label for="filter-category" class="form-label">Nach Kategorie filtern:</label>
+                    <select class="form-select" id="filter-category">
+                        <option value="">Alle Kategorien</option>
+                    </select>
+                </div>
+                <div id="questions-list">
+                    <!-- Fragen-Liste wird hier angezeigt -->
+                </div>
+                <div id="edit-question-modal" class="modal fade" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Frage bearbeiten</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                             </div>
-                            <div id="questions-list">
-                                <!-- Fragen-Liste wird hier angezeigt -->
+                            <div class="modal-body">
+                                <input type="text" class="form-control mb-2" id="edit-question-input">
+                                <input type="text" class="form-control mb-2" id="edit-answer-input">
+                                <select class="form-select mb-2" id="edit-category-select"></select>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                                <button type="button" class="btn btn-primary" id="save-question-edit">Speichern</button>
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
                 </div>
             </div>
         </div>

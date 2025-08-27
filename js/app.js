@@ -262,35 +262,38 @@ class LernApp {
 
     loginUser(event) {
         event.preventDefault();
-        
         const username = document.getElementById('login-username').value.trim();
         const password = document.getElementById('login-password').value;
-
         if (!this.users[username]) {
             this.showAlert('Benutzername nicht gefunden!', 'danger');
             return;
         }
-
         const user = this.users[username];
         if (user.password !== this.hashPassword(password)) {
             this.showAlert('Falsches Passwort!', 'danger');
             return;
         }
-
         // Login erfolgreich
+        const isFirstLogin = !user.lastLogin;
         user.lastLogin = new Date().toISOString();
         this.users[username] = user;
         this.saveToStorage('users', this.users, true);
-
         this.currentUser = username;
         this.isDemo = false;
         sessionStorage.setItem('lernapp_current_user', username);
         sessionStorage.removeItem('lernapp_demo_mode');
-
         this.loadUserData();
         this.updateUIForLoginState();
         this.updateDashboard();
         this.showAlert(`Willkommen zurück, ${user.displayName}!`, 'success');
+        // Nach erstem Login: Speicherort wählen
+        if (isFirstLogin && window.lernappCloudStorage && window.lernappCloudStorage.chooseDirectory) {
+            setTimeout(async () => {
+                alert('Bitte wählen Sie einen Speicherort für Ihre Daten.\nTipp: Ein Cloud-Ordner ermöglicht Synchronisation auf mehreren Geräten.');
+                await window.lernappCloudStorage.chooseDirectory();
+                window.lernappCloudStorage.setUserFolderName(username);
+            }, 500);
+        }
     }
 
     startDemoMode() {
@@ -1565,21 +1568,21 @@ class LernApp {
     renderCategoriesList() {
         const container = document.getElementById('categories-list');
         if (!container) return;
-
         container.innerHTML = this.categories.map(category => {
             const questionCount = this.questions.filter(q => q.category === category).length;
+            const editButton = (category !== 'Allgemein' && category !== 'Ordne zu') ?
+                `<button class="btn btn-sm btn-outline-primary me-1" onclick="app.showEditCategoryModal('${category}')"><i class='bi bi-pencil'></i> Bearbeiten</button>` : '';
             const deleteButton = (category !== 'Allgemein' && category !== 'Ordne zu') ? 
                 `<button class="btn btn-sm btn-outline-danger" onclick="app.deleteCategory('${category}')">
                     <i class="bi bi-trash"></i> Löschen
                 </button>` : '';
-                
             return `
                 <div class="d-flex justify-content-between align-items-center border rounded p-3 mb-2">
                     <div>
                         <h6 class="mb-1">${category}</h6>
                         <small class="text-muted">${questionCount} Fragen</small>
                     </div>
-                    ${deleteButton}
+                    <div>${editButton}${deleteButton}</div>
                 </div>
             `;
         }).join('');
@@ -1588,28 +1591,22 @@ class LernApp {
     renderQuestionsList() {
         const container = document.getElementById('questions-list');
         const filterCategory = document.getElementById('filter-category').value;
-        
         if (!container) return;
-
         let filteredQuestions = this.questions;
         if (filterCategory) {
             filteredQuestions = this.questions.filter(q => q.category === filterCategory);
         }
-
         if (filteredQuestions.length === 0) {
             container.innerHTML = '<p class="text-muted text-center">Keine Fragen vorhanden.</p>';
             return;
         }
-
         container.innerHTML = filteredQuestions.map(q => {
             const answerDisplay = q.answerType === 'text' ? 
                 `<strong>Antwort:</strong> ${q.answer}` :
                 `<strong>Antwort:</strong> <span class="badge bg-info">Bild</span>`;
-                
             const questionDisplay = q.question ? 
                 `<strong>Frage:</strong> ${q.question}` :
                 `<strong>Frage:</strong> <span class="badge bg-info">Bild</span>`;
-
             return `
                 <div class="card mb-3">
                     <div class="card-body">
@@ -1626,14 +1623,64 @@ class LernApp {
                                     ${q.questionImage ? ' | Mit Frage-Bild' : ''}
                                 </small>
                             </div>
-                            <button class="btn btn-sm btn-outline-danger" onclick="app.deleteQuestion(${q.id})">
-                                <i class="bi bi-trash"></i>
-                            </button>
+                            <div>
+                                <button class="btn btn-sm btn-outline-primary me-1" onclick="app.showEditQuestionModal(${q.id})"><i class='bi bi-pencil'></i> Bearbeiten</button>
+                                <button class="btn btn-sm btn-outline-danger" onclick="app.deleteQuestion(${q.id})">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
             `;
         }).join('');
+    }
+    // Kategorie bearbeiten
+    showEditCategoryModal(category) {
+        const modal = new bootstrap.Modal(document.getElementById('edit-category-modal'));
+        document.getElementById('edit-category-input').value = category;
+        document.getElementById('save-category-edit').onclick = () => {
+            const newName = document.getElementById('edit-category-input').value.trim();
+            if (!newName || this.categories.includes(newName)) {
+                alert('Ungültiger oder bereits vorhandener Kategoriename!');
+                return;
+            }
+            // Kategorie umbenennen
+            this.categories = this.categories.map(cat => cat === category ? newName : cat);
+            this.questions = this.questions.map(q => q.category === category ? { ...q, category: newName } : q);
+            this.saveToStorage('categories', this.categories);
+            this.saveToStorage('questions', this.questions);
+            this.renderCategoriesList();
+            this.renderQuestionsList();
+            this.updateCategorySelects();
+            modal.hide();
+        };
+        modal.show();
+    }
+
+    // Frage bearbeiten
+    showEditQuestionModal(id) {
+        const q = this.questions.find(q => q.id === id);
+        if (!q) return;
+        const modal = new bootstrap.Modal(document.getElementById('edit-question-modal'));
+        document.getElementById('edit-question-input').value = q.question || '';
+        document.getElementById('edit-answer-input').value = q.answer || '';
+        // Kategorie-Auswahl füllen
+        const select = document.getElementById('edit-category-select');
+        select.innerHTML = this.categories.map(cat => `<option value="${cat}"${cat === q.category ? ' selected' : ''}>${cat}</option>`).join('');
+        document.getElementById('save-question-edit').onclick = () => {
+            const newQ = document.getElementById('edit-question-input').value.trim();
+            const newA = document.getElementById('edit-answer-input').value.trim();
+            const newC = select.value;
+            if (!newC) { alert('Kategorie wählen!'); return; }
+            q.question = newQ;
+            if (q.answerType === 'text') q.answer = newA;
+            q.category = newC;
+            this.saveToStorage('questions', this.questions);
+            this.renderQuestionsList();
+            modal.hide();
+        };
+        modal.show();
     }
 
     // Spezielle Quiz-Funktion für "Ordne zu" mit allen Bild-Antworten
