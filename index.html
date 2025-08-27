@@ -23,6 +23,25 @@
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+    <!-- Modal: Speicherort wählen -->
+    <div class="modal fade" id="storageLocationModal" tabindex="-1">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Speicherort für Datenbank wählen</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <p>Möchtest du einen eigenen Speicherort für deine LernApp-Datenbank wählen? (z.B. Cloud-Ordner für Synchronisation)</p>
+            <p class="small text-muted">Du kannst dies später jederzeit in den Einstellungen ändern.</p>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" id="storage-location-skip" data-bs-dismiss="modal">Standard verwenden</button>
+            <button type="button" class="btn btn-primary" id="storage-location-choose">Ordner wählen</button>
+          </div>
+        </div>
+      </div>
+    </div>
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
         <div class="container">
             <a class="navbar-brand" href="#">

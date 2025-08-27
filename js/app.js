@@ -1,6 +1,26 @@
 // LernApp - Hauptlogik
 
 class LernApp {
+    // Zeigt beim ersten Login den Speicherort-Dialog an
+    async showStorageLocationDialogIfNeeded() {
+        if (!window.lernappCloudStorage) return;
+        const userKey = `user_${this.currentUser}`;
+        const storageFlag = localStorage.getItem(`lernapp_${userKey}_storage_chosen`);
+        if (!storageFlag) {
+            // Modal anzeigen
+            const modal = new bootstrap.Modal(document.getElementById('storageLocationModal'));
+            document.getElementById('storage-location-choose').onclick = async () => {
+                await window.lernappCloudStorage.chooseDirectory();
+                localStorage.setItem(`lernapp_${userKey}_storage_chosen`, '1');
+                modal.hide();
+            };
+            document.getElementById('storage-location-skip').onclick = () => {
+                localStorage.setItem(`lernapp_${userKey}_storage_chosen`, '1');
+                modal.hide();
+            };
+            modal.show();
+        }
+    }
     // Umschalten der Felder je nach Kategorie
     onCategorySelectChange() {
         const select = document.getElementById('question-category');
@@ -172,12 +192,13 @@ class LernApp {
     checkUserSession() {
         const sessionUser = sessionStorage.getItem('lernapp_current_user');
         const sessionDemo = sessionStorage.getItem('lernapp_demo_mode');
-        
         if (sessionDemo) {
             this.isDemo = true;
             this.currentUser = 'demo';
         } else if (sessionUser) {
             this.currentUser = sessionUser;
+            // Prüfe nach Login, ob Speicherort gewählt werden soll
+            setTimeout(() => this.showStorageLocationDialogIfNeeded(), 200);
         }
     }
 
@@ -422,15 +443,47 @@ class LernApp {
         } else if (this.currentUser) {
             // User-spezifische Daten laden
             const userKey = `user_${this.currentUser}`;
-            this.categories = this.loadFromStorage(`${userKey}_categories`) || ['Allgemein', 'Ordne zu'];
-            this.questions = this.loadFromStorage(`${userKey}_questions`) || [];
-            this.statistics = this.loadFromStorage(`${userKey}_statistics`) || {
-                totalQuestions: 0,
-                correctAnswers: 0,
-                categoriesPlayed: {},
-                lastPlayed: null
-            };
-
+            // Prüfe, ob ein Cloud-Ordner gewählt wurde
+            if (window.lernappCloudStorage && window.lernappCloudStorage.dirHandle) {
+                // Versuche, die Datenbank im Ordner zu laden (löst ggf. Berechtigungsabfrage aus)
+                window.lernappCloudStorage.loadData().then(data => {
+                    if (data && data.categories && data.questions && data.statistics) {
+                        this.categories = data.categories;
+                        this.questions = data.questions;
+                        this.statistics = data.statistics;
+                    } else {
+                        // Fallback: localStorage
+                        this.categories = this.loadFromStorage(`${userKey}_categories`) || ['Allgemein', 'Ordne zu'];
+                        this.questions = this.loadFromStorage(`${userKey}_questions`) || [];
+                        this.statistics = this.loadFromStorage(`${userKey}_statistics`) || {
+                            totalQuestions: 0,
+                            correctAnswers: 0,
+                            categoriesPlayed: {},
+                            lastPlayed: null
+                        };
+                    }
+                }).catch(() => {
+                    // Fallback: localStorage
+                    this.categories = this.loadFromStorage(`${userKey}_categories`) || ['Allgemein', 'Ordne zu'];
+                    this.questions = this.loadFromStorage(`${userKey}_questions`) || [];
+                    this.statistics = this.loadFromStorage(`${userKey}_statistics`) || {
+                        totalQuestions: 0,
+                        correctAnswers: 0,
+                        categoriesPlayed: {},
+                        lastPlayed: null
+                    };
+                });
+            } else {
+                // Kein Cloud-Ordner: localStorage verwenden
+                this.categories = this.loadFromStorage(`${userKey}_categories`) || ['Allgemein', 'Ordne zu'];
+                this.questions = this.loadFromStorage(`${userKey}_questions`) || [];
+                this.statistics = this.loadFromStorage(`${userKey}_statistics`) || {
+                    totalQuestions: 0,
+                    correctAnswers: 0,
+                    categoriesPlayed: {},
+                    lastPlayed: null
+                };
+            }
             // Wenn neue User keine Daten haben, Beispieldaten laden
             if (this.questions.length === 0) {
                 this.loadSampleData();
