@@ -155,12 +155,9 @@ class LernApp {
     updateUIForLoginState() {
         const userElements = document.querySelectorAll('.user-only');
         const guestElements = document.querySelectorAll('.guest-only');
-        
         if (this.currentUser || this.isDemo) {
-            // User ist eingeloggt
             userElements.forEach(el => el.style.display = 'block');
             guestElements.forEach(el => el.style.display = 'none');
-            
             if (this.currentUser && !this.isDemo) {
                 const userData = this.users[this.currentUser];
                 document.getElementById('current-username').textContent = 
@@ -171,13 +168,26 @@ class LernApp {
                 document.getElementById('current-username').textContent = 'Demo-Modus';
                 document.getElementById('dashboard-username').textContent = 'Demo-Benutzer';
             }
-            
             showPage('home');
         } else {
-            // User ist nicht eingeloggt
             userElements.forEach(el => el.style.display = 'none');
             guestElements.forEach(el => el.style.display = 'block');
             showPage('login');
+        }
+        // User-Login deaktivieren, wenn Admin eingeloggt
+        this.disableUserLoginIfAdmin();
+    }
+
+    // Deaktiviert das User-Login-Formular, solange Admin eingeloggt ist
+    disableUserLoginIfAdmin() {
+        const loginForm = document.getElementById('login-form');
+        const loginBtn = document.getElementById('login-btn');
+        if (sessionStorage.getItem('lernapp_admin_access')) {
+            if (loginForm) loginForm.querySelectorAll('input,button').forEach(el => el.disabled = true);
+            if (loginBtn) loginBtn.disabled = true;
+        } else {
+            if (loginForm) loginForm.querySelectorAll('input,button').forEach(el => el.disabled = false);
+            if (loginBtn) loginBtn.disabled = false;
         }
     }
 
@@ -262,6 +272,10 @@ class LernApp {
 
     loginUser(event) {
         event.preventDefault();
+        if (sessionStorage.getItem('lernapp_admin_access')) {
+            this.showAlert('Solange der Admin eingeloggt ist, kann sich kein Nutzer anmelden.', 'danger');
+            return;
+        }
         const username = document.getElementById('login-username').value.trim();
         const password = document.getElementById('login-password').value;
         if (!this.users[username]) {
@@ -273,6 +287,9 @@ class LernApp {
             this.showAlert('Falsches Passwort!', 'danger');
             return;
         }
+        // Admin-Session beenden, falls aktiv
+        sessionStorage.removeItem('lernapp_admin_access');
+        this.hideAdminInterface();
         // Login erfolgreich
         const isFirstLogin = !user.lastLogin;
         user.lastLogin = new Date().toISOString();
@@ -830,6 +847,12 @@ class LernApp {
         const correctPassword = 'LernApp2025Admin'; // In Produktion: Sicheres Passwort verwenden
         
         if (password === correctPassword) {
+            // Alle User ausloggen, falls eingeloggt
+            this.currentUser = null;
+            this.isDemo = false;
+            sessionStorage.removeItem('lernapp_current_user');
+            sessionStorage.removeItem('lernapp_demo_mode');
+            this.updateUIForLoginState();
             sessionStorage.setItem('lernapp_admin_access', 'granted');
             this.showAlert('Admin-Anmeldung erfolgreich!', 'success');
             
@@ -915,157 +938,6 @@ class LernApp {
             };
             
             return false;
-        }
-    }
-
-    // Beispieldaten laden (nur beim ersten Start)
-    loadSampleData() {
-        if (this.questions.length === 0) {
-            const sampleQuestions = [
-                // Geografie - Text-Fragen mit Text-Antworten
-                {
-                    id: 1,
-                    category: 'Geografie',
-                    question: 'Was ist die Hauptstadt von Deutschland?',
-                    answerType: 'text',
-                    answer: 'Berlin',
-                    questionImage: null,
-                    answerImage: null
-                },
-                {
-                    id: 2,
-                    category: 'Geografie', 
-                    question: 'Was ist die Hauptstadt von Frankreich?',
-                    answerType: 'text',
-                    answer: 'Paris',
-                    questionImage: null,
-                    answerImage: null
-                },
-                {
-                    id: 3,
-                    category: 'Geografie',
-                    question: 'Was ist die Hauptstadt von Italien?',
-                    answerType: 'text',
-                    answer: 'Rom',
-                    questionImage: null,
-                    answerImage: null
-                },
-                {
-                    id: 4,
-                    category: 'Geografie',
-                    question: 'Was ist die Hauptstadt von Spanien?',
-                    answerType: 'text',
-                    answer: 'Madrid',
-                    questionImage: null,
-                    answerImage: null
-                },
-                {
-                    id: 5,
-                    category: 'Geografie',
-                    question: 'Was ist die Hauptstadt von England?',
-                    answerType: 'text',
-                    answer: 'London',
-                    questionImage: null,
-                    answerImage: null
-                },
-                // Beispiel für "Ordne zu" - Text-Fragen mit Bild-Antworten
-                {
-                    id: 6,
-                    category: 'Ordne zu',
-                    question: 'Finde den Apfel',
-                    answerType: 'image',
-                    answer: null,
-                    questionImage: null,
-                    answerImage: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iNTAiIGN5PSI1MCIgcj0iNDAiIGZpbGw9InJlZCIvPjx0ZXh0IHg9IjUwIiB5PSI1NSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0id2hpdGUiIGZvbnQtc2l6ZT0iMTQiPkFwZmVsPC90ZXh0Pjwvc3ZnPg=='
-                },
-                {
-                    id: 7,
-                    category: 'Ordne zu',
-                    question: 'Finde die Banane',
-                    answerType: 'image',
-                    answer: null,
-                    questionImage: null,
-                    answerImage: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGVsbGlwc2UgY3g9IjUwIiBjeT0iNTAiIHJ4PSI0MCIgcnk9IjE1IiBmaWxsPSJ5ZWxsb3ciLz48dGV4dCB4PSI1MCIgeT0iNTUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9ImJsYWNrIiBmb250LXNpemU9IjEyIj5CYW5hbmU8L3RleHQ+PC9zdmc+'
-                },
-                {
-                    id: 8,
-                    category: 'Ordne zu',
-                    question: 'Finde die Orange',
-                    answerType: 'image',
-                    answer: null,
-                    questionImage: null,
-                    answerImage: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iNTAiIGN5PSI1MCIgcj0iNDAiIGZpbGw9Im9yYW5nZSIvPjx0ZXh0IHg9IjUwIiB5PSI1NSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iYmxhY2siIGZvbnQtc2l6ZT0iMTIiPk9yYW5nZTwvdGV4dD48L3N2Zz4='
-                },
-                {
-                    id: 9,
-                    category: 'Ordne zu',
-                    question: 'Finde die Traube',
-                    answerType: 'image',
-                    answer: null,
-                    questionImage: null,
-                    answerImage: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGVsbGlwc2UgY3g9IjUwIiBjeT0iNTAiIHJ4PSIzNSIgcnk9IjQ1IiBmaWxsPSJwdXJwbGUiLz48dGV4dCB4PSI1MCIgeT0iNTUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IndoaXRlIiBmb250LXNpemU9IjEyIj5UcmF1YmU8L3RleHQ+PC9zdmc+'
-                }
-            ];
-
-            this.questions = sampleQuestions;
-            this.saveUserData();
-        }
-
-        // Beispiel-Kategorien hinzufügen
-        if (!this.categories.includes('Geografie')) {
-            this.categories.push('Geografie');
-            this.saveUserData();
-        }
-    }
-
-    setupEventListeners() {
-        // Frage-Formular
-        const questionForm = document.getElementById('question-form');
-        if (questionForm) {
-            questionForm.addEventListener('submit', (e) => {
-                e.preventDefault();
-                this.addQuestion();
-            });
-        }
-
-        // Neue Kategorie
-        const newCategoryInput = document.getElementById('new-category');
-        if (newCategoryInput) {
-            newCategoryInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    this.addCategory();
-                }
-            });
-        }
-
-        // Antwort-Typ-Wechsel
-        document.querySelectorAll('input[name="answer-type"]').forEach(radio => {
-            radio.addEventListener('change', (e) => {
-                this.toggleAnswerTypeSection(e.target.value);
-            });
-        });
-
-        // Bild-Upload mit Vorschau
-        const sharedImageInput = document.getElementById('shared-image-input');
-        if (sharedImageInput) {
-            sharedImageInput.addEventListener('change', (e) => {
-                this.handleImageUpload(e, 'shared');
-            });
-        }
-        
-        const answerImageInput = document.getElementById('answer-image-input');
-        if (answerImageInput) {
-            answerImageInput.addEventListener('change', (e) => {
-                this.handleImageUpload(e, 'answer');
-            });
-        }
-
-        // Filter für Fragen-Liste
-        const filterCategory = document.getElementById('filter-category');
-        if (filterCategory) {
-            filterCategory.addEventListener('change', () => {
-                this.renderQuestionsList();
-            });
         }
     }
 
@@ -1778,7 +1650,7 @@ class LernApp {
         const imageAnswerQuestions = this.questions.filter(q => 
             q.answerType === 'image' && 
             q.answerImage && 
-            q.category !== 'Ordne zu' // Originale "Ordne zu" Fragen ausschließen
+            q.category !== 'Ordne zu'
         );
         
         if (imageAnswerQuestions.length < 4) {
@@ -2033,7 +1905,7 @@ class LernApp {
                 return `
                     <div class="col-md-6 mb-3">
                         <div class="answer-option text-answer h-100 d-flex align-items-center justify-content-center" data-index="${index}">
-                            <span class="fs-5 fw-bold text-center">${answer.text}</span>
+                                                       <span class="fs-5 fw-bold text-center">${answer.text}</span>
                         </div>
                     </div>
                 `;
@@ -2664,15 +2536,12 @@ function showPage(pageId) {
         document.getElementById('quiz-result').classList.add('d-none');
     }
 }
-
 function startQuiz(category) {
     window.app.startQuiz(category);
 }
-
 function startOrderQuiz() {
     window.app.startOrderQuiz();
 }
-
 function restartQuiz() {
     window.app.restartQuiz();
 }
