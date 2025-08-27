@@ -1,6 +1,101 @@
 // LernApp - Hauptlogik
 
 class LernApp {
+    // ========== ADMIN USER MANAGEMENT ==========
+    renderAdminUsersList() {
+        const container = document.getElementById('admin-users-list');
+        if (!container) return;
+        const users = Object.values(this.users);
+        if (users.length === 0) {
+            container.innerHTML = '<p class="text-muted">Keine Benutzer vorhanden.</p>';
+            return;
+        }
+        container.innerHTML = `<div class="table-responsive"><table class="table table-sm align-middle"><thead><tr><th>Benutzername</th><th>Anzeigename</th><th>Letzter Login</th><th>Aktionen</th></tr></thead><tbody>
+            ${users.map(u => `
+                <tr>
+                    <td>${u.username}</td>
+                    <td>${u.displayName || ''}</td>
+                    <td>${u.lastLogin ? new Date(u.lastLogin).toLocaleString('de-DE') : '-'}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-info me-1" onclick="app.adminShowUserData('${u.username}')"><i class='bi bi-database'></i> Daten</button>
+                        <button class="btn btn-sm btn-outline-warning me-1" onclick="app.adminResetPassword('${u.username}')"><i class='bi bi-key'></i> Passwort zurücksetzen</button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="app.adminDeleteUser('${u.username}')"><i class='bi bi-trash'></i> Löschen</button>
+                    </td>
+                </tr>`).join('')}
+            </tbody></table></div>`;
+    }
+
+    adminShowUserData(username) {
+        const container = document.getElementById('admin-user-data');
+        if (!container) return;
+        const user = this.users[username];
+        if (!user) {
+            container.innerHTML = '<div class="alert alert-danger">Benutzer nicht gefunden.</div>';
+            return;
+        }
+        // User-Daten laden
+        const userKey = `user_${username}`;
+        const categories = this.loadFromStorage(`${userKey}_categories`) || [];
+        const questions = this.loadFromStorage(`${userKey}_questions`) || [];
+        const statistics = this.loadFromStorage(`${userKey}_statistics`) || {};
+        container.innerHTML = `
+            <div class="card">
+                <div class="card-header bg-light"><strong>Daten von ${user.displayName || username}</strong></div>
+                <div class="card-body">
+                    <p><strong>Kategorien:</strong> ${categories.length}</p>
+                    <p><strong>Fragen:</strong> ${questions.length}</p>
+                    <p><strong>Statistiken:</strong> ${Object.keys(statistics).length > 0 ? 'vorhanden' : 'keine'}</p>
+                    <button class="btn btn-outline-secondary btn-sm me-2" onclick="app.adminExportUserData('${username}')"><i class='bi bi-download'></i> Exportieren</button>
+                </div>
+            </div>
+        `;
+    }
+
+    adminExportUserData(username) {
+        const user = this.users[username];
+        if (!user) return;
+        const userKey = `user_${username}`;
+        const exportData = {
+            username: user.username,
+            displayName: user.displayName,
+            exportDate: new Date().toISOString(),
+            categories: this.loadFromStorage(`${userKey}_categories`) || [],
+            questions: this.loadFromStorage(`${userKey}_questions`) || [],
+            statistics: this.loadFromStorage(`${userKey}_statistics`) || {}
+        };
+        const dataStr = JSON.stringify(exportData, null, 2);
+        const dataBlob = new Blob([dataStr], {type: 'application/json'});
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(dataBlob);
+        link.download = `lernapp-export-${username}-${new Date().toISOString().split('T')[0]}.json`;
+        link.click();
+    }
+
+    adminResetPassword(username) {
+        if (!confirm(`Passwort für ${username} wirklich zurücksetzen?`)) return;
+        const newPassword = prompt('Neues Passwort für ' + username + ':', '');
+        if (!newPassword || newPassword.length < 6) {
+            alert('Passwort muss mindestens 6 Zeichen lang sein!');
+            return;
+        }
+        this.users[username].password = this.hashPassword(newPassword);
+        this.saveToStorage('users', this.users, true);
+        alert('Passwort wurde geändert!');
+    }
+
+    adminDeleteUser(username) {
+        if (!confirm(`Benutzer ${username} und alle zugehörigen Daten unwiderruflich löschen?`)) return;
+        delete this.users[username];
+        this.saveToStorage('users', this.users, true);
+        // Alle Userdaten entfernen
+        const userKey = `user_${username}`;
+        localStorage.removeItem(`lernapp_${userKey}_categories`);
+        localStorage.removeItem(`lernapp_${userKey}_questions`);
+        localStorage.removeItem(`lernapp_${userKey}_statistics`);
+        this.renderAdminUsersList();
+        document.getElementById('admin-user-data').innerHTML = '';
+        alert('Benutzer und Daten gelöscht!');
+    }
     constructor() {
         // User Management System
         this.currentUser = null;
@@ -665,6 +760,10 @@ class LernApp {
             // Admin-Seite ist gesperrt, neu laden um entsperrt zu zeigen
             location.reload();
         }
+
+        // User-Liste anzeigen
+        this.renderAdminUsersList();
+        document.getElementById('admin-user-data').innerHTML = '';
     }
 
     hideAdminInterface() {

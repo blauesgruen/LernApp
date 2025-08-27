@@ -1,3 +1,8 @@
+// Admin-Methoden global verfügbar machen
+window.app && (window.app.adminShowUserData = function(username) { window.app.adminShowUserData(username); });
+window.app && (window.app.adminExportUserData = function(username) { window.app.adminExportUserData(username); });
+window.app && (window.app.adminResetPassword = function(username) { window.app.adminResetPassword(username); });
+window.app && (window.app.adminDeleteUser = function(username) { window.app.adminDeleteUser(username); });
 // Global navigation and helper functions
 function showPage(pageId) {
     if (window.app) {
