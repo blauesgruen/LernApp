@@ -1270,7 +1270,7 @@ class LernApp {
         }
 
         // Spezielle Validierung für "Ordne zu" Kategorie
-        if (category === 'Ordne zu') {
+        if (category && category.startsWith('Ordne zu')) {
             if (!questionText) {
                 this.showAlert('Für die Kategorie "Ordne zu" ist ein Frage-Text erforderlich (z.B. "Finde den Apfel")!', 'danger');
                 return;
@@ -1695,8 +1695,7 @@ class LernApp {
             }
         }
 
-        const categoryQuestions = this.questions.filter(q => q.category === category);
-        
+        const categoryQuestions = this.questions.filter(q => q.category === category || (category && category.startsWith('Ordne zu') && q.category && q.category.startsWith('Ordne zu')));
         if (categoryQuestions.length < 4) {
             this.showAlert('Diese Kategorie hat weniger als 4 Fragen! Bitte fügen Sie mehr Fragen hinzu.', 'warning');
             return;
@@ -1713,10 +1712,9 @@ class LernApp {
 
         // Erste Frage vorbereiten
         const firstQuestion = this.currentQuiz.questions[0];
-        const questionsPool = this.questions.filter(q => q.category === category);
-        
-        if (category === 'Ordne zu') {
-            // Spezielle Behandlung für "Ordne zu"
+        const questionsPool = this.questions.filter(q => q.category === category || (category && category.startsWith('Ordne zu') && q.category && q.category.startsWith('Ordne zu')));
+        if (category && category.startsWith('Ordne zu')) {
+            // Spezielle Behandlung für "Ordne zu" und Unterkategorien
             const multipleChoiceQuestion = this.generateOrderQuestion(firstQuestion, questionsPool);
             if (!multipleChoiceQuestion) {
                 this.showAlert('Nicht genügend Fragen für ein Quiz verfügbar!', 'danger');
@@ -1742,8 +1740,8 @@ class LernApp {
 
     // Generiert eine Multiple-Choice-Frage aus einer Frage/Antwort-Kombination
     generateMultipleChoiceQuestion(questionData, availableQuestions) {
-        // Spezielle Behandlung für "Ordne zu" Kategorie
-        if (questionData.category === 'Ordne zu') {
+        // Spezielle Behandlung für "Ordne zu" Kategorie und Unterkategorien
+        if (questionData.category && questionData.category.startsWith('Ordne zu')) {
             return this.generateOrderQuestion(questionData, availableQuestions);
         }
 
@@ -1787,9 +1785,9 @@ class LernApp {
 
     // Spezielle Funktion für "Ordne zu" Fragen
     generateOrderQuestion(questionData, availableQuestions) {
-        // Nur Fragen aus "Ordne zu" Kategorie mit Bild-Antworten
+        // Nur Fragen aus "Ordne zu" Kategorie (inkl. Unterkategorien) mit Bild-Antworten
         const orderQuestions = availableQuestions.filter(q => 
-            q.category === 'Ordne zu' && 
+            q.category && q.category.startsWith('Ordne zu') && 
             q.id !== questionData.id &&
             q.answerType === 'image' &&
             q.answerImage
@@ -2055,9 +2053,9 @@ class LernApp {
             );
             const multipleChoiceQuestion = this.generateMixedOrderQuestion(nextQuestion, imageAnswerQuestions);
             this.currentQuiz.questions[this.currentQuiz.currentIndex] = { ...nextQuestion, ...multipleChoiceQuestion };
-        } else if (this.currentQuiz.selectedCategory === 'Ordne zu') {
-            // Für normale "Ordne zu" Quizzes
-            const questionsPool = this.questions.filter(q => q.category === this.currentQuiz.selectedCategory);
+        } else if (this.currentQuiz.selectedCategory && this.currentQuiz.selectedCategory.startsWith('Ordne zu')) {
+            // Für normale "Ordne zu" Quizzes und Unterkategorien
+            const questionsPool = this.questions.filter(q => q.category && q.category.startsWith('Ordne zu'));
             const multipleChoiceQuestion = this.generateOrderQuestion(nextQuestion, questionsPool);
             this.currentQuiz.questions[this.currentQuiz.currentIndex] = { ...nextQuestion, ...multipleChoiceQuestion };
         } else {
