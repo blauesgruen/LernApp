@@ -1,3 +1,18 @@
+// Utility: Sicheres Event-Binding mit Existenz-Check
+function safeAddEventListener(selector, event, handler, options) {
+    const el = typeof selector === 'string' ? document.querySelector(selector) : selector;
+    if (el) el.addEventListener(event, handler, options);
+}
+
+// Utility: Event-Delegation für dynamische Elemente
+function delegateEvent(parentSelector, childSelector, event, handler) {
+    const parent = typeof parentSelector === 'string' ? document.querySelector(parentSelector) : parentSelector;
+    if (!parent) return;
+    parent.addEventListener(event, function(e) {
+        const target = e.target.closest(childSelector);
+        if (target && parent.contains(target)) handler.call(target, e);
+    });
+}
 // LernApp - Hauptlogik
 
 class LernApp {
@@ -1204,95 +1219,99 @@ class LernApp {
 
     setupEventListeners() {
         // Logout-Button (Profil Dropdown)
-        const logoutBtn = document.querySelector('.user-only .dropdown-menu .dropdown-item[onclick*="logoutUser"]');
-        if (logoutBtn) {
-            logoutBtn.onclick = (e) => {
+        safeAddEventListener('.user-only .dropdown-menu .dropdown-item[href="#"]', 'click', (e) => {
+            if (e.target.textContent.includes('Abmelden')) {
                 e.preventDefault();
                 this.logoutUser();
-            };
-        }
+            }
+        });
 
         // Account löschen (Profilseite)
-        const deleteAccountBtn = document.querySelector('.btn-outline-danger[onclick*="deleteAccount"]');
-        if (deleteAccountBtn) {
-            deleteAccountBtn.onclick = (e) => {
+        safeAddEventListener('.btn-outline-danger', 'click', (e) => {
+            if (e.target.textContent.includes('Account löschen')) {
                 e.preventDefault();
                 this.deleteAccount();
-            };
-        }
+            }
+        });
+
+        // Admin-User-Aktionen (Delegation für dynamische Buttons)
+        delegateEvent('#admin-users-list', '.btn-outline-danger', 'click', function(e) {
+            e.preventDefault();
+            const username = this.closest('tr')?.querySelector('td')?.textContent;
+            if (username) app.adminDeleteUser(username);
+        });
+        delegateEvent('#admin-users-list', '.btn-outline-warning', 'click', function(e) {
+            e.preventDefault();
+            const username = this.closest('tr')?.querySelector('td')?.textContent;
+            if (username) app.adminResetPassword(username);
+        });
+        delegateEvent('#admin-users-list', '.btn-outline-info', 'click', function(e) {
+            e.preventDefault();
+            const username = this.closest('tr')?.querySelector('td')?.textContent;
+            if (username) app.adminShowUserData(username);
+        });
+
         // Frage-Formular
-        document.getElementById('question-form').addEventListener('submit', (e) => {
+        safeAddEventListener('#question-form', 'submit', (e) => {
             e.preventDefault();
             this.addQuestion();
         });
 
         // Neue Kategorie
-        document.getElementById('new-category').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                this.addCategory();
-            }
+        safeAddEventListener('#new-category', 'keypress', (e) => {
+            if (e.key === 'Enter') this.addCategory();
         });
 
         // Antwort-Typ-Wechsel
         document.querySelectorAll('input[name="answer-type"]').forEach(radio => {
-            radio.addEventListener('change', (e) => {
+            safeAddEventListener(radio, 'change', (e) => {
                 this.toggleAnswerTypeSection(e.target.value);
             });
         });
 
         // Bild-Upload mit Vorschau
-        document.getElementById('shared-image-input').addEventListener('change', (e) => {
+        safeAddEventListener('#shared-image-input', 'change', (e) => {
             this.handleImageUpload(e, 'shared');
         });
-        document.getElementById('answer-image-input').addEventListener('change', (e) => {
+        safeAddEventListener('#answer-image-input', 'change', (e) => {
             this.handleImageUpload(e, 'answer');
         });
 
         // Filter für Fragen-Liste
-        document.getElementById('filter-category').addEventListener('change', () => {
+        safeAddEventListener('#filter-category', 'change', () => {
             this.renderQuestionsList();
         });
 
         // Login/Register Umschaltung (Tabs)
-        const loginTab = document.getElementById('login-tab');
-        const registerTab = document.getElementById('register-tab');
-        if (loginTab && registerTab) {
-            loginTab.onclick = (e) => {
-                e.preventDefault();
-                this.switchAuthMode('login');
-            };
-            registerTab.onclick = (e) => {
-                e.preventDefault();
-                this.switchAuthMode('register');
-            };
-        }
+        safeAddEventListener('#login-tab', 'click', (e) => {
+            e.preventDefault();
+            this.switchAuthMode('login');
+        });
+        safeAddEventListener('#register-tab', 'click', (e) => {
+            e.preventDefault();
+            this.switchAuthMode('register');
+        });
 
         // Admin-Login Button
-        const adminLoginLink = document.getElementById('admin-login-link');
-        if (adminLoginLink) {
-            adminLoginLink.onclick = (e) => {
-                e.preventDefault();
-                this.showAdminLogin();
-            };
-        }
+        safeAddEventListener('#admin-login-link', 'click', (e) => {
+            e.preventDefault();
+            this.showAdminLogin();
+        });
 
         // User-Login Button
-        const userLoginBtn = document.querySelector('.guest-only .nav-link[onclick*="showUserLogin"]');
-        if (userLoginBtn) {
-            userLoginBtn.onclick = (e) => {
+        safeAddEventListener('.guest-only .nav-link[href="#"]', 'click', (e) => {
+            if (e.target.textContent.includes('Anmelden')) {
                 e.preventDefault();
                 this.showUserLogin('login');
-            };
-        }
-
+            }
+        });
         // User-Register Button
-        const userRegisterBtn = document.querySelector('.card-body .btn.btn-primary[onclick*="showUserLogin"]');
-        if (userRegisterBtn) {
-            userRegisterBtn.onclick = (e) => {
+        safeAddEventListener('.card-body .btn.btn-primary', 'click', (e) => {
+            if (e.target.textContent.includes('Registrieren')) {
                 e.preventDefault();
                 this.showUserLogin('register');
-            };
-        }
+            }
+        });
     }
 
     // Antwort-Typ Umschalten
