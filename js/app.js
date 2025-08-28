@@ -1145,6 +1145,11 @@ class LernApp {
     }
 
     showAdminInterface() {
+        // Standardkategorien sicherstellen
+        const standardKategorien = ['Allgemein', 'Ordne zu'];
+        standardKategorien.forEach(kat => {
+            if (!this.categories.includes(kat)) this.categories.unshift(kat);
+        });
         // Admin-Navigation anzeigen
         document.getElementById('admin-nav-item').style.display = 'block';
         document.getElementById('admin-logout-item').style.display = 'block';
@@ -1163,6 +1168,10 @@ class LernApp {
         // User-Liste anzeigen
         this.renderAdminUsersList();
         document.getElementById('admin-user-data').innerHTML = '';
+        // Kategorien und Fragen anzeigen
+        this.renderCategories();
+        this.renderCategoriesList();
+        this.renderQuestionsList();
     }
 
     hideAdminInterface() {
