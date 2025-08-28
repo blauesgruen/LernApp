@@ -23,21 +23,36 @@
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-    <!-- Modal: Speicherort wählen -->
-    <div class="modal fade" id="storageLocationModal" tabindex="-1">
-      <div class="modal-dialog">
+    <!-- Modal: Speicherort wählen (mit Cloud-Hinweis) -->
+    <div class="modal fade" id="storageLocationModal" tabindex="-1" aria-labelledby="storageLocationLabel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
           <div class="modal-header">
-            <h5 class="modal-title">Speicherort für Datenbank wählen</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            <h5 class="modal-title" id="storageLocationLabel">Speicherort wählen</h5>
           </div>
           <div class="modal-body">
-            <p>Möchtest du einen eigenen Speicherort für deine LernApp-Datenbank wählen? (z.B. Cloud-Ordner für Synchronisation)</p>
-            <p class="small text-muted">Du kannst dies später jederzeit in den Einstellungen ändern.</p>
+            <p>Bitte wählen Sie einen Speicherort für Ihre Daten.<br><span style="font-size:0.95em;color:#888;">Tipp: Ein Cloud-Ordner (z.B. Dropbox, Nextcloud, OneDrive) ermöglicht Synchronisation auf mehreren Geräten.</span></p>
           </div>
           <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" id="storage-location-skip" data-bs-dismiss="modal">Standard verwenden</button>
-            <button type="button" class="btn btn-primary" id="storage-location-choose">Ordner wählen</button>
+            <button type="button" class="btn btn-primary" id="storage-location-choose">Speicherort wählen</button>
+            <button type="button" class="btn btn-secondary" id="storage-location-skip">Abbrechen</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Modal: Speicherort nicht unterstützt -->
+    <div class="modal fade" id="storageNotSupportedModal" tabindex="-1" aria-labelledby="storageNotSupportedLabel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="storageNotSupportedLabel">Speicherort nicht unterstützt</h5>
+          </div>
+          <div class="modal-body">
+            <p>Ihr Browser unterstützt die automatische Ordnerauswahl nicht.<br>Bitte nutzen Sie den Datei-Export/Import.</p>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-primary" id="storage-not-supported-choose">Speicherort wählen</button>
+            <button type="button" class="btn btn-secondary" id="storage-not-supported-cancel" data-bs-dismiss="modal">Abbrechen</button>
           </div>
         </div>
       </div>
@@ -370,6 +385,9 @@
                                     </button>
                                     <button class="btn btn-outline-warning" onclick="app.resetUserData()">
                                         <i class="bi bi-arrow-clockwise me-2"></i>Daten zurücksetzen
+                                    </button>
+                                    <button class="btn btn-outline-danger" onclick="app.deleteAccount()">
+                                        <i class="bi bi-trash me-2"></i>Account löschen
                                     </button>
                                 </div>
                             </div>
@@ -846,7 +864,7 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="js/app.js"></script>
     <script src="js/app-extensions.js" type="module"></script>
+    <script src="js/app.js"></script>
 </body>
 </html>

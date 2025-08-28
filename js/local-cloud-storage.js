@@ -11,20 +11,36 @@ export class LocalCloudStorage {
         this.loadDirHandle();
     }
 
-    async chooseDirectory() {
+    async chooseDirectory(silent) {
         if (!this.supported) {
-            alert('Ihr Browser unterstützt die automatische Ordnerauswahl nicht. Bitte nutzen Sie den Datei-Export/Import.');
+            // Kein alert mehr, stattdessen Modal-Logik im App-Flow
             return false;
         }
         try {
             this.dirHandle = await window.showDirectoryPicker();
             await this.saveDirHandle();
+            // Nach Ordnerwahl: Versuche Datenbank zu laden, aber ignoriere "nicht gefunden"
+            let loaded = false;
+            try {
+                await this.loadData();
+                loaded = true;
+            } catch (err) {
+                // Nur still ignorieren, wenn Datei nicht existiert
+                if (err && err.message && err.message.match(/kein speicherort gewählt|not found|existiert nicht|not found/i)) {
+                    // still
+                } else if (err && err.name === 'NotFoundError') {
+                    // still
+                } else {
+                    // Andere Fehler ggf. loggen
+                    console.warn('Fehler beim Laden der Datenbank nach Ordnerwahl:', err);
+                }
+            }
             if (window.app && window.app.updateStorageLocationInfo) {
                 window.app.updateStorageLocationInfo();
             }
             return true;
         } catch (e) {
-            alert('Ordnerauswahl abgebrochen oder nicht erlaubt.');
+            // Kein alert mehr, stilles Scheitern
             if (window.app && window.app.updateStorageLocationInfo) {
                 window.app.updateStorageLocationInfo();
             }

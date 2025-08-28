@@ -1,24 +1,93 @@
 // LernApp - Hauptlogik
 
 class LernApp {
+    // Account löschen
+    deleteAccount() {
+        if (this.isDemo) {
+            this.showAlert('Im Demo-Modus kann kein Account gelöscht werden!', 'warning');
+            return;
+        }
+        if (!this.currentUser || !this.users[this.currentUser]) return;
+        if (!confirm('Möchten Sie Ihren Account wirklich unwiderruflich löschen? Alle Daten gehen verloren!')) return;
+        // Nur noch eine zweite Nachfrage!
+        if (!confirm('Letzte Warnung: Account und alle Daten werden gelöscht. Fortfahren?')) return;
+        const username = this.currentUser;
+        // User entfernen
+        delete this.users[username];
+        this.saveToStorage('users', this.users, true);
+        // Lokale Userdaten entfernen
+        this.resetUserData();
+        // Ausloggen und auf Startseite
+        this.logoutUser(true); // true = forceLogout nach Account-Löschung
+    }
     // Zeigt beim ersten Login den Speicherort-Dialog an
     async showStorageLocationDialogIfNeeded() {
-        if (!window.lernappCloudStorage) return;
+        if (!window.lernappCloudStorage) {
+            console.warn('lernappCloudStorage nicht vorhanden');
+            return;
+        }
         const userKey = `user_${this.currentUser}`;
         const storageFlag = localStorage.getItem(`lernapp_${userKey}_storage_chosen`);
-        if (!storageFlag) {
-            // Modal anzeigen
-            const modal = new bootstrap.Modal(document.getElementById('storageLocationModal'));
-            document.getElementById('storage-location-choose').onclick = async () => {
-                await window.lernappCloudStorage.chooseDirectory();
-                localStorage.setItem(`lernapp_${userKey}_storage_chosen`, '1');
-                modal.hide();
+        console.log('[LernApp] showStorageLocationDialogIfNeeded:', { userKey, storageFlag, currentUser: this.currentUser });
+        if (storageFlag !== '1') {
+            // Erstes Login: Modal anzeigen, kein alert, kein automatischer Dialog
+            const showModal = () => {
+                const modalElem = document.getElementById('storageLocationModal');
+                if (!modalElem) {
+                    console.error('storageLocationModal nicht im DOM!');
+                    return;
+                }
+                const modal = new bootstrap.Modal(modalElem, { backdrop: 'static', keyboard: false });
+                const skipBtn = document.getElementById('storage-location-skip');
+                const chooseBtn = document.getElementById('storage-location-choose');
+                skipBtn.onclick = null;
+                chooseBtn.onclick = null;
+                skipBtn.onclick = () => {
+                    localStorage.setItem(`lernapp_${userKey}_storage_chosen`, '1');
+                    modal.hide();
+                    console.log('[LernApp] Speicherort-Dialog: Abbrechen');
+                };
+                chooseBtn.onclick = async () => {
+                    if (!window.lernappCloudStorage.supported) {
+                        // Zeige eigenes Modal statt alert
+                        const notSupportedModalElem = document.getElementById('storageNotSupportedModal');
+                        const notSupportedModal = new bootstrap.Modal(notSupportedModalElem, { backdrop: 'static', keyboard: false });
+                        const chooseBtn2 = document.getElementById('storage-not-supported-choose');
+                        const cancelBtn2 = document.getElementById('storage-not-supported-cancel');
+                        chooseBtn2.onclick = null;
+                        cancelBtn2.onclick = null;
+                        chooseBtn2.onclick = () => {
+                            notSupportedModal.hide();
+                            modal.hide();
+                            localStorage.setItem(`lernapp_${userKey}_storage_chosen`, '1');
+                            console.log('[LernApp] Speicherort nicht unterstützt: gewählt');
+                        };
+                        cancelBtn2.onclick = () => {
+                            notSupportedModal.hide();
+                            console.log('[LernApp] Speicherort nicht unterstützt: abgebrochen');
+                        };
+                        notSupportedModal.show();
+                    } else {
+                        await window.lernappCloudStorage.chooseDirectory(false);
+                        localStorage.setItem(`lernapp_${userKey}_storage_chosen`, '1');
+                        modal.hide();
+                        console.log('[LernApp] Speicherort gewählt');
+                    }
+                };
+                modal.show();
+                console.log('[LernApp] Speicherort-Dialog angezeigt');
             };
-            document.getElementById('storage-location-skip').onclick = () => {
-                localStorage.setItem(`lernapp_${userKey}_storage_chosen`, '1');
-                modal.hide();
-            };
-            modal.show();
+            // Fallback: Modal nach DOM-Ready oder mit Timeout anzeigen
+            if (document.readyState === 'complete' || document.readyState === 'interactive') {
+                setTimeout(showModal, 0);
+            } else {
+                document.addEventListener('DOMContentLoaded', showModal);
+            }
+        } else {
+            // 2. Login und später: Speicherort im Hintergrund verbinden
+            if (window.lernappCloudStorage.dirHandle == null) {
+                await window.lernappCloudStorage.loadDirHandle();
+            }
         }
     }
     // Umschalten der Felder je nach Kategorie
@@ -59,12 +128,13 @@ class LernApp {
             container.innerHTML = '<p class="text-muted">Keine Benutzer vorhanden.</p>';
             return;
         }
-        container.innerHTML = `<div class="table-responsive"><table class="table table-sm align-middle"><thead><tr><th>Benutzername</th><th>Anzeigename</th><th>Letzter Login</th><th>Aktionen</th></tr></thead><tbody>
+        container.innerHTML = `<div class="table-responsive"><table class="table table-sm align-middle"><thead><tr><th>Benutzername</th><th>Anzeigename</th><th>Letzter Login</th><th>Logins</th><th>Aktionen</th></tr></thead><tbody>
             ${users.map(u => `
                 <tr>
                     <td>${u.username}</td>
                     <td>${u.displayName || ''}</td>
                     <td>${u.lastLogin ? new Date(u.lastLogin).toLocaleString('de-DE') : '-'}</td>
+                    <td>${u.loginCount || 0}</td>
                     <td>
                         <button class="btn btn-sm btn-outline-info me-1" onclick="app.adminShowUserData('${u.username}')"><i class='bi bi-database'></i> Daten</button>
                         <button class="btn btn-sm btn-outline-warning me-1" onclick="app.adminResetPassword('${u.username}')"><i class='bi bi-key'></i> Passwort zurücksetzen</button>
@@ -198,7 +268,7 @@ class LernApp {
         } else if (sessionUser) {
             this.currentUser = sessionUser;
             // Prüfe nach Login, ob Speicherort gewählt werden soll
-            setTimeout(() => this.showStorageLocationDialogIfNeeded(), 200);
+            this.showStorageLocationDialogIfNeeded();
         }
     }
 
@@ -212,6 +282,10 @@ class LernApp {
                 const userData = this.users[this.currentUser];
                 document.getElementById('current-username').textContent = 
                     userData.displayName || this.currentUser;
+                let loginInfo = userData.lastLogin ? new Date(userData.lastLogin).toLocaleString('de-DE') : '-';
+                loginInfo += ` (Logins: ${userData.loginCount || 0})`;
+                const lastLoginElem = document.getElementById('last-login-time');
+                if (lastLoginElem) lastLoginElem.textContent = loginInfo;
                 document.getElementById('dashboard-username').textContent = 
                     userData.displayName || this.currentUser;
             } else if (this.isDemo) {
@@ -309,7 +383,8 @@ class LernApp {
             password: this.hashPassword(password),
             displayName: displayName || username,
             createdAt: new Date().toISOString(),
-            lastLogin: null
+            lastLogin: null,
+            loginCount: 0
         };
 
         this.users[username] = newUser;
@@ -341,8 +416,8 @@ class LernApp {
         sessionStorage.removeItem('lernapp_admin_access');
         this.hideAdminInterface();
         // Login erfolgreich
-        const isFirstLogin = !user.lastLogin;
         user.lastLogin = new Date().toISOString();
+        user.loginCount = (user.loginCount || 0) + 1;
         this.users[username] = user;
         this.saveToStorage('users', this.users, true);
         this.currentUser = username;
@@ -353,13 +428,13 @@ class LernApp {
         this.updateUIForLoginState();
         this.updateDashboard();
         this.showAlert(`Willkommen zurück, ${user.displayName}!`, 'success');
-        // Nach erstem Login: Speicherort wählen
-        if (isFirstLogin && window.lernappCloudStorage && window.lernappCloudStorage.chooseDirectory) {
-            setTimeout(async () => {
-                alert('Bitte wählen Sie einen Speicherort für Ihre Daten.\nTipp: Ein Cloud-Ordner ermöglicht Synchronisation auf mehreren Geräten.');
-                await window.lernappCloudStorage.chooseDirectory();
-                window.lernappCloudStorage.setUserFolderName(username);
-            }, 500);
+        // Speicherort-Dialog nur beim ersten Login anzeigen, ab 2. Login automatisch laden
+        if (user.loginCount === 1 && window.lernappCloudStorage) {
+            this.showStorageLocationDialogIfNeeded();
+        } else if (user.loginCount > 1 && window.lernappCloudStorage) {
+            if (window.lernappCloudStorage.dirHandle == null && typeof window.lernappCloudStorage.loadDirHandle === 'function') {
+                window.lernappCloudStorage.loadDirHandle();
+            }
         }
     }
 
@@ -375,16 +450,20 @@ class LernApp {
         this.showAlert('Demo-Modus gestartet! Ihre Daten werden nicht dauerhaft gespeichert.', 'info');
     }
 
-    logoutUser() {
-        if (confirm('Möchten Sie sich wirklich abmelden?')) {
+    logoutUser(forceLogout = false) {
+        if (forceLogout || confirm('Möchten Sie sich wirklich abmelden?')) {
             this.currentUser = null;
             this.isDemo = false;
             sessionStorage.removeItem('lernapp_current_user');
             sessionStorage.removeItem('lernapp_demo_mode');
             sessionStorage.removeItem('lernapp_admin_access');
-            
             this.updateUIForLoginState();
-            this.showAlert('Erfolgreich abgemeldet!', 'success');
+            if (forceLogout) {
+                // Nach Account-Löschung: sofort auf Startseite und reload
+                location.reload();
+            } else {
+                this.showAlert('Erfolgreich abgemeldet!', 'success');
+            }
         }
     }
 
@@ -825,13 +904,13 @@ class LernApp {
         document.getElementById('my-questions-count').textContent = this.questions.length;
         this.updateSharedContentList();
 
-        // Last login time
+        // Last login time + login count (wie im Dashboard oben)
         const lastLoginElement = document.getElementById('last-login-time');
         if (lastLoginElement && !this.isDemo && this.users[this.currentUser]) {
-            const lastLogin = this.users[this.currentUser].lastLogin;
-            if (lastLogin) {
-                lastLoginElement.textContent = new Date(lastLogin).toLocaleDateString('de-DE');
-            }
+            const userData = this.users[this.currentUser];
+            let loginInfo = userData.lastLogin ? new Date(userData.lastLogin).toLocaleString('de-DE') : '-';
+            loginInfo += ` (Logins: ${userData.loginCount || 0})`;
+            lastLoginElement.textContent = loginInfo;
         }
     }
 
@@ -1124,6 +1203,23 @@ class LernApp {
     }
 
     setupEventListeners() {
+        // Logout-Button (Profil Dropdown)
+        const logoutBtn = document.querySelector('.user-only .dropdown-menu .dropdown-item[onclick*="logoutUser"]');
+        if (logoutBtn) {
+            logoutBtn.onclick = (e) => {
+                e.preventDefault();
+                this.logoutUser();
+            };
+        }
+
+        // Account löschen (Profilseite)
+        const deleteAccountBtn = document.querySelector('.btn-outline-danger[onclick*="deleteAccount"]');
+        if (deleteAccountBtn) {
+            deleteAccountBtn.onclick = (e) => {
+                e.preventDefault();
+                this.deleteAccount();
+            };
+        }
         // Frage-Formular
         document.getElementById('question-form').addEventListener('submit', (e) => {
             e.preventDefault();
@@ -1148,7 +1244,6 @@ class LernApp {
         document.getElementById('shared-image-input').addEventListener('change', (e) => {
             this.handleImageUpload(e, 'shared');
         });
-        
         document.getElementById('answer-image-input').addEventListener('change', (e) => {
             this.handleImageUpload(e, 'answer');
         });
@@ -1157,6 +1252,47 @@ class LernApp {
         document.getElementById('filter-category').addEventListener('change', () => {
             this.renderQuestionsList();
         });
+
+        // Login/Register Umschaltung (Tabs)
+        const loginTab = document.getElementById('login-tab');
+        const registerTab = document.getElementById('register-tab');
+        if (loginTab && registerTab) {
+            loginTab.onclick = (e) => {
+                e.preventDefault();
+                this.switchAuthMode('login');
+            };
+            registerTab.onclick = (e) => {
+                e.preventDefault();
+                this.switchAuthMode('register');
+            };
+        }
+
+        // Admin-Login Button
+        const adminLoginLink = document.getElementById('admin-login-link');
+        if (adminLoginLink) {
+            adminLoginLink.onclick = (e) => {
+                e.preventDefault();
+                this.showAdminLogin();
+            };
+        }
+
+        // User-Login Button
+        const userLoginBtn = document.querySelector('.guest-only .nav-link[onclick*="showUserLogin"]');
+        if (userLoginBtn) {
+            userLoginBtn.onclick = (e) => {
+                e.preventDefault();
+                this.showUserLogin('login');
+            };
+        }
+
+        // User-Register Button
+        const userRegisterBtn = document.querySelector('.card-body .btn.btn-primary[onclick*="showUserLogin"]');
+        if (userRegisterBtn) {
+            userRegisterBtn.onclick = (e) => {
+                e.preventDefault();
+                this.showUserLogin('register');
+            };
+        }
     }
 
     // Antwort-Typ Umschalten
@@ -2583,6 +2719,8 @@ function restartQuiz() {
 // App initialisieren
 document.addEventListener('DOMContentLoaded', () => {
     window.app = new LernApp();
+    // Globale Referenz für HTML-Buttons sicherstellen
+    window.app && (window.app = app = window.app);
     if (window.app.updateStorageLocationInfo) {
         window.app.updateStorageLocationInfo();
     }
