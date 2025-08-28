@@ -1,3 +1,36 @@
+// ========== ZENTRALES LOGGING ========== 
+// Log-Buffer in sessionStorage speichern
+function lernappLog(...args) {
+    const msg = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
+    // Zeitstempel für jede Zeile
+    const line = `[${new Date().toLocaleTimeString()}] ${msg}`;
+    let log = sessionStorage.getItem('lernapp_log') || '';
+    log += line + '\n';
+    sessionStorage.setItem('lernapp_log', log);
+    // Zusätzlich normale Ausgabe
+    console._origLog.apply(console, args);
+}
+
+// console.log überschreiben, Original sichern
+if (!console._origLog) {
+    console._origLog = console.log;
+    console.log = lernappLog;
+}
+
+// Log beim Laden der Seite löschen
+window.addEventListener('DOMContentLoaded', () => {
+    sessionStorage.removeItem('lernapp_log');
+});
+// ========== HINWEIS ZUR AUSLAGERUNG ==========
+// Die Logging-Funktion kann in eine eigene Datei ausgelagert werden, z.B. js/log.js
+// Dann einfach <script src="js/log.js"></script> vor allen anderen Skripten einbinden.
+// Ebenso können weitere Hilfsfunktionen (z.B. für Storage, Validierung, UI) ausgelagert werden.
+// Empfohlene Struktur:
+// - js/log.js (Logging)
+// - js/storage.js (Storage-Logik)
+// - js/validation.js (Validierungen)
+// - js/ui.js (UI-Hilfen)
+// - js/app.js (nur noch Hauptlogik und App-Klasse)
 // addCategory global verfügbar machen (wie showPage)
 if (typeof window !== 'undefined' && typeof app !== 'undefined' && typeof app.addCategory === 'function') {
     window.addCategory = function() { window.app.addCategory(); };
@@ -25,7 +58,7 @@ function delegateEvent(parentSelector, childSelector, event, handler) {
 
 class LernApp {
     // Account löschen
-    deleteAccount() {
+    async deleteAccount() {
         if (this.isDemo) {
             this.showAlert('Im Demo-Modus kann kein Account gelöscht werden!', 'warning');
             return;
@@ -35,13 +68,34 @@ class LernApp {
         // Nur noch eine zweite Nachfrage!
         if (!confirm('Letzte Warnung: Account und alle Daten werden gelöscht. Fortfahren?')) return;
         const username = this.currentUser;
+        // Debug-Ausgaben vor Löschen
+        if (this.currentUser) {
+            console.log('[LernApp][deleteAccount] users vor Löschen:', JSON.stringify(this.users));
+            console.log('[LernApp][deleteAccount] localStorage vor Cleanup:', Object.keys(localStorage).filter(k => k.includes(this.currentUser)));
+        }
         // User entfernen
         delete this.users[username];
-        this.saveToStorage('users', this.users, true);
-        // Lokale Userdaten entfernen
-        this.resetUserData();
+        await this.saveToStorage('users', this.users, true);
+        // Zentrales Userpaket und alle zugehörigen Daten explizit entfernen
+        localStorage.removeItem(`lernapp_user_${username}`);
+        localStorage.removeItem(`lernapp_user_${username}_categories`);
+        localStorage.removeItem(`lernapp_user_${username}_questions`);
+        localStorage.removeItem(`lernapp_user_${username}_statistics`);
+        // Zusätzlich: Alle lokalen Storage-Keys, die den Usernamen enthalten, entfernen (Altlasten!)
+        const userKeyRegex = new RegExp(`(^|[_-])${username}([_-]|$)`, 'i');
+        Object.keys(localStorage).forEach(key => {
+            if (userKeyRegex.test(key)) {
+                localStorage.removeItem(key);
+            }
+        });
+        // Debug-Ausgaben nach Löschen
+        console.log('[LernApp][deleteAccount] users nach Löschen:', JSON.stringify(this.users));
+        console.log('[LernApp][deleteAccount] localStorage nach Cleanup:', Object.keys(localStorage).filter(k => k.includes(username)));
+        // Userliste garantiert frisch laden
+        this.users = await this.loadFromStorage('users', true) || {};
         // Ausloggen und auf Startseite
         this.logoutUser(true); // true = forceLogout nach Account-Löschung
+        location.reload();
     }
     // Zeigt beim ersten Login den Speicherort-Dialog an
     async showStorageLocationDialogIfNeeded() {
@@ -143,9 +197,13 @@ class LernApp {
         }
     }
     // ========== ADMIN USER MANAGEMENT ==========
-    renderAdminUsersList() {
+    async renderAdminUsersList() {
         const container = document.getElementById('admin-users-list');
         if (!container) return;
+        // Lade User-Liste frisch aus dem Storage (async!)
+        let usersObj = await this.loadFromStorage('users', true);
+        if (!usersObj) usersObj = {};
+        this.users = usersObj;
         const users = Object.values(this.users);
         if (users.length === 0) {
             container.innerHTML = '<p class="text-muted">Keine Benutzer vorhanden.</p>';
@@ -225,31 +283,46 @@ class LernApp {
         alert('Passwort wurde geändert!');
     }
 
-    adminDeleteUser(username) {
+    async adminDeleteUser(username) {
         if (!confirm(`Benutzer ${username} und alle zugehörigen Daten unwiderruflich löschen?`)) return;
+        // Debug-Ausgaben vor Löschen
+        console.log('[LernApp][adminDeleteUser] users vor Löschen:', JSON.stringify(this.users));
+        console.log('[LernApp][adminDeleteUser] localStorage vor Cleanup:', Object.keys(localStorage).filter(k => k.includes(username)));
         delete this.users[username];
-        this.saveToStorage('users', this.users, true);
-        // Alle Userdaten entfernen
-        const userKey = `user_${username}`;
-        localStorage.removeItem(`lernapp_${userKey}_categories`);
-        localStorage.removeItem(`lernapp_${userKey}_questions`);
-        localStorage.removeItem(`lernapp_${userKey}_statistics`);
+        await this.saveToStorage('users', this.users, true);
+        // Zentrales Userpaket und alle zugehörigen Daten explizit entfernen
+        localStorage.removeItem(`lernapp_user_${username}`);
+        localStorage.removeItem(`lernapp_user_${username}_categories`);
+        localStorage.removeItem(`lernapp_user_${username}_questions`);
+        localStorage.removeItem(`lernapp_user_${username}_statistics`);
+        // Zusätzlich: Alle lokalen Storage-Keys, die den Usernamen enthalten, entfernen (Altlasten!)
+        const userKeyRegex = new RegExp(`(^|[_-])${username}([_-]|$)`, 'i');
+        Object.keys(localStorage).forEach(key => {
+            if (userKeyRegex.test(key)) {
+                localStorage.removeItem(key);
+            }
+        });
+        // Debug-Ausgaben nach Löschen
+        console.log('[LernApp][adminDeleteUser] users nach Löschen:', JSON.stringify(this.users));
+        console.log('[LernApp][adminDeleteUser] localStorage nach Cleanup:', Object.keys(localStorage).filter(k => k.includes(username)));
+        // Userliste garantiert frisch laden
+        this.users = await this.loadFromStorage('users', true) || {};
         this.renderAdminUsersList();
         document.getElementById('admin-user-data').innerHTML = '';
         alert('Benutzer und Daten gelöscht!');
+        // Seite sofort neu laden, damit alle Instanzen synchron sind
+        location.reload();
     }
     constructor() {
         // User Management System
         this.currentUser = null;
         this.isDemo = false;
-        this.users = this.loadFromStorage('users', true) || {}; // Global users storage
-        this.sharedData = this.loadFromStorage('shared_data', true) || {}; // Global shared data storage
-        
+        this.users = {};
+        this.sharedData = {};
         // Current user's data (wird dynamisch geladen)
         this.categories = [];
         this.questions = [];
         this.statistics = {};
-        
         this.currentQuiz = {
             questions: [],
             currentIndex: 0,
@@ -257,14 +330,29 @@ class LernApp {
             selectedCategory: null,
             answers: []
         };
-
         this.init();
     }
 
-    init() {
+    async init() {
+        // User- und SharedData asynchron laden
+        this.users = await this.loadFromStorage('users', true) || {};
+        // Migration: Falls Userdaten noch nicht zentralisiert sind, migrieren
+        let migrationNeeded = false;
+        Object.keys(this.users).forEach(username => {
+            const user = this.users[username];
+            if (!user.statistics) { user.statistics = { totalQuestions: 0, correctAnswers: 0, lastPlayed: null, categoriesPlayed: {} }; migrationNeeded = true; }
+            if (!user.settings) { user.settings = {}; migrationNeeded = true; }
+            if (!user.storage) { user.storage = { chosen: false, folder: '', cloud: false }; migrationNeeded = true; }
+            if (!user.displayName) { user.displayName = username; migrationNeeded = true; }
+            if (!user.createdAt) { user.createdAt = new Date().toISOString(); migrationNeeded = true; }
+            if (typeof user.loginCount !== 'number') { user.loginCount = 0; migrationNeeded = true; }
+        });
+        if (migrationNeeded) await this.saveToStorage('users', this.users, true);
+        this.sharedData = await this.loadFromStorage('shared_data', true) || {};
+
         // Prüfen ob User eingeloggt ist
         this.checkUserSession();
-        
+
         if (this.currentUser || this.isDemo) {
             this.loadUserData();
             this.updateCategorySelects();
@@ -274,7 +362,7 @@ class LernApp {
             this.renderStatistics();
             this.updateDashboard();
         }
-        
+
         this.setupEventListeners();
         this.checkAdminAccess();
         this.updateUIForLoginState();
@@ -396,13 +484,23 @@ class LernApp {
         }
     }
 
-    registerUser(event) {
+    async registerUser(event) {
         event.preventDefault();
-        
+
+        // Username und Felder holen
         const username = document.getElementById('register-username').value.trim();
         const password = document.getElementById('register-password').value;
         const confirmPassword = document.getElementById('register-password-confirm').value;
         const displayName = document.getElementById('register-display-name').value.trim();
+
+        // 1. Userliste frisch laden
+        let users = await this.loadFromStorage('users', true);
+        if (!users) users = {};
+        this.users = users;
+
+        // Debug-Ausgaben: Userliste und localStorage vor dem Anlegen
+        console.log('[LernApp][registerUser] users vor Validierung:', JSON.stringify(this.users));
+        console.log('[LernApp][registerUser] localStorage vor Validierung:', Object.keys(localStorage).filter(k => k.includes(username)));
 
         // Validierung
         if (username.length < 3 || username.length > 20) {
@@ -425,23 +523,60 @@ class LernApp {
             return;
         }
 
+        // 2. Altlasten entfernen
+        localStorage.removeItem(`lernapp_user_${username}`);
+        localStorage.removeItem(`lernapp_user_${username}_categories`);
+        localStorage.removeItem(`lernapp_user_${username}_questions`);
+        localStorage.removeItem(`lernapp_user_${username}_statistics`);
+        // Zusätzlich: Alle lokalen Storage-Keys, die den Usernamen enthalten, entfernen (Altlasten!)
+        const userKeyRegex = new RegExp(`(^|[_-])${username}([_-]|$)`, 'i');
+        Object.keys(localStorage).forEach(key => {
+            if (userKeyRegex.test(key)) {
+                localStorage.removeItem(key);
+            }
+        });
+        // Auch aus dem zentralen User-Objekt entfernen (falls noch vorhanden)
         if (this.users[username]) {
-            this.showAlert('Benutzername bereits vergeben!', 'danger');
+            delete this.users[username];
+            await this.saveToStorage('users', this.users, true);
+        }
+
+        // 3. Userliste erneut frisch laden (nach Cleanup!)
+        users = await this.loadFromStorage('users', true);
+        if (!users) users = {};
+        this.users = users;
+
+        // Debug-Ausgaben nach Cleanup
+        console.log('[LernApp][registerUser] users nach Cleanup:', JSON.stringify(this.users));
+        console.log('[LernApp][registerUser] localStorage nach Cleanup:', Object.keys(localStorage).filter(k => k.includes(username)));
+
+        // 4. Jetzt erst prüfen, ob User existiert
+        if (this.users[username]) {
+            this.showAlert('Benutzername existiert noch im System! Bitte Seite neu laden oder anderen Namen wählen.', 'danger');
             return;
         }
 
-        // Benutzer erstellen
+        // Benutzer erstellen (zentralisiert)
         const newUser = {
             username: username,
             password: this.hashPassword(password),
             displayName: displayName || username,
             createdAt: new Date().toISOString(),
             lastLogin: null,
-            loginCount: 0
+            loginCount: 0,
+            storage: { chosen: false, folder: '', cloud: false },
+            statistics: { totalQuestions: 0, correctAnswers: 0, lastPlayed: null, categoriesPlayed: {} },
+            settings: {},
+            categories: ['Allgemein', 'Ordne zu'],
+            questions: []
         };
-
         this.users[username] = newUser;
-        this.saveToStorage('users', this.users, true);
+        // Zentrales Userpaket im localStorage speichern
+        localStorage.setItem(`lernapp_user_${username}`, JSON.stringify(newUser));
+        await this.saveToStorage('users', this.users, true);
+        // Debug-Ausgaben nach Anlegen
+        console.log('[LernApp][registerUser] users nach Anlegen:', JSON.stringify(this.users));
+        console.log('[LernApp][registerUser] localStorage nach Anlegen:', Object.keys(localStorage).filter(k => k.includes(username)));
 
         this.showAlert('Registrierung erfolgreich! Sie können sich jetzt anmelden.', 'success');
         this.switchAuthMode('login');
@@ -456,7 +591,10 @@ class LernApp {
         }
         const username = document.getElementById('login-username').value.trim();
         const password = document.getElementById('login-password').value;
+        // Prüfe, ob User in zentraler Userliste existiert
         if (!this.users[username]) {
+            // Sicherheit: auch zentrales Userpaket entfernen, falls noch vorhanden
+            localStorage.removeItem(`lernapp_user_${username}`);
             this.showAlert('Benutzername nicht gefunden!', 'danger');
             return;
         }
@@ -573,55 +711,82 @@ class LernApp {
                 lastPlayed: null
             };
         } else if (this.currentUser) {
-            // User-spezifische Daten laden
-            const userKey = `user_${this.currentUser}`;
-            // Prüfe, ob ein Cloud-Ordner gewählt wurde
-            if (window.lernappCloudStorage && window.lernappCloudStorage.dirHandle) {
-                // Versuche, die Datenbank im Ordner zu laden (löst ggf. Berechtigungsabfrage aus)
-                window.lernappCloudStorage.loadData().then(data => {
-                    if (data && data.categories && data.questions && data.statistics) {
-                        this.categories = data.categories;
-                        this.questions = data.questions;
-                        this.statistics = data.statistics;
-                    } else {
-                        // Fallback: localStorage
-                        this.categories = this.loadFromStorage(`${userKey}_categories`) || ['Allgemein', 'Ordne zu'];
-                        this.questions = this.loadFromStorage(`${userKey}_questions`) || [];
-                        this.statistics = this.loadFromStorage(`${userKey}_statistics`) || {
-                            totalQuestions: 0,
-                            correctAnswers: 0,
-                            categoriesPlayed: {},
-                            lastPlayed: null
-                        };
-                    }
-                }).catch(() => {
-                    // Fallback: localStorage
-                    this.categories = this.loadFromStorage(`${userKey}_categories`) || ['Allgemein', 'Ordne zu'];
-                    this.questions = this.loadFromStorage(`${userKey}_questions`) || [];
-                    this.statistics = this.loadFromStorage(`${userKey}_statistics`) || {
-                        totalQuestions: 0,
-                        correctAnswers: 0,
-                        categoriesPlayed: {},
-                        lastPlayed: null
-                    };
-                });
-            } else {
-                // Kein Cloud-Ordner: localStorage verwenden
-                this.categories = this.loadFromStorage(`${userKey}_categories`) || ['Allgemein', 'Ordne zu'];
-                this.questions = this.loadFromStorage(`${userKey}_questions`) || [];
-                this.statistics = this.loadFromStorage(`${userKey}_statistics`) || {
+            // Prüfe, ob User in zentraler Userliste existiert
+            if (!this.users[this.currentUser]) {
+                // Sicherheit: auch zentrales Userpaket entfernen, falls noch vorhanden
+                localStorage.removeItem(`lernapp_user_${this.currentUser}`);
+                this.categories = ['Allgemein', 'Ordne zu'];
+                this.questions = [];
+                this.statistics = {
                     totalQuestions: 0,
                     correctAnswers: 0,
                     categoriesPlayed: {},
                     lastPlayed: null
                 };
+                return;
+            }
+            // Debug-Ausgaben zu Beginn
+            if (this.currentUser) {
+                console.log('[LernApp][loadUserData] users:', JSON.stringify(this.users));
+                console.log('[LernApp][loadUserData] localStorage:', Object.keys(localStorage).filter(k => k.includes(this.currentUser)));
+            }
+            // Zentrales Userpaket laden
+            const userObjStr = localStorage.getItem(`lernapp_user_${this.currentUser}`);
+            if (userObjStr) {
+                try {
+                    const userObj = JSON.parse(userObjStr);
+                    // Wenn das Userpaket leer ist, keine Altlasten übernehmen
+                    this.categories = Array.isArray(userObj.categories) ? userObj.categories : ['Allgemein', 'Ordne zu'];
+                    this.questions = Array.isArray(userObj.questions) ? userObj.questions : [];
+                    this.statistics = (userObj.statistics && typeof userObj.statistics === 'object') ? userObj.statistics : {
+                        totalQuestions: 0,
+                        correctAnswers: 0,
+                        categoriesPlayed: {},
+                        lastPlayed: null
+                    };
+                    // Optionale Felder
+                    if (userObj.settings) this.users[this.currentUser].settings = userObj.settings;
+                    if (userObj.storage) this.users[this.currentUser].storage = userObj.storage;
+                    // loginCount und lastLogin NICHT überschreiben, wenn sie im User-Objekt schon gesetzt sind
+                    if (this.users[this.currentUser]) {
+                        if (typeof this.users[this.currentUser].loginCount === 'number') {
+                            userObj.loginCount = this.users[this.currentUser].loginCount;
+                        }
+                        if (this.users[this.currentUser].lastLogin) {
+                            userObj.lastLogin = this.users[this.currentUser].lastLogin;
+                        }
+                        this.users[this.currentUser] = { ...userObj };
+                    }
+                    console.log('[LernApp][loadUserData] Userpaket geladen:', userObj);
+                } catch (e) {
+                    // Fallback: leere Daten
+                    this.categories = ['Allgemein', 'Ordne zu'];
+                    this.questions = [];
+                    this.statistics = {
+                        totalQuestions: 0,
+                        correctAnswers: 0,
+                        categoriesPlayed: {},
+                        lastPlayed: null
+                    };
+                    console.log('[LernApp][loadUserData] Fehler beim Parsen, Daten zurückgesetzt.');
+                }
+            } else {
+                // Kein Paket vorhanden: Fallback auf leere Daten
+                this.categories = ['Allgemein', 'Ordne zu'];
+                this.questions = [];
+                this.statistics = {
+                    totalQuestions: 0,
+                    correctAnswers: 0,
+                    categoriesPlayed: {},
+                    lastPlayed: null
+                };
+                console.log('[LernApp][loadUserData] Kein Userpaket gefunden, Daten zurückgesetzt.');
             }
             // Wenn neue User keine Daten haben, Beispieldaten laden
-            if (this.questions.length === 0) {
+            if (!this.questions || this.questions.length === 0) {
                 this.loadSampleData();
             }
         }
-
         // Daten-Integrität prüfen
         this.validateDataIntegrity();
     }
@@ -697,86 +862,82 @@ class LernApp {
         this.saveToStorage('shared_data', this.sharedData, true);
 
         document.getElementById('share-code-display').value = shareCode;
-        this.updateSharedContentList();
-        this.showAlert('Teilungs-Code erfolgreich erstellt!', 'success');
-    }
-
-    generateUniqueCode() {
-        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-        let code = '';
-        for (let i = 0; i < 8; i++) {
-            code += chars.charAt(Math.floor(Math.random() * chars.length));
-        }
-        
-        // Prüfen ob Code bereits existiert
-        if (this.sharedData[code]) {
-            return this.generateUniqueCode();
-        }
-        
-        return code;
-    }
-
-    copyShareCode() {
-        const codeField = document.getElementById('share-code-display');
-        codeField.select();
-        codeField.setSelectionRange(0, 99999);
-        navigator.clipboard.writeText(codeField.value);
-        this.showAlert('Code in Zwischenablage kopiert!', 'success');
-    }
-
-    previewImportData() {
-        const importCode = document.getElementById('import-code').value.trim().toUpperCase();
-        
-        if (!importCode) {
-            this.showAlert('Bitte geben Sie einen Teilungs-Code ein!', 'warning');
-            return;
-        }
-
-        if (!this.sharedData[importCode]) {
-            this.showAlert('Ungültiger Teilungs-Code!', 'danger');
-            return;
-        }
-
-        const shareData = this.sharedData[importCode];
-        const previewContent = document.getElementById('import-preview-content');
-        
-        previewContent.innerHTML = `
-            <p><strong>Von:</strong> ${shareData.displayName} (${shareData.username})</p>
-            <p><strong>Erstellt am:</strong> ${new Date(shareData.timestamp).toLocaleDateString('de-DE')}</p>
-            <p><strong>Kategorien:</strong> ${shareData.categories.length} (${shareData.categories.join(', ')})</p>
-            <p><strong>Fragen:</strong> ${shareData.questions.length}</p>
-        `;
-
-        document.getElementById('import-preview').classList.remove('d-none');
-        this.pendingImportData = shareData;
-    }
-
-    confirmImportData() {
         if (this.isDemo) {
-            this.showAlert('Im Demo-Modus können keine Daten importiert werden!', 'warning');
-            return;
-        }
-
-        if (!this.pendingImportData) {
-            this.showAlert('Keine Daten zum Importieren verfügbar!', 'danger');
-            return;
-        }
-
-        const mergeCategories = document.getElementById('merge-categories').checked;
-        const mergeQuestions = document.getElementById('merge-questions').checked;
-        const importData = this.pendingImportData;
-
-        let importedCategories = 0;
-        let importedQuestions = 0;
-
-        // Kategorien importieren
-        if (mergeCategories && importData.categories) {
-            importData.categories.forEach(category => {
-                if (!this.categories.includes(category)) {
-                    this.categories.push(category);
-                    importedCategories++;
+            // Demo-Daten
+            this.categories = ['Allgemein', 'Ordne zu', 'Demo'];
+            this.questions = this.generateDemoQuestions();
+            this.statistics = {
+                totalQuestions: 0,
+                correctAnswers: 0,
+                categoriesPlayed: {},
+                lastPlayed: null
+            };
+        } else if (this.currentUser) {
+            // Prüfe, ob User in zentraler Userliste existiert
+            if (!this.users[this.currentUser]) {
+                // Sicherheit: auch zentrales Userpaket entfernen, falls noch vorhanden
+                localStorage.removeItem(`lernapp_user_${this.currentUser}`);
+                this.categories = ['Allgemein', 'Ordne zu'];
+                this.questions = [];
+                this.statistics = {
+                    totalQuestions: 0,
+                    correctAnswers: 0,
+                    categoriesPlayed: {},
+                    lastPlayed: null
+                };
+                console.log('[LernApp][loadUserData] User nicht gefunden, Daten zurückgesetzt.');
+                return;
+            }
+            // Debug-Ausgaben zu Beginn
+            console.log('[LernApp][loadUserData] users:', JSON.stringify(this.users));
+            console.log('[LernApp][loadUserData] localStorage:', Object.keys(localStorage).filter(k => k.includes(this.currentUser)));
+            // Zentrales Userpaket laden
+            const userObjStr = localStorage.getItem(`lernapp_user_${this.currentUser}`);
+            if (userObjStr) {
+                let userObj = null;
+                try {
+                    userObj = JSON.parse(userObjStr);
+                    // Wenn das Userpaket leer ist, keine Altlasten übernehmen
+                    this.categories = Array.isArray(userObj.categories) ? userObj.categories : ['Allgemein', 'Ordne zu'];
+                    this.questions = Array.isArray(userObj.questions) ? userObj.questions : [];
+                    this.statistics = (userObj.statistics && typeof userObj.statistics === 'object') ? userObj.statistics : {
+                        totalQuestions: 0,
+                        correctAnswers: 0,
+                        categoriesPlayed: {},
+                        lastPlayed: null
+                    };
+                    // Optionale Felder
+                    if (userObj.settings) this.users[this.currentUser].settings = userObj.settings;
+                    if (userObj.storage) this.users[this.currentUser].storage = userObj.storage;
+                    console.log('[LernApp][loadUserData] Userpaket geladen:', userObj);
+                } catch (e) {
+                    // Fallback: leere Daten
+                    this.categories = ['Allgemein', 'Ordne zu'];
+                    this.questions = [];
+                    this.statistics = {
+                        totalQuestions: 0,
+                        correctAnswers: 0,
+                        categoriesPlayed: {},
+                        lastPlayed: null
+                    };
+                    console.log('[LernApp][loadUserData] Fehler beim Parsen, Daten zurückgesetzt.');
                 }
-            });
+            } else {
+                // Kein Paket vorhanden: Fallback auf leere Daten
+                this.categories = ['Allgemein', 'Ordne zu'];
+                this.questions = [];
+                this.statistics = {
+                    totalQuestions: 0,
+                    correctAnswers: 0,
+                    categoriesPlayed: {},
+                    lastPlayed: null
+                };
+                console.log('[LernApp][loadUserData] Kein Userpaket gefunden, Daten zurückgesetzt.');
+            }
+            // Wenn neue User keine Daten haben, Beispieldaten laden
+            if (!this.questions || this.questions.length === 0) {
+                this.loadSampleData();
+            }
         }
 
         // Fragen importieren
@@ -870,10 +1031,16 @@ class LernApp {
         }
 
         if (this.currentUser) {
-            const userKey = `user_${this.currentUser}`;
-            this.saveToStorage(`${userKey}_categories`, this.categories);
-            this.saveToStorage(`${userKey}_questions`, this.questions);
-            this.saveToStorage(`${userKey}_statistics`, this.statistics);
+            // Zentrales Userpaket speichern
+            const userObj = {
+                ...this.users[this.currentUser],
+                categories: this.categories,
+                questions: this.questions,
+                statistics: this.statistics,
+                settings: this.users[this.currentUser].settings || {},
+                storage: this.users[this.currentUser].storage || {}
+            };
+            localStorage.setItem(`lernapp_user_${this.currentUser}`, JSON.stringify(userObj));
         }
     }
 
@@ -911,10 +1078,8 @@ class LernApp {
 
         if (confirm('Möchten Sie wirklich ALLE Ihre Daten löschen? Diese Aktion kann nicht rückgängig gemacht werden!')) {
             if (confirm('Sind Sie sich wirklich sicher? Alle Kategorien, Fragen und Statistiken werden gelöscht!')) {
-                const userKey = `user_${this.currentUser}`;
-                localStorage.removeItem(`lernapp_${userKey}_categories`);
-                localStorage.removeItem(`lernapp_${userKey}_questions`);
-                localStorage.removeItem(`lernapp_${userKey}_statistics`);
+                // Zentrales Userpaket entfernen
+                localStorage.removeItem(`lernapp_user_${this.currentUser}`);
 
                 this.loadUserData();
                 this.updateDashboard();
@@ -1105,6 +1270,7 @@ class LernApp {
             this.hideAdminInterface();
             this.showAlert('Admin-Abmeldung erfolgreich!', 'success');
             showPage('home');
+            this.disableUserLoginIfAdmin(); // Login sofort wieder aktivieren
         }
     }
 

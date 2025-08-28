@@ -61,7 +61,7 @@
         <div class="container">
             <a class="navbar-brand" href="#">
                 <i class="bi bi-mortarboard-fill me-2"></i>
-                LernApp
+                LernApp v1.0
             </a>
             <span id="storage-location-info" class="text-light small ms-3 d-none">
                 <i class="bi bi-hdd-network me-1"></i>
@@ -121,12 +121,36 @@
                             <i class="bi bi-box-arrow-right"></i> Logout
                         </a>
                     </li>
+        <!-- Log-Button -->
+        <li class="nav-item">
+            <a class="nav-link" href="#" onclick="showLernAppLogModal()">
+                <i class="bi bi-file-earmark-text"></i> Logs
+            </a>
+        </li>
                 </ul>
             </div>
         </div>
     </nav>
 
     <div class="container mt-4">
+    <!-- Log-Modal -->
+    <div class="modal fade" id="lernappLogModal" tabindex="-1" aria-labelledby="lernappLogModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="lernappLogModalLabel">LernApp Log-Ausgaben</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
+          </div>
+          <div class="modal-body">
+            <pre id="lernapp-log-content" style="max-height:60vh;overflow:auto;background:#f8f9fa;padding:1em;border-radius:6px;"></pre>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Schließen</button>
+            <button type="button" class="btn btn-outline-primary" onclick="downloadLernAppLog()"><i class="bi bi-download"></i> Log herunterladen</button>
+          </div>
+        </div>
+      </div>
+    </div>
         <!-- User Login/Registration Seite -->
         <div id="login-page" class="page">
             <div class="row justify-content-center">
@@ -875,6 +899,30 @@
         }
     }, 300);
 </script>
+</script>
+<script>
+// Log-Modal anzeigen
+function showLernAppLogModal() {
+    const log = sessionStorage.getItem('lernapp_log') || 'Keine Log-Ausgaben vorhanden.';
+    document.getElementById('lernapp-log-content').textContent = log;
+    const modal = new bootstrap.Modal(document.getElementById('lernappLogModal'));
+    modal.show();
+}
+// Log als Datei herunterladen
+function downloadLernAppLog() {
+    const log = sessionStorage.getItem('lernapp_log') || '';
+    const blob = new Blob([log], {type: 'text/plain'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'lernapp-log.txt';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }, 100);
+}
 </script>
 
 <!-- Zentrale Initialisierung für robuste, modulare App-Logik -->
