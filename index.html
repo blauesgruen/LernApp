@@ -138,17 +138,17 @@
                         <div class="card-body">
                             <!-- Login/Register Toggle -->
                             <div class="btn-group w-100 mb-4" role="group">
-                                <button type="button" class="btn btn-outline-primary active" id="login-tab" onclick="app.switchAuthMode('login')">
+                                <button type="button" class="btn btn-outline-primary active" id="login-tab">
                                     <i class="bi bi-box-arrow-in-right me-2"></i>Anmelden
                                 </button>
-                                <button type="button" class="btn btn-outline-primary" id="register-tab" onclick="app.switchAuthMode('register')">
+                                <button type="button" class="btn btn-outline-primary" id="register-tab">
                                     <i class="bi bi-person-plus me-2"></i>Registrieren
                                 </button>
                             </div>
 
                             <!-- Login Form -->
                             <div id="login-form">
-                                <form onsubmit="app.loginUser(event)">
+                                <form id="login-form-inner">
                                     <div class="mb-3">
                                         <label for="login-username" class="form-label">Benutzername</label>
                                         <input type="text" class="form-control" id="login-username" required>
@@ -165,7 +165,7 @@
 
                             <!-- Register Form -->
                             <div id="register-form" class="d-none">
-                                <form onsubmit="app.registerUser(event)">
+                                <form id="register-form-inner">
                                     <div class="mb-3">
                                         <label for="register-username" class="form-label">Benutzername</label>
                                         <input type="text" class="form-control" id="register-username" required>
@@ -671,7 +671,7 @@
                         <label for="new-category" class="form-label">Neue Kategorie</label>
                         <div class="input-group">
                             <input type="text" class="form-control" id="new-category" placeholder="Kategorie-Name">
-                            <button class="btn btn-primary" onclick="addCategory()">
+                            <button class="btn btn-primary" onclick="window.app.addCategory()">
                                 <i class="bi bi-plus-lg"></i>
                             </button>
                         </div>
@@ -865,6 +865,108 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="js/app-extensions.js" type="module"></script>
-    <script src="js/app.js"></script>
+    <script src="js/app.js" type="module"></script>
+
+<!-- Fallback: Stelle sicher, dass showPage global verfügbar ist (wichtig für HTML-Onclick) -->
+<script>
+    setTimeout(function() {
+        if (typeof window.showPage !== 'function' && typeof showPage === 'function') {
+            window.showPage = showPage;
+        }
+    }, 300);
+</script>
+</script>
+
+<!-- Zentrale Initialisierung für robuste, modulare App-Logik -->
+<script type="module">
+// === Globale Initialisierung: Robustheit & Einheitlichkeit ===
+
+// Bootstrap-Standard-Modal-Handling, plus robuster Fallback für Backdrop-Probleme
+const storageModal = document.getElementById('storageLocationModal');
+const bsStorageModal = storageModal ? new bootstrap.Modal(storageModal) : null;
+const chooseBtn = document.getElementById('storage-location-choose');
+const skipBtn = document.getElementById('storage-location-skip');
+if (chooseBtn) chooseBtn.onclick = () => { if (bsStorageModal) bsStorageModal.hide(); };
+if (skipBtn) skipBtn.onclick = () => { if (bsStorageModal) bsStorageModal.hide(); };
+
+// Fallback: Nach jedem Seitenaufruf und Modal-Schließen alle Backdrops und Modal-Open-States entfernen
+function removeAllModalArtifacts() {
+    // Entferne alle Backdrops
+    document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+    // Entferne Modal-Open-Klasse vom Body (verhindert Scroll-Blockade)
+    document.body.classList.remove('modal-open');
+    // Entferne evtl. übrig gebliebene Padding
+    document.body.style.overflow = '';
+    document.body.style.paddingRight = '';
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+    setTimeout(removeAllModalArtifacts, 100);
+});
+if (storageModal) {
+    storageModal.addEventListener('hidden.bs.modal', removeAllModalArtifacts);
+}
+
+// Nach App-Initialisierung und Erweiterung: Globale Methoden robust zuweisen
+window.addEventListener('DOMContentLoaded', () => {
+    // Warte, bis window.app und alle Erweiterungen vorhanden sind
+    setTimeout(() => {
+        if (window.app) {
+            const methods = [
+                'showAdminLogin', 'logoutAdmin', 'showUserLogin', 'logoutUser', 'startDemoMode', 'updateProfile',
+                'adminShowUserData', 'adminExportUserData', 'adminResetPassword', 'adminDeleteUser',
+                'copyShareCode', 'generateShareCode', 'previewImportData', 'confirmImportData', 'cancelImport',
+                'exportUserData', 'resetUserData', 'deleteAccount', 'setUserData', 'getUserData',
+                'submitAnswer', 'nextQuestion', 'finishQuiz', 'onCategorySelectChange'
+            ];
+            methods.forEach(fn => {
+                if (typeof window.app[fn] === 'function' && !window.app[fn].__bound) {
+                    window.app[fn] = window.app[fn].bind(window.app);
+                    window.app[fn].__bound = true;
+                }
+            });
+        }
+    }, 150);
+});
+
+// Zentrales Event-Binding für Login/Register/Admin (Fallback für alle Browser)
+document.addEventListener('DOMContentLoaded', () => {
+    const loginTab = document.getElementById('login-tab');
+    const registerTab = document.getElementById('register-tab');
+    if (loginTab) {
+        loginTab.onclick = (e) => {
+            e.preventDefault();
+            window.app && window.app.switchAuthMode && window.app.switchAuthMode('login');
+        };
+    }
+    if (registerTab) {
+        registerTab.onclick = (e) => {
+            e.preventDefault();
+            window.app && window.app.switchAuthMode && window.app.switchAuthMode('register');
+        };
+    }
+    const loginForm = document.getElementById('login-form-inner');
+    if (loginForm) {
+        loginForm.onsubmit = (e) => {
+            e.preventDefault();
+            window.app && window.app.loginUser && window.app.loginUser(e);
+        };
+    }
+    const registerForm = document.getElementById('register-form-inner');
+    if (registerForm) {
+        registerForm.onsubmit = (e) => {
+            e.preventDefault();
+            window.app && window.app.registerUser && window.app.registerUser(e);
+        };
+    }
+    const adminLoginLink = document.getElementById('admin-login-link');
+    if (adminLoginLink) {
+        adminLoginLink.onclick = (e) => {
+            e.preventDefault();
+            window.app && window.app.showAdminLogin && window.app.showAdminLogin();
+        };
+    }
+});
+</script>
 </body>
 </html>

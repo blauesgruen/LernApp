@@ -1,42 +1,3 @@
-// Admin-Methoden global verfügbar machen
-window.app && (window.app.adminShowUserData = function(username) { window.app.adminShowUserData(username); });
-window.app && (window.app.adminExportUserData = function(username) { window.app.adminExportUserData(username); });
-window.app && (window.app.adminResetPassword = function(username) { window.app.adminResetPassword(username); });
-window.app && (window.app.adminDeleteUser = function(username) { window.app.adminDeleteUser(username); });
-// Global navigation and helper functions
-function showPage(pageId) {
-    if (window.app) {
-        // Alle Seiten verstecken
-        document.querySelectorAll('.page').forEach(page => {
-            page.classList.add('d-none');
-        });
-        
-        // Gewünschte Seite anzeigen
-        const targetPage = document.getElementById(pageId + '-page');
-        if (targetPage) {
-            targetPage.classList.remove('d-none');
-        }
-        
-        // Spezielle Behandlung für Admin-Seite
-        if (pageId === 'admin') {
-            const adminAccess = sessionStorage.getItem('lernapp_admin_access');
-            if (!adminAccess) {
-                window.app.lockAdminFeatures();
-            }
-        }
-        
-        // Dashboard aktualisieren wenn zur Startseite gewechselt wird
-        if (pageId === 'home') {
-            window.app.updateDashboard();
-        }
-    }
-}
-
-function addCategory() {
-    if (window.app) {
-        window.app.addCategory();
-    }
-}
 
 // Erweiterte LernApp Methoden - Diese werden zur bestehenden Klasse hinzugefügt
 const LernAppExtensions = {
@@ -497,6 +458,10 @@ window.addEventListener('DOMContentLoaded', () => {
     setTimeout(() => {
         if (window.app) {
             Object.assign(window.app, LernAppExtensions);
+        }
+        // Stelle sicher, dass showPage global verfügbar ist (wichtig für alle Browser)
+        if (typeof window.showPage !== 'function' && typeof showPage === 'function') {
+            window.showPage = showPage;
         }
     }, 100);
 });

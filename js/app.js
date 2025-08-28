@@ -1,3 +1,11 @@
+// addCategory global verfügbar machen (wie showPage)
+if (typeof window !== 'undefined' && typeof app !== 'undefined' && typeof app.addCategory === 'function') {
+    window.addCategory = function() { window.app.addCategory(); };
+}
+// storage.js als zentrale Storage-Utility importieren
+import { storage } from './storage.js';
+window.storage = storage;
+
 // Utility: Sicheres Event-Binding mit Existenz-Check
 function safeAddEventListener(selector, event, handler, options) {
     const el = typeof selector === 'string' ? document.querySelector(selector) : selector;
@@ -332,6 +340,36 @@ class LernApp {
 
     showUserLogin(mode = 'login') {
         showPage('login');
+        // Umschalt-Buttons neu binden (wichtig bei dynamischem DOM)
+        const loginTab = document.getElementById('login-tab');
+        const registerTab = document.getElementById('register-tab');
+        if (loginTab) {
+            loginTab.onclick = (e) => {
+                e.preventDefault();
+                this.switchAuthMode('login');
+            };
+        }
+        if (registerTab) {
+            registerTab.onclick = (e) => {
+                e.preventDefault();
+                this.switchAuthMode('register');
+            };
+        }
+        // Formulare neu binden
+        const loginForm = document.getElementById('login-form-inner');
+        if (loginForm) {
+            loginForm.onsubmit = (e) => {
+                e.preventDefault();
+                this.loginUser(e);
+            };
+        }
+        const registerForm = document.getElementById('register-form-inner');
+        if (registerForm) {
+            registerForm.onsubmit = (e) => {
+                e.preventDefault();
+                this.registerUser(e);
+            };
+        }
         if (mode === 'register') {
             this.switchAuthMode('register');
         } else {
@@ -1021,7 +1059,7 @@ class LernApp {
     unlockAdminAccess() {
         const password = document.getElementById('modal-admin-password').value;
         const correctPassword = 'LernApp2025Admin'; // In Produktion: Sicheres Passwort verwenden
-        
+
         if (password === correctPassword) {
             // Alle User ausloggen, falls eingeloggt
             this.currentUser = null;
@@ -1031,20 +1069,27 @@ class LernApp {
             this.updateUIForLoginState();
             sessionStorage.setItem('lernapp_admin_access', 'granted');
             this.showAlert('Admin-Anmeldung erfolgreich!', 'success');
-            
-            // Modal schließen
-            const modal = bootstrap.Modal.getInstance(document.getElementById('adminLoginModal'));
+
+            // Modal schließen und aus dem DOM entfernen
+            const modalElem = document.getElementById('adminLoginModal');
+            const modal = modalElem ? bootstrap.Modal.getInstance(modalElem) : null;
             if (modal) {
                 modal.hide();
             }
-            
-            // Admin-Interface aktivieren
-            this.showAdminInterface();
-            
-            // Zur Admin-Seite wechseln
             setTimeout(() => {
+                if (modalElem && modalElem.parentNode) {
+                    modalElem.parentNode.removeChild(modalElem);
+                }
+                // Backdrop und Modal-Open-Status entfernen (UI-Blockade verhindern)
+                document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+                document.body.classList.remove('modal-open');
+                document.body.style.overflow = '';
+                document.body.style.paddingRight = '';
+                // Admin-Interface aktivieren
+                this.showAdminInterface();
+                // Direkt auf Admin-Seite umschalten
                 showPage('admin');
-            }, 1000);
+            }, 350); // Bootstrap-Animation abwarten
         } else {
             const errorDiv = document.getElementById('login-error');
             errorDiv.textContent = 'Falsches Passwort!';
@@ -1312,6 +1357,24 @@ class LernApp {
                 this.showUserLogin('register');
             }
         });
+
+        // Login-Formular (submit)
+        const loginForm = document.getElementById('login-form-inner');
+        if (loginForm) {
+            loginForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.loginUser(e);
+            });
+        }
+
+        // Registrierungsformular (submit)
+        const registerForm = document.getElementById('register-form-inner');
+        if (registerForm) {
+            registerForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.registerUser(e);
+            });
+        }
     }
 
     // Antwort-Typ Umschalten
@@ -1335,26 +1398,50 @@ class LernApp {
     }
 
     // Lokaler Speicher mit Verschlüsselung
-    loadFromStorage(key) {
+    async loadFromStorage(key) {
+        // Zentrale Storage-Utility nutzen
+        try {
+            if (window.storage && window.storage.load) {
+                const data = await window.storage.load(key);
+                // Wenn aus localStorage geladen, ggf. entschlüsseln
+                if (data && typeof data === 'string') {
+                    const decrypted = this.decryptData(data);
+                    return decrypted ? JSON.parse(decrypted) : null;
+                }
+                return data;
+            }
+        } catch (error) {
+            console.error('Fehler beim Laden der Daten (Storage-Utility):', error);
+        }
+        // Fallback: localStorage (verschlüsselt)
         try {
             const encryptedData = localStorage.getItem(`lernapp_${key}`);
             if (!encryptedData) return null;
-            
             const decryptedData = this.decryptData(encryptedData);
             return decryptedData ? JSON.parse(decryptedData) : null;
         } catch (error) {
-            console.error('Fehler beim Laden der Daten:', error);
+            console.error('Fehler beim Laden der Daten (Fallback):', error);
             return null;
         }
     }
 
-    saveToStorage(key, data) {
+    async saveToStorage(key, data) {
+        // Zentrale Storage-Utility nutzen
+        try {
+            if (window.storage && window.storage.save) {
+                await window.storage.save(key, data);
+                return;
+            }
+        } catch (error) {
+            console.error('Fehler beim Speichern der Daten (Storage-Utility):', error);
+        }
+        // Fallback: localStorage (verschlüsselt)
         try {
             const jsonData = JSON.stringify(data);
             const encryptedData = this.encryptData(jsonData);
             localStorage.setItem(`lernapp_${key}`, encryptedData);
         } catch (error) {
-            console.error('Fehler beim Speichern der Daten:', error);
+            console.error('Fehler beim Speichern der Daten (Fallback):', error);
             this.showAlert('Fehler beim Speichern der Daten!', 'danger');
         }
     }
@@ -2743,4 +2830,49 @@ document.addEventListener('DOMContentLoaded', () => {
     if (window.app.updateStorageLocationInfo) {
         window.app.updateStorageLocationInfo();
     }
+
+    // Fallback: Login/Register-Formulare und Admin-Link direkt binden
+    function bindLoginRegisterUI() {
+        const loginTab = document.getElementById('login-tab');
+        const registerTab = document.getElementById('register-tab');
+        if (loginTab) {
+            loginTab.onclick = (e) => {
+                e.preventDefault();
+                window.app && window.app.switchAuthMode && window.app.switchAuthMode('login');
+            };
+        }
+        if (registerTab) {
+            registerTab.onclick = (e) => {
+                e.preventDefault();
+                window.app && window.app.switchAuthMode && window.app.switchAuthMode('register');
+            };
+        }
+        const loginForm = document.getElementById('login-form-inner');
+        if (loginForm) {
+            loginForm.onsubmit = (e) => {
+                e.preventDefault();
+                window.app && window.app.loginUser && window.app.loginUser(e);
+            };
+        }
+        const registerForm = document.getElementById('register-form-inner');
+        if (registerForm) {
+            registerForm.onsubmit = (e) => {
+                e.preventDefault();
+                window.app && window.app.registerUser && window.app.registerUser(e);
+            };
+        }
+        const adminLoginLink = document.getElementById('admin-login-link');
+        if (adminLoginLink) {
+            adminLoginLink.onclick = (e) => {
+                e.preventDefault();
+                window.app && window.app.showAdminLogin && window.app.showAdminLogin();
+            };
+        }
+    }
+    bindLoginRegisterUI();
 });
+
+// showPage global verfügbar machen (wichtig für HTML-Onclick)
+if (typeof window !== 'undefined' && typeof showPage === 'function') {
+    window.showPage = showPage;
+}
