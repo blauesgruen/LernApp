@@ -586,7 +586,8 @@ class LernApp {
     async loginUser(event) {
         // Doppel-Login-Schutz: Wenn bereits eingeloggt, nicht erneut zählen
         if (this.currentUser && this.currentUser === document.getElementById('login-username').value.trim()) {
-            this.showAlert('Sie sind bereits eingeloggt.', 'info');
+            // Nur auf der Login-Seite blockieren, aber keine Info-Bubble nach erfolgreichem Login anzeigen
+            // Keine weitere Aktion nötig, da nach Login die Seite gewechselt wird
             return;
         }
         event.preventDefault();
