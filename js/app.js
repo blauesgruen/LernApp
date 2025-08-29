@@ -561,7 +561,7 @@ class LernApp {
             displayName: displayName || username,
             createdAt: new Date().toISOString(),
             lastLogin: null,
-            loginCount: 0,
+            loginCount: 0, // Bleibt 0, wird erst beim ersten Login auf 1 gesetzt
             storage: { chosen: false, folder: '', cloud: false },
             statistics: { totalQuestions: 0, correctAnswers: 0, lastPlayed: null, categoriesPlayed: {} },
             settings: {},
@@ -578,10 +578,18 @@ class LernApp {
 
         this.showAlert('Registrierung erfolgreich! Sie können sich jetzt anmelden.', 'success');
         this.switchAuthMode('login');
-        document.getElementById('login-username').value = username;
+        // Login-Formular leeren, dann Username setzen
+        document.getElementById('login-username').value = '';
+        document.getElementById('login-password').value = '';
+        setTimeout(() => { document.getElementById('login-username').value = username; }, 50);
     }
 
     async loginUser(event) {
+        // Doppel-Login-Schutz: Wenn bereits eingeloggt, nicht erneut zählen
+        if (this.currentUser && this.currentUser === document.getElementById('login-username').value.trim()) {
+            this.showAlert('Sie sind bereits eingeloggt.', 'info');
+            return;
+        }
         event.preventDefault();
         if (sessionStorage.getItem('lernapp_admin_access')) {
             this.showAlert('Solange der Admin eingeloggt ist, kann sich kein Nutzer anmelden.', 'danger');
@@ -604,10 +612,17 @@ class LernApp {
         // Admin-Session beenden, falls aktiv
         sessionStorage.removeItem('lernapp_admin_access');
         this.hideAdminInterface();
+        // loginCount vor Setzen von lastLogin prüfen und erhöhen
+        if (typeof user.loginCount !== 'number' || user.loginCount === 0) {
+            user.loginCount = 1;
+        } else {
+            user.loginCount++;
+        }
         // Login erfolgreich
         user.lastLogin = new Date().toISOString();
-        user.loginCount = (user.loginCount || 0) + 1;
         this.users[username] = user;
+        // Zentrales Userpaket im localStorage aktualisieren!
+        localStorage.setItem(`lernapp_user_${username}`, JSON.stringify(user));
         this.saveToStorage('users', this.users, true);
         this.currentUser = username;
         this.isDemo = false;
