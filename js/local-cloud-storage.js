@@ -1,8 +1,22 @@
+
+// =============================
+// LernApp: LocalCloudStorage
+//
+// WICHTIG: Diese Datei MUSS VOR storage.js eingebunden werden!
+//
+// <script src="js/local-cloud-storage.js"></script>
+// <script src="js/storage.js"></script>
+// ...weitere Skripte...
+//
+// KEIN type="module" und KEIN async verwenden!
+// Optional: defer ist erlaubt, aber Reihenfolge muss stimmen.
+// =============================
+
 // Lokale und Cloud-Speicherung für LernApp
 // Moderne Browser: File System Access API (Chrome, Edge, Opera, ...)
 // Fallback: Datei-Export/Import
 
-export class LocalCloudStorage {
+class LocalCloudStorage {
     constructor() {
         this.dirHandle = null;
         this.fileName = 'lernapp-datenbank.json';
@@ -172,7 +186,7 @@ export class LocalCloudStorage {
 }
 
 // Hinweis für UI:
-export function getCloudHint() {
+function getLernAppCloudHint() {
     const knownClouds = [
         'Dropbox',
         'Nextcloud',
@@ -183,3 +197,7 @@ export function getCloudHint() {
     ];
     return 'Tipp: Wählen Sie einen Ordner in Ihrer Cloud (z.B. Dropbox, Nextcloud, OneDrive), um Ihre LernApp-Daten automatisch auf allen Geräten zu synchronisieren.';
 }
+
+// Global verfügbar machen (nur einmal, am Dateiende!)
+window.LocalCloudStorage = LocalCloudStorage;
+window.getLernAppCloudHint = getLernAppCloudHint;

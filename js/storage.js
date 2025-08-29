@@ -1,9 +1,11 @@
 // storage.js
 // Zentrale Storage-Utility für LernApp
 // Entscheidet automatisch: Cloud-Ordner (File System Access API) oder localStorage (verschlüsselt)
-// Fallback: Datei-Export/Import
+// Import/Export entfernt, alles im globalen Scope
+// Falls Funktionen/Objekte global gebraucht werden:
+// window.storageManager = storageManager;
 
-import { LocalCloudStorage, getCloudHint } from './local-cloud-storage.js';
+// Import entfernt, LocalCloudStorage und getCloudHint müssen global verfügbar sein
 
 class StorageManager {
     constructor() {
@@ -75,17 +77,18 @@ class StorageManager {
         if (userKey.endsWith('_statistics')) return data.statistics || {};
         return null;
     }
-
-    // Export/Import
-    exportData(data) {
-        LocalCloudStorage.exportData(data);
-    }
-    async importData() {
-        return await LocalCloudStorage.importData();
-    }
+    // Export/Import entfernt
+    // exportData(data) {
+    //     LocalCloudStorage.exportData(data);
+    // }
+    // async importData() {
+    //     return await LocalCloudStorage.importData();
+    // }
+    // getCloudHint als Methode
     getCloudHint() {
-        return getCloudHint();
+        return window.getLernAppCloudHint();
     }
 }
 
-export const storage = new StorageManager();
+// Singleton-Instanz für globale Nutzung
+window.storageManager = new StorageManager();

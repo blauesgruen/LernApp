@@ -1,3 +1,10 @@
+/* Modals immer über Navbar anzeigen */
+.modal {
+    z-index: 13000 !important;
+}
+.modal-backdrop {
+    z-index: 12900 !important;
+}
 /* LernApp - Custom Styles */
 
 :root {
@@ -22,6 +29,35 @@ body {
 
 .page {
     min-height: 80vh;
+}
+
+/* Fix: Navbar immer über allen Overlays */
+.navbar {
+    z-index: 11000;
+    position: relative;
+}
+
+/* Optional: Dropdown-Menüs der Navbar noch höher anzeigen */
+.navbar .dropdown-menu {
+    z-index: 11010;
+}
+
+/* Alerts immer über der Navbar anzeigen */
+.alert {
+    z-index: 12000;
+    position: relative;
+}
+
+/* Alerts als Overlay immer ganz oben, zentriert und sichtbar */
+.alert-global {
+    position: fixed !important;
+    top: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 12050;
+    min-width: 320px;
+    max-width: 90vw;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.15);
 }
 
 /* Quiz Styles */

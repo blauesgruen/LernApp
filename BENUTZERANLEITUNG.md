@@ -4,7 +4,28 @@
 
 Die LernApp ist eine interaktive Lernplattform mit Multi-User-Unterstützung, die es ermöglicht, eigene Fragen zu erstellen, Wissen zu testen und Inhalte mit anderen Benutzern zu teilen.
 
+
 ## 🚀 Erste Schritte
+
+### Technische Hinweise (für fortgeschrittene Nutzer)
+
+- Die App verwendet klassische `<script>`-Einbindung, keine Module!
+- Alle wichtigen Funktionen und Manager sind global verfügbar (z.B. `window.app`, `window.questionManager`, `window.groupManager`, `window.storageManager`).
+- Die Reihenfolge der Skripte ist wichtig (siehe README.md).
+
+### Cloud-Speicher & Datenexport
+
+Sie können Ihre Daten optional in einem Cloud-Ordner (z.B. Dropbox, Nextcloud, OneDrive) speichern. Dafür stehen folgende globale Methoden zur Verfügung (nach Laden der App):
+
+- `chooseLernAppStorageDir()` – Cloud-Ordner wählen
+- `saveLernAppDataToCloud(data)` – Datenbank speichern
+- `loadLernAppDataFromCloud()` – Datenbank laden
+- `exportLernAppData(data)` – Datenbank exportieren (Fallback)
+- `importLernAppData()` – Datenbank importieren (Fallback)
+- `getLernAppCloudHint()` – Hinweistext für UI
+- `lernappAutoSave(data)` – Automatisches Speichern
+
+**Hinweis:** Die Cloud-Funktionen sind nur verfügbar, wenn Ihr Browser die File System Access API unterstützt (z.B. Chrome, Edge). Bei Problemen prüfen Sie die Reihenfolge der Skripte in der `index.html`.
 
 ### Registrierung und Anmeldung
 

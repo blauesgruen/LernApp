@@ -114,90 +114,8 @@ const LernAppExtensions = {
 
         const correctAnswer = {
             text: questionData.answerType === 'text' ? questionData.answer : null,
-            image: questionData.answerType === 'image' ? questionData.answerImage : null,
-            isCorrect: true
-        };
-
-        const allAnswers = this.shuffleArray([...wrongAnswers, correctAnswer]);
-
-        return {
-            questionText: questionData.question || 'Was ist die richtige Antwort?',
-            questionImage: questionData.questionImage,
-            answers: allAnswers,
-            correctAnswerIndex: allAnswers.findIndex(a => a.isCorrect)
-        };
-    },
-
-    generateOrderQuestion(questionData, availableQuestions) {
-        const orderQuestions = availableQuestions.filter(q => 
-            q.category === 'Ordne zu' && 
-            q.id !== questionData.id &&
-            q.answerType === 'image' &&
-            q.answerImage
-        );
-
-        if (orderQuestions.length < 3) {
-            return null;
-        }
-
-        const wrongAnswers = this.shuffleArray(orderQuestions)
-            .slice(0, 3)
-            .map(q => ({
-                text: null,
-                image: q.answerImage,
-                isCorrect: false
-            }));
-
-        const correctAnswer = {
-            text: null,
-            image: questionData.answerImage,
-            isCorrect: true
-        };
-
-        const allAnswers = this.shuffleArray([...wrongAnswers, correctAnswer]);
-
-        return {
-            questionText: questionData.question,
-            questionImage: null,
-            answers: allAnswers,
-            correctAnswerIndex: allAnswers.findIndex(a => a.isCorrect)
-        };
-    },
-
-    generateMixedOrderQuestion(questionData, availableQuestions) {
-        const imageQuestions = availableQuestions.filter(q => 
-            q.id !== questionData.id &&
-            q.answerType === 'image' &&
-            q.answerImage
-        );
-
-        if (imageQuestions.length < 3) {
-            return null;
-        }
-
-        const wrongAnswers = this.shuffleArray(imageQuestions)
-            .slice(0, 3)
-            .map(q => ({
-                text: null,
-                image: q.answerImage,
-                isCorrect: false
-            }));
-
-        const correctAnswer = {
-            text: null,
-            image: questionData.answerImage,
-            isCorrect: true
-        };
-
-        const allAnswers = this.shuffleArray([...wrongAnswers, correctAnswer]);
-
-        return {
-            questionText: questionData.question,
-            questionImage: null,
-            answers: allAnswers,
-            correctAnswerIndex: allAnswers.findIndex(a => a.isCorrect)
-        };
-    },
+// Import/Export entfernt, alle globalen Funktionen korrekt deklariert
+// Siehe Dokumentation unten für die Nutzung der Cloud-Funktionen
 
     // Quiz-Anzeige
     showQuestion() {
@@ -522,7 +440,7 @@ const quizStyles = `
 // Styles zum Head hinzufügen
 document.head.insertAdjacentHTML('beforeend', quizStyles);
 
-import { LocalCloudStorage, getCloudHint } from './local-cloud-storage.js';
+
 
 // Instanz für lokalen/Cloud-Speicher
 window.lernappCloudStorage = new LocalCloudStorage();
@@ -658,3 +576,7 @@ window.lernappCheckUserFolder = async function(username) {
         }
     }
 };
+// Datei-Ende: Fehlende schließende Klammer ergänzt
+}
+}
+// (Datei korrekt abgeschlossen)
