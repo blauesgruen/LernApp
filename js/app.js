@@ -564,7 +564,7 @@ class LernApp {
             storage: { chosen: false, folder: '', cloud: false },
             statistics: { totalQuestions: 0, correctAnswers: 0, lastPlayed: null, categoriesPlayed: {} },
             settings: {},
-            categories: ['Allgemein', 'Ordne zu'],
+            categories: ['Textfragen', 'Bilderquiz'],
             questions: []
         };
         this.users[username] = newUser;
@@ -716,7 +716,7 @@ class LernApp {
     loadUserData() {
         if (this.isDemo) {
             // Demo-Daten
-            this.categories = ['Allgemein', 'Ordne zu', 'Demo'];
+            this.categories = ['Textfragen', 'Bilderquiz'];
             this.questions = this.generateDemoQuestions();
             this.statistics = {
                 totalQuestions: 0,
@@ -729,7 +729,7 @@ class LernApp {
             if (!this.users[this.currentUser]) {
                 // Sicherheit: auch zentrales Userpaket entfernen, falls noch vorhanden
                 localStorage.removeItem(`lernapp_user_${this.currentUser}`);
-                this.categories = ['Allgemein', 'Ordne zu'];
+                this.categories = ['Textfragen', 'Bilderquiz'];
                 this.questions = [];
                 this.statistics = {
                     totalQuestions: 0,
@@ -750,7 +750,7 @@ class LernApp {
                 try {
                     const userObj = JSON.parse(userObjStr);
                     // Wenn das Userpaket leer ist, keine Altlasten übernehmen
-                    this.categories = Array.isArray(userObj.categories) ? userObj.categories : ['Allgemein', 'Ordne zu'];
+                    this.categories = Array.isArray(userObj.categories) ? userObj.categories : ['Textfragen', 'Bilderquiz'];
                     this.questions = Array.isArray(userObj.questions) ? userObj.questions : [];
                     this.statistics = (userObj.statistics && typeof userObj.statistics === 'object') ? userObj.statistics : {
                         totalQuestions: 0,
@@ -765,7 +765,7 @@ class LernApp {
                     console.log('[LernApp][loadUserData] Userpaket geladen:', userObj);
                 } catch (e) {
                     // Fallback: leere Daten
-                    this.categories = ['Allgemein', 'Ordne zu'];
+                    this.categories = ['Textfragen', 'Bilderquiz'];
                     this.questions = [];
                     this.statistics = {
                         totalQuestions: 0,
@@ -777,7 +777,7 @@ class LernApp {
                 }
             } else {
                 // Kein Paket vorhanden: Fallback auf leere Daten
-                this.categories = ['Allgemein', 'Ordne zu'];
+                this.categories = ['Textfragen', 'Bilderquiz'];
                 this.questions = [];
                 this.statistics = {
                     totalQuestions: 0,
@@ -800,7 +800,7 @@ class LernApp {
         return [
             {
                 id: 'demo1',
-                category: 'Demo',
+                // entfernt
                 question: 'Was ist 2 + 2?',
                 answerType: 'text',
                 answer: '4',
@@ -809,7 +809,7 @@ class LernApp {
             },
             {
                 id: 'demo2',
-                category: 'Demo',
+                // entfernt
                 question: 'Wie viele Beine hat eine Spinne?',
                 answerType: 'text',
                 answer: '8',
@@ -818,7 +818,7 @@ class LernApp {
             },
             {
                 id: 'demo3',
-                category: 'Demo',
+                // entfernt
                 question: 'Was ist die Hauptstadt von Deutschland?',
                 answerType: 'text',
                 answer: 'Berlin',
@@ -827,7 +827,7 @@ class LernApp {
             },
             {
                 id: 'demo4',
-                category: 'Demo',
+                // entfernt
                 question: 'Welches Jahr haben wir aktuell?',
                 answerType: 'text',
                 answer: '2025',
@@ -1457,7 +1457,7 @@ class LernApp {
                 // Geografie - Text-Fragen mit Text-Antworten
                 {
                     id: 1,
-                    category: 'Geografie',
+                    // entfernt
                     question: 'Was ist die Hauptstadt von Deutschland?',
                     answerType: 'text',
                     answer: 'Berlin',
@@ -1466,7 +1466,7 @@ class LernApp {
                 },
                 {
                     id: 2,
-                    category: 'Geografie', 
+                    // entfernt
                     question: 'Was ist die Hauptstadt von Frankreich?',
                     answerType: 'text',
                     answer: 'Paris',
@@ -1475,7 +1475,7 @@ class LernApp {
                 },
                 {
                     id: 3,
-                    category: 'Geografie',
+                    // entfernt
                     question: 'Was ist die Hauptstadt von Italien?',
                     answerType: 'text',
                     answer: 'Rom',
@@ -1484,7 +1484,7 @@ class LernApp {
                 },
                 {
                     id: 4,
-                    category: 'Geografie',
+                    // entfernt
                     question: 'Was ist die Hauptstadt von Spanien?',
                     answerType: 'text',
                     answer: 'Madrid',
@@ -1493,7 +1493,7 @@ class LernApp {
                 },
                 {
                     id: 5,
-                    category: 'Geografie',
+                    // entfernt
                     question: 'Was ist die Hauptstadt von England?',
                     answerType: 'text',
                     answer: 'London',
@@ -1503,7 +1503,7 @@ class LernApp {
                 // Beispiel für "Ordne zu" - Text-Fragen mit Bild-Antworten
                 {
                     id: 6,
-                    category: 'Ordne zu',
+                    // entfernt
                     question: 'Finde den Apfel',
                     answerType: 'image',
                     answer: null,
@@ -1512,7 +1512,7 @@ class LernApp {
                 },
                 {
                     id: 7,
-                    category: 'Ordne zu',
+                    // entfernt
                     question: 'Finde die Banane',
                     answerType: 'image',
                     answer: null,
@@ -1521,7 +1521,7 @@ class LernApp {
                 },
                 {
                     id: 8,
-                    category: 'Ordne zu',
+                    // entfernt
                     question: 'Finde die Orange',
                     answerType: 'image',
                     answer: null,
@@ -1530,7 +1530,7 @@ class LernApp {
                 },
                 {
                     id: 9,
-                    category: 'Ordne zu',
+                    // entfernt
                     question: 'Finde die Traube',
                     answerType: 'image',
                     answer: null,

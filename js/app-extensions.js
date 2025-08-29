@@ -1,103 +1,49 @@
 
 // Erweiterte LernApp Methoden - Diese werden zur bestehenden Klasse hinzugefügt
 const LernAppExtensions = {
-    // Spezielle Quiz-Funktion für "Ordne zu" mit allen Bild-Antworten
-    startOrderQuiz() {
-        const imageAnswerQuestions = this.questions.filter(q => 
-            q.answerType === 'image' && 
-            q.answerImage && 
-            q.category !== 'Ordne zu'
-        );
-        
-        if (imageAnswerQuestions.length < 4) {
-            this.showAlert('Es gibt weniger als 4 Fragen mit Bildantworten! Bitte fügen Sie mehr Fragen hinzu.', 'warning');
-            return;
-        }
-
-        this.currentQuiz = {
-            questions: this.shuffleArray(imageAnswerQuestions).slice(0, 10),
-            currentIndex: 0,
-            score: 0,
-            selectedCategory: 'Ordne zu (Gemischt)',
-            answers: []
-        };
-
-        const firstQuestion = this.currentQuiz.questions[0];
-        const multipleChoiceQuestion = this.generateMixedOrderQuestion(firstQuestion, imageAnswerQuestions);
-        
-        if (!multipleChoiceQuestion) {
-            this.showAlert('Nicht genügend Fragen für ein Quiz verfügbar!', 'danger');
-            return;
-        }
-        
-        this.currentQuiz.questions[0] = { ...firstQuestion, ...multipleChoiceQuestion };
-
-        showPage('quiz');
-        document.getElementById('category-selection').classList.add('d-none');
-        document.getElementById('quiz-container').classList.remove('d-none');
-        this.showQuestion();
-    },
+    // Entfernt: Ordne zu Quiz-Funktion
 
     // Quiz-Logik
-    startQuiz(category) {
-        if (!category) {
-            category = document.getElementById('quiz-category').value;
-            if (!category) {
-                this.showAlert('Bitte wählen Sie eine Kategorie!', 'danger');
-                return;
-            }
-        }
+startQuiz(mainCategory, group) {
+    if (!mainCategory || !group) {
+        this.showAlert('Bitte wählen Sie eine Haupt- und Unterkategorie!', 'danger');
+        return;
+    }
 
-        const categoryQuestions = this.questions.filter(q => q.category === category);
-        
-        if (categoryQuestions.length < 4) {
-            this.showAlert('Diese Kategorie hat weniger als 4 Fragen! Bitte fügen Sie mehr Fragen hinzu.', 'warning');
-            return;
-        }
+    const filteredQuestions = this.questions.filter(q => q.mainCategory === mainCategory && q.group === group);
 
-        this.currentQuiz = {
-            questions: this.shuffleArray(categoryQuestions).slice(0, 10),
-            currentIndex: 0,
-            score: 0,
-            selectedCategory: category,
-            answers: []
-        };
+    if (filteredQuestions.length < 4) {
+        this.showAlert('Diese Unterkategorie hat weniger als 4 Fragen! Bitte fügen Sie mehr Fragen hinzu.', 'warning');
+        return;
+    }
 
-        const firstQuestion = this.currentQuiz.questions[0];
-        const questionsPool = this.questions.filter(q => q.category === category);
-        
-        if (category === 'Ordne zu') {
-            const multipleChoiceQuestion = this.generateOrderQuestion(firstQuestion, questionsPool);
-            if (!multipleChoiceQuestion) {
-                this.showAlert('Nicht genügend Fragen für ein Quiz verfügbar!', 'danger');
-                return;
-            }
-            this.currentQuiz.questions[0] = { ...firstQuestion, ...multipleChoiceQuestion };
-        } else {
-            const multipleChoiceQuestion = this.generateMultipleChoiceQuestion(firstQuestion, questionsPool);
-            if (!multipleChoiceQuestion) {
-                this.showAlert('Nicht genügend Fragen für ein Quiz verfügbar!', 'danger');
-                return;
-            }
-            this.currentQuiz.questions[0] = { ...firstQuestion, ...multipleChoiceQuestion };
-        }
+    this.currentQuiz = {
+        questions: this.shuffleArray(filteredQuestions).slice(0, 10),
+        currentIndex: 0,
+        score: 0,
+        selectedCategory: group,
+        selectedMainCategory: mainCategory,
+        answers: []
+    };
 
-        showPage('quiz');
-        document.getElementById('category-selection').classList.add('d-none');
-        document.getElementById('quiz-container').classList.remove('d-none');
-        this.showQuestion();
+    const firstQuestion = this.currentQuiz.questions[0];
+    const questionsPool = filteredQuestions;
+    // Nur neue Kategorien: Normale Multiple-Choice-Frage
+    const multipleChoiceQuestion = this.generateMultipleChoiceQuestion(firstQuestion, questionsPool);
+    if (!multipleChoiceQuestion) {
+        this.showAlert('Nicht genügend Fragen für ein Quiz verfügbar!', 'danger');
+        return;
+    }
+    this.currentQuiz.questions[0] = { ...firstQuestion, ...multipleChoiceQuestion };
     },
 
     // Quiz-Fragen generieren
     generateMultipleChoiceQuestion(questionData, availableQuestions) {
-        if (questionData.category === 'Ordne zu') {
-            return this.generateOrderQuestion(questionData, availableQuestions);
-        }
-
+        // Nur Multiple-Choice für neue Kategorien und Demo-Fragen (nur Text)
         const categoryQuestions = availableQuestions.filter(q => 
-            q.category === questionData.category && 
-            q.id !== questionData.id &&
-            q.answerType === questionData.answerType
+            q.mainCategory === questionData.mainCategory && 
+            q.group === questionData.group &&
+            q !== questionData
         );
 
         if (categoryQuestions.length < 3) {
@@ -107,15 +53,26 @@ const LernAppExtensions = {
         const wrongAnswers = this.shuffleArray(categoryQuestions)
             .slice(0, 3)
             .map(q => ({
-                text: questionData.answerType === 'text' ? q.answer : null,
-                image: questionData.answerType === 'image' ? q.answerImage : null,
+                text: q.answer,
+                image: null,
                 isCorrect: false
             }));
 
         const correctAnswer = {
-            text: questionData.answerType === 'text' ? questionData.answer : null,
-// Import/Export entfernt, alle globalen Funktionen korrekt deklariert
-// Siehe Dokumentation unten für die Nutzung der Cloud-Funktionen
+            text: questionData.answer,
+            image: null,
+            isCorrect: true
+        };
+
+        // Antworten mischen und Index des richtigen setzen
+        const answers = this.shuffleArray([correctAnswer, ...wrongAnswers]);
+        const correctAnswerIndex = answers.findIndex(a => a.isCorrect);
+
+        return {
+            answers,
+            correctAnswerIndex
+        };
+    },
 
     // Quiz-Anzeige
     showQuestion() {
@@ -268,23 +225,9 @@ const LernAppExtensions = {
         
         const nextQuestion = this.currentQuiz.questions[this.currentQuiz.currentIndex];
         
-        if (this.currentQuiz.selectedCategory === 'Ordne zu (Gemischt)') {
-            const imageAnswerQuestions = this.questions.filter(q => 
-                q.answerType === 'image' && 
-                q.answerImage && 
-                q.category !== 'Ordne zu'
-            );
-            const multipleChoiceQuestion = this.generateMixedOrderQuestion(nextQuestion, imageAnswerQuestions);
-            this.currentQuiz.questions[this.currentQuiz.currentIndex] = { ...nextQuestion, ...multipleChoiceQuestion };
-        } else if (this.currentQuiz.selectedCategory === 'Ordne zu') {
-            const questionsPool = this.questions.filter(q => q.category === this.currentQuiz.selectedCategory);
-            const multipleChoiceQuestion = this.generateOrderQuestion(nextQuestion, questionsPool);
-            this.currentQuiz.questions[this.currentQuiz.currentIndex] = { ...nextQuestion, ...multipleChoiceQuestion };
-        } else {
-            const questionsPool = this.questions.filter(q => q.category === this.currentQuiz.selectedCategory);
-            const multipleChoiceQuestion = this.generateMultipleChoiceQuestion(nextQuestion, questionsPool);
-            this.currentQuiz.questions[this.currentQuiz.currentIndex] = { ...nextQuestion, ...multipleChoiceQuestion };
-        }
+        const questionsPool = this.questions.filter(q => q.category === this.currentQuiz.selectedCategory);
+        const multipleChoiceQuestion = this.generateMultipleChoiceQuestion(nextQuestion, questionsPool);
+        this.currentQuiz.questions[this.currentQuiz.currentIndex] = { ...nextQuestion, ...multipleChoiceQuestion };
         
         this.showQuestion();
     },
@@ -579,4 +522,4 @@ window.lernappCheckUserFolder = async function(username) {
 // Datei-Ende: Fehlende schließende Klammer ergänzt
 }
 }
-// (Datei korrekt abgeschlossen)
+// Datei-Ende
