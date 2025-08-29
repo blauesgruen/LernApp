@@ -1,6 +1,10 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
+    <style>
+    /* Verhindert FOUC: Alle Seiten initial verstecken, bis App bereit */
+    .app-hidden { display: none !important; }
+    </style>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
@@ -152,7 +156,7 @@
       </div>
     </div>
         <!-- User Login/Registration Seite -->
-        <div id="login-page" class="page">
+    <div id="login-page" class="page app-hidden">
             <div class="row justify-content-center">
                 <div class="col-md-6">
                     <div class="card shadow">
@@ -238,7 +242,7 @@
         </div>
 
         <!-- Sharing/Datenteilung Seite -->
-        <div id="sharing-page" class="page d-none">
+    <div id="sharing-page" class="page d-none app-hidden">
             <div class="row">
                 <div class="col-md-10 mx-auto">
                     <div class="d-flex justify-content-between align-items-center mb-4">
@@ -363,7 +367,7 @@
         </div>
 
         <!-- Profil Seite -->
-        <div id="profile-page" class="page d-none">
+    <div id="profile-page" class="page d-none app-hidden">
             <div class="row justify-content-center">
                 <div class="col-md-6">
                     <div class="d-flex justify-content-between align-items-center mb-4">
@@ -433,7 +437,7 @@
         </div>
 
         <!-- Startseite -->
-        <div id="home-page" class="page">
+    <div id="home-page" class="page app-hidden">
             <!-- Welcome für nicht-eingeloggte Benutzer -->
             <div id="guest-welcome" class="guest-only">
                 <div class="row">
@@ -582,7 +586,7 @@
         </div>
 
         <!-- Quiz Seite -->
-        <div id="quiz-page" class="page d-none">
+    <div id="quiz-page" class="page d-none app-hidden">
             <div class="row">
                 <div class="col-md-8 mx-auto">
                     <div class="d-flex justify-content-between align-items-center mb-4">
@@ -662,7 +666,7 @@
         </div>
 
         <!-- Admin Seite -->
-        <div id="admin-page" class="page d-none">
+    <div id="admin-page" class="page d-none app-hidden">
             <div class="row">
                 <div class="col-md-10 mx-auto">
                     <div class="d-flex justify-content-between align-items-center mb-4">
@@ -869,7 +873,7 @@
         </div>
 
         <!-- Statistiken Seite -->
-        <div id="stats-page" class="page d-none">
+    <div id="stats-page" class="page d-none app-hidden">
             <div class="row">
                 <div class="col-md-8 mx-auto">
                     <div class="d-flex justify-content-between align-items-center mb-4">
@@ -901,15 +905,43 @@
 <!-- showPage global und sofort verfügbar machen (klassisches Script, kein Modul!) -->
 <script>
 function showPage(pageId) {
-    document.querySelectorAll('.page').forEach(page => page.classList.add('d-none'));
+    document.querySelectorAll('.page').forEach(page => {
+        page.classList.add('d-none');
+        page.classList.remove('app-hidden'); // Sichtbar machen, falls initial versteckt
+    });
     var targetPage = document.getElementById(pageId + '-page');
-    if (targetPage) targetPage.classList.remove('d-none');
+    if (targetPage) {
+        targetPage.classList.remove('d-none');
+        targetPage.classList.remove('app-hidden');
+    }
     // Optional: Aktiven Navbar-Link setzen
     document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
     var activeLink = document.querySelector('[onclick="showPage(\'' + pageId + '\')"]');
     if (activeLink) activeLink.classList.add('active');
+    // Zuletzt besuchte Seite merken (außer login/register)
+    if (pageId && pageId !== 'login' && pageId !== 'register') {
+        sessionStorage.setItem('lernapp_last_page', pageId);
+    }
 }
 window.showPage = showPage;
+
+// Nach dem Laden der Seite: Falls eingeloggt, letzte Seite anzeigen
+document.addEventListener('DOMContentLoaded', function() {
+    try {
+        var isLoggedIn = false;
+        if (window.app && (window.app.currentUser || window.app.isDemo)) {
+            isLoggedIn = true;
+        } else if (sessionStorage.getItem('lernapp_current_user') || sessionStorage.getItem('lernapp_demo_mode')) {
+            isLoggedIn = true;
+        }
+        if (isLoggedIn) {
+            var lastPage = sessionStorage.getItem('lernapp_last_page');
+            if (lastPage && document.getElementById(lastPage + '-page')) {
+                showPage(lastPage);
+            }
+        }
+    } catch(e) {}
+});
 </script>
 <script>
 // Cloud-Hinweis nach Laden der Seite setzen (robust, auch wenn Funktion erst nachträglich verfügbar)
