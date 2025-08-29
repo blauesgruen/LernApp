@@ -376,7 +376,7 @@ class LernApp {
             this.currentUser = 'demo';
         } else if (sessionUser) {
             this.currentUser = sessionUser;
-            // Kein automatischer Speicherort-Dialog mehr beim Reload
+            // loginCount NICHT erhöhen! Nur beim echten Login in loginUser.
         }
     }
 
@@ -1083,17 +1083,124 @@ class LernApp {
 
         if (confirm('Möchten Sie wirklich ALLE Ihre Daten löschen? Diese Aktion kann nicht rückgängig gemacht werden!')) {
             if (confirm('Sind Sie sich wirklich sicher? Alle Kategorien, Fragen und Statistiken werden gelöscht!')) {
-                // Zentrales Userpaket entfernen
-                localStorage.removeItem(`lernapp_user_${this.currentUser}`);
+                const username = this.currentUser;
+                // Entferne alle lokalen Storage-Keys, die den Usernamen enthalten, aber NICHT das User-Objekt selbst
+                const userKeyRegex = new RegExp(`(^|[_-])${username}([_-]|$)`, 'i');
+                Object.keys(localStorage).forEach(key => {
+                    // User-Objekt NICHT löschen:
+                    if (userKeyRegex.test(key) && !key.startsWith('lernapp_user_' + username)) {
+                        localStorage.removeItem(key);
+                    }
+                });
+                // Entferne bekannte Datenstrukturen (Fragen, Kategorien, Statistiken, Flags, Cloud, Altlasten)
+                localStorage.removeItem(`lernapp_user_${username}_categories`);
+                localStorage.removeItem(`lernapp_user_${username}_questions`);
+                localStorage.removeItem(`lernapp_user_${username}_statistics`);
+                localStorage.removeItem(`lernapp_user_${username}_storage_chosen`);
+                localStorage.removeItem(`lernapp_stats_${username}`);
+                localStorage.removeItem(`lernapp_flags_${username}`);
+                localStorage.removeItem(`lernapp_questions_${username}`);
+                localStorage.removeItem(`lernapp_categories_${username}`);
+                localStorage.removeItem(`lernapp_cloud_dir_${username}`);
+                localStorage.removeItem(`lernapp_cloud_hint_${username}`);
+                // Altlasten und globale Daten (falls vorhanden)
+                localStorage.removeItem('lernapp_userdata');
+                localStorage.removeItem('lernapp_questions');
+                localStorage.removeItem('lernapp_categories');
+                localStorage.removeItem('lernapp_stats');
+                localStorage.removeItem('lernapp_flags');
+                localStorage.removeItem('lernapp_cloud_dir');
+                localStorage.removeItem('lernapp_cloud_hint');
+                // Session- und temporäre Flags NICHT löschen, damit der User eingeloggt bleibt
 
-                this.loadUserData();
+                // Benutzerdaten im Speicher zurücksetzen
+                this.categories = ['Allgemein', 'Ordne zu'];
+                this.questions = [];
+                this.statistics = {
+                    totalQuestions: 0,
+                    correctAnswers: 0,
+                    categoriesPlayed: {},
+                    lastPlayed: null
+                };
+                // Zähler zurücksetzen
+                if (this.users && this.currentUser && this.users[this.currentUser]) {
+                    this.users[this.currentUser].loginCount = 1;
+                    // Speicherort-Flag entfernen, damit die Abfrage wieder erscheint
+                    localStorage.removeItem(`lernapp_user_${this.currentUser}_storage_chosen`);
+                    // Zentrales User-Objekt sofort mit loginCount=1 speichern
+                    const userObj = {
+                        ...this.users[this.currentUser],
+                        categories: this.categories,
+                        questions: this.questions,
+                        statistics: this.statistics,
+                        settings: this.users[this.currentUser].settings || {},
+                        storage: this.users[this.currentUser].storage || {}
+                    };
+                    localStorage.setItem(`lernapp_user_${this.currentUser}`, JSON.stringify(userObj));
+                    // WICHTIG: Auch verschlüsselten Storage sofort aktualisieren!
+                    this.saveToStorage('users', this.users, true);
+                }
+                this.saveUserData();
                 this.updateDashboard();
                 this.renderCategories();
                 this.renderCategoriesList();
                 this.renderQuestionsList();
                 this.renderStatistics();
-
                 this.showAlert('Alle Daten wurden zurückgesetzt!', 'success');
+                // Nach Reset: Dashboard anzeigen
+                showPage('home');
+                // Speicherort-Dialog nach Reset erneut anzeigen (Flag wurde entfernt)
+                setTimeout(() => {
+                    const modalEl = document.getElementById('storageLocationModal');
+                    if (typeof bootstrap !== 'undefined' && modalEl && !modalEl.classList.contains('show')) {
+                        // Fallback: Modal-Backdrops entfernen, falls noch vorhanden
+                        document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+                        document.body.classList.remove('modal-open');
+                        document.body.style.overflow = '';
+                        document.body.style.paddingRight = '';
+                        // Modal anzeigen
+                        const modal = new bootstrap.Modal(modalEl);
+                        // Event-Handler für Buttons neu binden
+                        const userKey = `user_${this.currentUser}`;
+                        const skipBtn = document.getElementById('storage-location-skip');
+                        const chooseBtn = document.getElementById('storage-location-choose');
+                        if (skipBtn) {
+                            skipBtn.onclick = () => {
+                                localStorage.setItem(`lernapp_${userKey}_storage_chosen`, '1');
+                                modal.hide();
+                                console.log('[LernApp] Speicherort-Dialog: Abbrechen (nach Reset)');
+                            };
+                        }
+                        if (chooseBtn) {
+                            chooseBtn.onclick = async () => {
+                                if (!window.lernappCloudStorage || !window.lernappCloudStorage.supported) {
+                                    // Zeige eigenes Modal statt alert
+                                    const notSupportedModalElem = document.getElementById('storageNotSupportedModal');
+                                    const notSupportedModal = new bootstrap.Modal(notSupportedModalElem, { backdrop: 'static', keyboard: false });
+                                    const chooseBtn2 = document.getElementById('storage-not-supported-choose');
+                                    const cancelBtn2 = document.getElementById('storage-not-supported-cancel');
+                                    if (chooseBtn2) chooseBtn2.onclick = () => {
+                                        notSupportedModal.hide();
+                                        modal.hide();
+                                        localStorage.setItem(`lernapp_${userKey}_storage_chosen`, '1');
+                                        console.log('[LernApp] Speicherort nicht unterstützt: gewählt (nach Reset)');
+                                    };
+                                    if (cancelBtn2) cancelBtn2.onclick = () => {
+                                        notSupportedModal.hide();
+                                        console.log('[LernApp] Speicherort nicht unterstützt: abgebrochen (nach Reset)');
+                                    };
+                                    notSupportedModal.show();
+                                } else {
+                                    await window.lernappCloudStorage.chooseDirectory(false);
+                                    localStorage.setItem(`lernapp_${userKey}_storage_chosen`, '1');
+                                    modal.hide();
+                                    console.log('[LernApp] Speicherort gewählt (nach Reset)');
+                                }
+                            };
+                        }
+                        modal.show();
+                    }
+                }, 600);
             }
         }
     }
