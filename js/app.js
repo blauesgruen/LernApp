@@ -61,7 +61,37 @@ function delegateEvent(parentSelector, childSelector, event, handler) {
 class LernApp {
     // Account löschen (unverändert)
     async deleteAccount() {
-        // ...existing code...
+        if (!this.currentUser) {
+            this.showAlert('Kein Benutzer eingeloggt!', 'danger');
+            return;
+        }
+        const username = this.currentUser;
+        if (!confirm(`Möchten Sie Ihren Account (${username}) und alle zugehörigen Daten unwiderruflich löschen?`)) return;
+        // Debug-Ausgaben vor Löschen
+        console.log('[LernApp][deleteAccount] users vor Löschen:', JSON.stringify(this.users));
+        console.log('[LernApp][deleteAccount] localStorage vor Cleanup:', Object.keys(localStorage).filter(k => k.includes(username)));
+        delete this.users[username];
+        await this.saveToStorage('users', this.users, true);
+        // Zentrales Userpaket und alle zugehörigen Daten explizit entfernen
+        localStorage.removeItem(`lernapp_user_${username}`);
+        localStorage.removeItem(`lernapp_user_${username}_categories`);
+        localStorage.removeItem(`lernapp_user_${username}_questions`);
+        localStorage.removeItem(`lernapp_user_${username}_statistics`);
+        // Speicherort-Flag entfernen
+        localStorage.removeItem(`lernapp_user_${username}_storage_chosen`);
+        // Zusätzlich: Alle lokalen Storage-Keys, die den Usernamen enthalten, entfernen (Altlasten!)
+        const userKeyRegex = new RegExp(`(^|[_-])${username}([_-]|$)`, 'i');
+        Object.keys(localStorage).forEach(key => {
+            if (userKeyRegex.test(key)) {
+                localStorage.removeItem(key);
+            }
+        });
+        // Debug-Ausgaben nach Löschen
+        console.log('[LernApp][deleteAccount] users nach Löschen:', JSON.stringify(this.users));
+        console.log('[LernApp][deleteAccount] localStorage nach Cleanup:', Object.keys(localStorage).filter(k => k.includes(username)));
+        // Logout und UI-Reset
+        this.logoutUser();
+        this.showAlert('Ihr Account und alle zugehörigen Daten wurden gelöscht.', 'success');
     }
     // Zeigt beim ersten Login den Speicherort-Dialog an
     async showStorageLocationDialogIfNeeded() {
