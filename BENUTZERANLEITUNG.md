@@ -212,15 +212,7 @@ Nach der Anmeldung sehen Sie Ihr persönliches Dashboard mit:
 
 ### Daten-Management
 
-#### Daten exportieren
-- **Vollständiger Export** aller Ihrer Daten
-- **JSON-Format** für Portabilität
-- **Backup-Zwecke** und Migration
 
-#### Daten zurücksetzen
-- **⚠️ ACHTUNG:** Löscht ALLE Ihre Daten
-- **Doppelte Bestätigung** erforderlich
-- **Nicht rückgängig machbar**
 
 ### Abmelden
 - **Klicken Sie auf Ihren Namen** → "Abmelden"

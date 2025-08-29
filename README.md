@@ -42,8 +42,7 @@ window.lernappAutoSave(app.getUserData());
 ```
 
 ## Fehlerbehebung
-- **ReferenceError:** Prüfe, ob alle Skripte in der richtigen Reihenfolge geladen werden.
-- **Cloud-Funktionen nicht verfügbar:** Stelle sicher, dass `local-cloud-storage.js` und `app-extensions.js` vor der Nutzung geladen sind.
+
 
 ## Dokumentation & Benutzeranleitung
 - Siehe `BENUTZERANLEITUNG.md` für eine vollständige Anleitung zur Nutzung der App.
