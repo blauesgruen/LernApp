@@ -376,8 +376,7 @@ class LernApp {
             this.currentUser = 'demo';
         } else if (sessionUser) {
             this.currentUser = sessionUser;
-            // Prüfe nach Login, ob Speicherort gewählt werden soll
-            this.showStorageLocationDialogIfNeeded();
+            // Kein automatischer Speicherort-Dialog mehr beim Reload
         }
     }
 
@@ -613,8 +612,10 @@ class LernApp {
         sessionStorage.removeItem('lernapp_admin_access');
         this.hideAdminInterface();
         // loginCount vor Setzen von lastLogin prüfen und erhöhen
+        let firstLogin = false;
         if (typeof user.loginCount !== 'number' || user.loginCount === 0) {
             user.loginCount = 1;
+            firstLogin = true;
         } else {
             user.loginCount++;
         }
@@ -632,8 +633,10 @@ class LernApp {
         this.updateUIForLoginState();
         this.updateDashboard();
         this.showAlert(`Willkommen zurück, ${user.displayName}!`, 'success');
-        // Kein automatischer Speicherort-Dialog mehr nach Login
-        if (window.lernappCloudStorage && window.lernappCloudStorage.dirHandle == null && typeof window.lernappCloudStorage.loadDirHandle === 'function') {
+        // Speicherort-Dialog nur beim ersten Login anzeigen
+        if (firstLogin) {
+            this.showStorageLocationDialogIfNeeded();
+        } else if (window.lernappCloudStorage && window.lernappCloudStorage.dirHandle == null && typeof window.lernappCloudStorage.loadDirHandle === 'function') {
             window.lernappCloudStorage.loadDirHandle();
         }
         showPage('home');
