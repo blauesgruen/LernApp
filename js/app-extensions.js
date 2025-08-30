@@ -1,4 +1,13 @@
 
+// Gibt einen Hinweistext zum aktuellen Cloud-Speicherstatus zurück
+function getCloudHint() {
+    if (window.lernappCloudStorage && window.lernappCloudStorage.dirHandle) {
+        return 'Cloud-Speicher ist aktiv: ' + window.lernappCloudStorage.dirHandle.name;
+    } else {
+        return 'Cloud-Speicher ist nicht aktiv. Ihre Daten werden nur lokal gespeichert.';
+    }
+}
+
 // Erweiterte LernApp Methoden - Diese werden zur bestehenden Klasse hinzugefügt
 const LernAppExtensions = {
     // Entfernt: Ordne zu Quiz-Funktion
@@ -10,7 +19,7 @@ startQuiz(mainCategory, group) {
         return;
     }
 
-    const filteredQuestions = this.questions.filter(q => q.mainCategory === mainCategory && q.group === group);
+    const filteredQuestions = window.questionManager.getQuestions(mainCategory, group);
 
     if (filteredQuestions.length < 4) {
         this.showAlert('Diese Unterkategorie hat weniger als 4 Fragen! Bitte fügen Sie mehr Fragen hinzu.', 'warning');
@@ -78,7 +87,7 @@ startQuiz(mainCategory, group) {
     showQuestion() {
         const question = this.currentQuiz.questions[this.currentQuiz.currentIndex];
         
-        document.getElementById('question-text').textContent = question.questionText;
+    document.getElementById('question-text').textContent = question.question || question.questionText || '';
         
         const questionImageContainer = document.getElementById('question-image');
         if (question.questionImage) {
@@ -519,7 +528,4 @@ window.lernappCheckUserFolder = async function(username) {
         }
     }
 };
-// Datei-Ende: Fehlende schließende Klammer ergänzt
-}
-}
 // Datei-Ende

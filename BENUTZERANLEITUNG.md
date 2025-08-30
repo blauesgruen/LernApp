@@ -23,6 +23,8 @@ Sie können Ihre Daten optional in einem Cloud-Ordner (z.B. Dropbox, Nextcloud, 
 - `exportLernAppData(data)` – Datenbank exportieren (Fallback)
 - `importLernAppData()` – Datenbank importieren (Fallback)
 - `getLernAppCloudHint()` – Hinweistext für UI
+
+   Gibt einen Hinweistext zurück, ob Cloud-Speicher aktiv ist (z.B. "Cloud-Speicher ist aktiv: ..." oder "Cloud-Speicher ist nicht aktiv. Ihre Daten werden nur lokal gespeichert.")
 - `lernappAutoSave(data)` – Automatisches Speichern
 
 **Hinweis:** Die Cloud-Funktionen sind nur verfügbar, wenn Ihr Browser die File System Access API unterstützt (z.B. Chrome, Edge). Bei Problemen prüfen Sie die Reihenfolge der Skripte in der `index.html`.

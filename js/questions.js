@@ -2,6 +2,92 @@
 // Deutsche Kommentare für Übersichtlichkeit
 
 class QuestionManager {
+    // NEU: Verschachtelte Gruppenstruktur
+    // this.nestedGroups = {
+    //   'Textfragen': [ { name: 'Unterkategorie', children: [ { name: 'Quizfragengruppe', children: [] } ] } ],
+    //   'Bilderquiz': [ ... ]
+    // }
+    nestedGroups = {
+        'Textfragen': [],
+        'Bilderquiz': []
+    };
+
+    // Fügt eine verschachtelte Gruppe hinzu (parentPath = Array von Namen)
+    addNestedGroup(mainCategory, groupName, parentPath = []) {
+        let node = this.nestedGroups[mainCategory];
+        for (const part of parentPath) {
+            let found = node.find(g => g.name === part);
+            if (!found) return false;
+            node = found.children;
+        }
+        if (!node.find(g => g.name === groupName)) {
+            node.push({ name: groupName, children: [] });
+            return true;
+        }
+        return false;
+    }
+
+    // Holt alle Gruppen/Untergruppen als Array (rekursiv)
+    getNestedGroups(mainCategory, node = undefined, path = []) {
+        // Wenn node explizit als [] übergeben wird, trotzdem Wurzel nehmen
+        if (!node || (Array.isArray(node) && node.length === 0)) {
+            node = this.nestedGroups[mainCategory] || [];
+        }
+        let result = [];
+        for (const group of node) {
+            const fullPath = [...path, group.name];
+            result.push({ path: fullPath, name: group.name });
+            if (group.children && group.children.length > 0) {
+                result = result.concat(this.getNestedGroups(mainCategory, group.children, fullPath));
+            }
+        }
+        return result;
+    }
+
+    // Holt alle Fragen zu einem Gruppenpfad (z.B. ['Unterkategorie', 'Quizfragengruppe'])
+    getQuestionsByGroupPath(mainCategory, groupPathArr) {
+        return this.questions.filter(q =>
+            q.mainCategory === mainCategory &&
+            Array.isArray(q.groupPath) &&
+            q.groupPath.join('>') === groupPathArr.join('>')
+        );
+    }
+
+    // Wrapper für alte Methoden (Kompatibilität)
+    addGroup(mainCategory, groupName) {
+        // Flach wie bisher, aber auch in verschachtelte Struktur als Top-Level
+        if (!this.groups[mainCategory]) this.groups[mainCategory] = [];
+        if (!this.groups[mainCategory].includes(groupName)) {
+            this.groups[mainCategory].push(groupName);
+        }
+        // Auch in verschachtelte Struktur als Top-Level
+        if (!this.nestedGroups[mainCategory].find(g => g.name === groupName)) {
+            this.nestedGroups[mainCategory].push({ name: groupName, children: [] });
+        }
+    }
+
+    // Holt alle Top-Level Gruppen (Kompatibilität)
+    getGroups(mainCategory) {
+        return this.groups[mainCategory] || [];
+    }
+
+    // Frage hinzufügen (Kompatibilität: groupPath optional)
+    addQuestion({ mainCategory, group, question, answer, answerImage, description, groupPath }) {
+        const newQuestion = {
+            mainCategory,
+            group,
+            question,
+            answer: answer || null,
+            answerImage: answerImage || null,
+            description: description || '',
+            groupPath: groupPath || (group ? [group] : [])
+        };
+        this.questions.push(newQuestion);
+    }
+    // Gibt alle Fragen einer bestimmten Gruppe (über alle Hauptkategorien) zurück
+    getQuestionsByGroup(group) {
+        return this.questions.filter(q => q.group === group);
+    }
     // Gibt alle Unterkategorien als Button-HTML zurück (für Quiz-Auswahl)
     getGroupButtons(mainCategory) {
         var groups = this.getGroups(mainCategory);
@@ -33,45 +119,36 @@ class QuestionManager {
 
     // Initialisiert Demo-Unterkategorie und Fragen für Textquiz
     initDemoTextQuiz() {
-        var demoGroup = 'Demo Testfragen';
-        this.addGroup('Textfragen', demoGroup);
+        // Demo-Unterkategorie für verschachtelte Gruppen
+        var demoSubgroup = 'Demo-Unterkategorie';
+        if (this.nestedGroups && Array.isArray(this.nestedGroups['Textfragen'])) {
+            // Nur hinzufügen, wenn noch nicht vorhanden
+            if (!this.nestedGroups['Textfragen'].find(g => g.name === demoSubgroup)) {
+                this.nestedGroups['Textfragen'].push({ name: demoSubgroup, children: [] });
+            }
+        }
+        // Logging: Wie sieht nestedGroups['Textfragen'] jetzt aus?
+    // ...
+        // Demo-Frage in die Unterkategorie
         var demoQuestions = [
             {
                 question: 'Was ist die Hauptstadt von Deutschland?',
                 answer: 'Berlin',
                 description: 'Berlin ist die größte Stadt Deutschlands.'
-            },
-            {
-                question: 'Wie viele Kontinente gibt es?',
-                answer: '7',
-                description: 'Die Kontinente sind Europa, Asien, Afrika, Nordamerika, Südamerika, Australien und Antarktis.'
-            },
-            {
-                question: 'Welches Element hat das chemische Symbol "O"?',
-                answer: 'Sauerstoff',
-                description: 'Sauerstoff ist lebenswichtig für die Atmung.'
-            },
-            {
-                question: 'Wer schrieb "Faust"?',
-                answer: 'Goethe',
-                description: 'Johann Wolfgang von Goethe ist einer der bekanntesten deutschen Dichter.'
-            },
-            {
-                question: 'Was ist das Ergebnis von 9 x 7?',
-                answer: '63',
-                description: '9 mal 7 ergibt 63.'
             }
         ];
         for (var i = 0; i < demoQuestions.length; i++) {
             var q = demoQuestions[i];
             this.addQuestion({
                 mainCategory: 'Textfragen',
-                group: demoGroup,
+                group: demoSubgroup,
                 question: q.question,
                 answer: q.answer,
                 description: q.description
             });
         }
+        // Logging: Teste getNestedGroups
+    // ...
     }
     // Neue Untergruppe anlegen
     addGroup(mainCategory, groupName) {
@@ -103,26 +180,31 @@ class QuestionManager {
     getGroups(mainCategory) {
         return this.groups[mainCategory] || [];
     }
+
+    // Lädt alle Userdaten (Fragen, Kategorien, Statistiken) in den questionManager
+    loadUserData(userObj) {
+        this.categories = Array.isArray(userObj.categories) ? [...userObj.categories] : [];
+        this.groups = {};
+        // Gruppen aus Fragen ableiten
+        if (Array.isArray(userObj.questions)) {
+            userObj.questions.forEach(q => {
+                if (!this.groups[q.mainCategory]) this.groups[q.mainCategory] = [];
+                if (!this.groups[q.mainCategory].includes(q.group)) this.groups[q.mainCategory].push(q.group);
+            });
+        }
+        this.questions = Array.isArray(userObj.questions) ? userObj.questions.map(q => ({...q})) : [];
+        this.statistics = userObj.statistics ? {...userObj.statistics} : {};
+    }
+
+    // Gibt ein Userpaket (Fragen, Kategorien, Statistiken) zurück
+    getUserData() {
+        return {
+            categories: [...this.categories],
+            questions: this.questions.map(q => ({...q})),
+            statistics: this.statistics ? {...this.statistics} : {}
+        };
+    }
 }
 
 // Singleton-Instanz für globale Nutzung
 window.questionManager = new QuestionManager();
-// Nach Laden der Seite: Hauptkategorien anzeigen, dann Unterkategorien nach Auswahl
-document.addEventListener('DOMContentLoaded', function() {
-    var btnContainer = document.getElementById('category-buttons');
-    if (!btnContainer) return;
-    // Hauptkategorien anzeigen
-    var mainCats = window.questionManager.categories;
-    btnContainer.innerHTML = '';
-    for (var i = 0; i < mainCats.length; i++) {
-        var cat = mainCats[i];
-        btnContainer.innerHTML += '<button class="btn btn-primary" style="min-width:140px;margin:4px;" onclick="window.showSubcategories(\'' + cat + '\')">' + cat + '</button>';
-    }
-});
-
-// Zeigt die Unterkategorien für eine Hauptkategorie an
-window.showSubcategories = function(mainCategory) {
-    var btnContainer = document.getElementById('category-buttons');
-    if (!btnContainer) return;
-    btnContainer.innerHTML = window.questionManager.getGroupButtons(mainCategory);
-};

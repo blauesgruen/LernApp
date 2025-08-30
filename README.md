@@ -33,6 +33,8 @@ Folgende Methoden stehen nach dem Laden von `app-extensions.js` global zur Verf�
 - `exportLernAppData(data)` – Datenbank exportieren (Fallback)
 - `importLernAppData()` – Datenbank importieren (Fallback)
 - `getLernAppCloudHint()` – Hinweistext für UI
+
+	Gibt einen Hinweistext zurück, ob Cloud-Speicher aktiv ist (z.B. "Cloud-Speicher ist aktiv: ..." oder "Cloud-Speicher ist nicht aktiv. Ihre Daten werden nur lokal gespeichert.")
 - `lernappAutoSave(data)` – Automatisches Speichern
 
 **Beispiel für Integration:**

@@ -1,3 +1,27 @@
+<!-- showPage global und sofort verfügbar machen (klassisches Script, kein Modul!) -->
+<script>
+function showPage(pageId) {
+    document.querySelectorAll('.page').forEach(page => {
+        page.classList.add('d-none');
+        page.classList.remove('app-hidden'); // Sichtbar machen, falls initial versteckt
+    });
+    var targetPage = document.getElementById(pageId + '-page');
+    if (targetPage) {
+        targetPage.classList.remove('d-none');
+        targetPage.classList.remove('app-hidden');
+    }
+    // Optional: Aktiven Navbar-Link setzen
+    document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
+    var activeLink = document.querySelector('[onclick="showPage(\'' + pageId + '\')"]');
+    if (activeLink) activeLink.classList.add('active');
+    // Zuletzt besuchte Seite merken (außer login/register)
+    if (pageId && pageId !== 'login' && pageId !== 'register') {
+        sessionStorage.setItem('lernapp_last_page', pageId);
+    }
+}
+window.showPage = showPage;
+
+</script>
 <!DOCTYPE html>
 <html lang="de">
 <head>
@@ -603,6 +627,15 @@
                             <div id="category-buttons" class="d-flex flex-wrap gap-2">
                                 <!-- Kategorien werden hier dynamisch eingefügt -->
                             </div>
+                            <!-- UI für Untergruppe hinzufügen -->
+                            <div id="add-subgroup-ui" class="mt-3">
+                                <div class="input-group">
+                                    <input type="text" class="form-control" id="subgroup-name-input" placeholder="Name der Untergruppe">
+                                    <button class="btn btn-outline-secondary" id="add-subgroup-btn" type="button">Untergruppe hinzufügen</button>
+                                </div>
+                                <small class="text-muted">Fügt eine Untergruppe zur aktuell angezeigten Gruppe/Hauptkategorie hinzu.</small>
+                            </div>
+                            </div>
                         </div>
                     </div>
 
@@ -902,47 +935,6 @@
     <script src="js/app-extensions.js"></script>
     <script src="js/app.js"></script>
 
-<!-- showPage global und sofort verfügbar machen (klassisches Script, kein Modul!) -->
-<script>
-function showPage(pageId) {
-    document.querySelectorAll('.page').forEach(page => {
-        page.classList.add('d-none');
-        page.classList.remove('app-hidden'); // Sichtbar machen, falls initial versteckt
-    });
-    var targetPage = document.getElementById(pageId + '-page');
-    if (targetPage) {
-        targetPage.classList.remove('d-none');
-        targetPage.classList.remove('app-hidden');
-    }
-    // Optional: Aktiven Navbar-Link setzen
-    document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
-    var activeLink = document.querySelector('[onclick="showPage(\'' + pageId + '\')"]');
-    if (activeLink) activeLink.classList.add('active');
-    // Zuletzt besuchte Seite merken (außer login/register)
-    if (pageId && pageId !== 'login' && pageId !== 'register') {
-        sessionStorage.setItem('lernapp_last_page', pageId);
-    }
-}
-window.showPage = showPage;
-
-// Nach dem Laden der Seite: Falls eingeloggt, letzte Seite anzeigen
-document.addEventListener('DOMContentLoaded', function() {
-    try {
-        var isLoggedIn = false;
-        if (window.app && (window.app.currentUser || window.app.isDemo)) {
-            isLoggedIn = true;
-        } else if (sessionStorage.getItem('lernapp_current_user') || sessionStorage.getItem('lernapp_demo_mode')) {
-            isLoggedIn = true;
-        }
-        if (isLoggedIn) {
-            var lastPage = sessionStorage.getItem('lernapp_last_page');
-            if (lastPage && document.getElementById(lastPage + '-page')) {
-                showPage(lastPage);
-            }
-        }
-    } catch(e) {}
-});
-</script>
 <script>
 // Cloud-Hinweis nach Laden der Seite setzen (robust, auch wenn Funktion erst nachträglich verfügbar)
 document.addEventListener('DOMContentLoaded', function() {

@@ -1,3 +1,45 @@
+// Robuste Initialisierung: Nach DOMContentLoaded regelmäßig prüfen, ob App und questionManager bereit sind
+window.addEventListener('DOMContentLoaded', function() {
+    let tries = 0;
+    const maxTries = 40;
+    const interval = setInterval(() => {
+        tries++;
+        if (window.app && window.questionManager) {
+            clearInterval(interval);
+            const lastPage = sessionStorage.getItem('lernapp_last_page');
+            if (lastPage && typeof window.showPage === 'function') {
+                window.showPage(lastPage);
+            }
+        } else if (tries >= maxTries) {
+            clearInterval(interval);
+            console.warn('[DEBUG] App-Initialisierung: window.app oder window.questionManager nicht bereit.');
+        }
+    }, 50);
+});
+
+// Zentrale Initialisierung: Nach DOMContentLoaded und App-Init richtige Seite anzeigen
+window.addEventListener('DOMContentLoaded', function() {
+    function tryShowLastPage() {
+        const lastPage = sessionStorage.getItem('lernapp_last_page');
+        if (lastPage && typeof window.showPage === 'function') {
+            window.showPage(lastPage);
+        }
+    }
+    // Falls App schon da, sofort ausführen, sonst auf window.app warten
+    if (window.app) {
+        tryShowLastPage();
+    } else {
+        let tries = 0;
+        const interval = setInterval(() => {
+            if (window.app) {
+                clearInterval(interval);
+                tryShowLastPage();
+            } else if (++tries > 20) {
+                clearInterval(interval);
+            }
+        }, 50);
+    }
+});
 // ========== ZENTRALES LOGGING ========== 
 // Log-Buffer in sessionStorage speichern
 function lernappLog(...args) {
@@ -59,6 +101,137 @@ function delegateEvent(parentSelector, childSelector, event, handler) {
 // LernApp - Hauptlogik
 
 class LernApp {
+    // Speichert den zuletzt angezeigten Hauptkategorie-Namen (für Untergruppen-UI)
+    lastMainCategory = null;
+    // Speichert den zuletzt angezeigten Gruppenpfad (als Array)
+    lastGroupPath = [];
+
+    // Erweiterte showNestedGroups, merkt sich den Pfad
+    showNestedGroups(mainCategory, groupPath = []) {
+        this.lastMainCategory = mainCategory;
+        this.lastGroupPath = groupPath;
+        const container = document.getElementById('category-buttons');
+        if (!container) return;
+        // Hole Untergruppen für den aktuellen Pfad
+    const subgroups = questionManager.getNestedGroups(mainCategory, groupPath);
+        container.innerHTML = '';
+        // Buttons für Untergruppen anzeigen
+        if (subgroups && subgroups.length > 0) {
+            subgroups.forEach(subgroup => {
+                const btn = document.createElement('button');
+                btn.className = 'btn btn-secondary m-1';
+                btn.textContent = subgroup.name;
+                btn.onclick = () => {
+                    this.showNestedGroups(mainCategory, subgroup.path);
+                };
+                container.appendChild(btn);
+            });
+        } else {
+            // Wenn keine weiteren Untergruppen, ggf. Hinweis
+            const info = document.createElement('div');
+            info.className = 'text-muted m-2';
+            info.textContent = 'Keine weiteren Untergruppen.';
+            container.appendChild(info);
+        }
+        // UI für Untergruppen anlegen nur ab Ebene 1 anzeigen
+        const ui = document.getElementById('add-subgroup-ui');
+    // ...
+        if (ui) {
+            // Zeige das Feld, sobald eine Hauptkategorie gewählt ist (also immer, außer im Hauptmenü)
+            if (typeof mainCategory === 'string' && mainCategory.length > 0) {
+                ui.style.display = 'flex';
+                container.appendChild(ui);
+                // Fokus auf das Eingabefeld setzen (optional)
+                const input = document.getElementById('subgroup-name-input');
+                if (input) input.focus();
+            } else {
+                ui.style.display = 'none';
+            }
+        }
+        this._showAddSubgroupUI();
+    }
+
+    // Hilfsfunktion: Finde Knoten in nestedGroups nach Pfad
+    _getNodeByPath(mainCategory, pathArr) {
+        let node = questionManager.nestedGroups[mainCategory];
+        for (const part of pathArr) {
+            let found = node.find(g => g.name === part);
+            if (!found) return [];
+            node = found.children;
+        }
+        return node;
+    }
+
+    // Bindet das Event für das UI zum Hinzufügen von Untergruppen
+    _showAddSubgroupUI() {
+        const btn = document.getElementById('add-subgroup-btn');
+        const input = document.getElementById('subgroup-name-input');
+        if (!btn || !input) return;
+        btn.onclick = () => {
+            const name = input.value.trim();
+            if (!name) return alert('Bitte gib einen Namen für die Untergruppe ein!');
+            // Füge Untergruppe zum aktuellen Pfad hinzu
+            questionManager.addNestedGroup(this.lastMainCategory, name, this.lastGroupPath);
+            // Nach dem Hinzufügen: Anzeige aktualisieren
+            this.showNestedGroups(this.lastMainCategory, this.lastGroupPath);
+            input.value = '';
+        };
+    }
+    // Zeigt die Hauptkategorie-Buttons im UI an
+    renderMainCategories() {
+        console.log('[DEBUG] renderMainCategories aufgerufen');
+        const container = document.getElementById('category-buttons');
+        if (!container) {
+            console.log('[DEBUG] #category-buttons NICHT gefunden!');
+            return;
+        }
+        let mainCats = questionManager.categories;
+        // Fallback: Demo-Kategorien initialisieren, falls leer
+        if (!mainCats || mainCats.length === 0) {
+            if (typeof questionManager.initDemoTextQuiz === 'function') {
+                questionManager.initDemoTextQuiz();
+                mainCats = questionManager.categories;
+                console.log('[DEBUG] Demo-Kategorien initialisiert:', mainCats);
+            }
+        }
+        console.log('[DEBUG] Kategorien:', mainCats);
+        container.innerHTML = '';
+        if (!mainCats || mainCats.length === 0) {
+            container.innerHTML = '<div class="text-muted">Keine Kategorien vorhanden.</div>';
+            return;
+        }
+        for (const cat of mainCats) {
+            container.innerHTML += `<button class=\"btn btn-primary m-2\" onclick=\"window.app.showNestedGroups('${cat}')\">${cat}</button>`;
+        }
+        // Untergruppen-Feld im Hauptmenü immer ausblenden
+        const ui = document.getElementById('add-subgroup-ui');
+        if (ui) ui.style.display = 'none';
+        // Sichtbarkeits-Check
+        const style = window.getComputedStyle(container);
+        console.log('[DEBUG] #category-buttons sichtbar?', style.display !== 'none', 'display:', style.display, 'parent:', container.parentElement && container.parentElement.id);
+        let el = container.parentElement;
+        while (el) {
+            const s = window.getComputedStyle(el);
+            console.log('[DEBUG] Eltern-Element', el.id || el.className, 'display:', s.display, 'd-none:', el.classList.contains('d-none'), 'app-hidden:', el.classList.contains('app-hidden'));
+            el = el.parentElement;
+        }
+    }
+    // Rekursive Anzeige verschachtelter Gruppen als Buttons
+    renderNestedGroupButtons(mainCategory, node = null, path = []) {
+        node = node || questionManager.nestedGroups[mainCategory];
+        let html = '';
+        for (const group of node) {
+            const fullPath = [...path, group.name];
+            html += `<div style="margin-left:${path.length * 20}px">
+                <button class="btn btn-outline-primary" onclick="window.app.startQuiz('${mainCategory}', '${fullPath.join('>')}')">${group.name}</button>
+            </div>`;
+            if (group.children.length > 0) {
+                html += this.renderNestedGroupButtons(mainCategory, group.children, fullPath);
+            }
+        }
+        return html;
+    }
+
     // Account löschen (unverändert)
     async deleteAccount() {
         if (!this.currentUser) {
@@ -72,188 +245,172 @@ class LernApp {
         console.log('[LernApp][deleteAccount] localStorage vor Cleanup:', Object.keys(localStorage).filter(k => k.includes(username)));
         delete this.users[username];
         await this.saveToStorage('users', this.users, true);
-        // Zentrales Userpaket und alle zugehörigen Daten explizit entfernen
-        localStorage.removeItem(`lernapp_user_${username}`);
-        localStorage.removeItem(`lernapp_user_${username}_categories`);
-        localStorage.removeItem(`lernapp_user_${username}_questions`);
-        localStorage.removeItem(`lernapp_user_${username}_statistics`);
-        // Speicherort-Flag entfernen
-        localStorage.removeItem(`lernapp_user_${username}_storage_chosen`);
-        // Zusätzlich: Alle lokalen Storage-Keys, die den Usernamen enthalten, entfernen (Altlasten!)
-        const userKeyRegex = new RegExp(`(^|[_-])${username}([_-]|$)`, 'i');
-        Object.keys(localStorage).forEach(key => {
-            if (userKeyRegex.test(key)) {
-                localStorage.removeItem(key);
-            }
-        });
-        // Debug-Ausgaben nach Löschen
-        console.log('[LernApp][deleteAccount] users nach Löschen:', JSON.stringify(this.users));
-        console.log('[LernApp][deleteAccount] localStorage nach Cleanup:', Object.keys(localStorage).filter(k => k.includes(username)));
-        // Logout und UI-Reset
-        this.logoutUser();
-        this.showAlert('Ihr Account und alle zugehörigen Daten wurden gelöscht.', 'success');
     }
-    // Zeigt beim ersten Login den Speicherort-Dialog an
-    async showStorageLocationDialogIfNeeded() {
-        if (!window.lernappCloudStorage) {
-            console.warn('lernappCloudStorage nicht vorhanden');
-            return;
-        }
-        const userKey = `user_${this.currentUser}`;
-        const storageFlag = localStorage.getItem(`lernapp_${userKey}_storage_chosen`);
-        console.log('[LernApp] showStorageLocationDialogIfNeeded:', { userKey, storageFlag, currentUser: this.currentUser });
-        if (storageFlag !== '1') {
-            // Erstes Login: Modal anzeigen, kein alert, kein automatischer Dialog
-            const showModal = () => {
-                const modalElem = document.getElementById('storageLocationModal');
-                if (!modalElem) {
-                    console.error('storageLocationModal nicht im DOM!');
-                    return;
-                }
-                const modal = new bootstrap.Modal(modalElem, { backdrop: 'static', keyboard: false });
-                const skipBtn = document.getElementById('storage-location-skip');
-                const chooseBtn = document.getElementById('storage-location-choose');
-                skipBtn.onclick = null;
-                chooseBtn.onclick = null;
-                skipBtn.onclick = () => {
-                    localStorage.setItem(`lernapp_${userKey}_storage_chosen`, '1');
-                    modal.hide();
-                    console.log('[LernApp] Speicherort-Dialog: Abbrechen');
-                };
-                chooseBtn.onclick = async () => {
-                    if (!window.lernappCloudStorage.supported) {
-                        // Zeige eigenes Modal statt alert
-                        const notSupportedModalElem = document.getElementById('storageNotSupportedModal');
-                        const notSupportedModal = new bootstrap.Modal(notSupportedModalElem, { backdrop: 'static', keyboard: false });
-                        const chooseBtn2 = document.getElementById('storage-not-supported-choose');
-                        const cancelBtn2 = document.getElementById('storage-not-supported-cancel');
-                        chooseBtn2.onclick = null;
-                        cancelBtn2.onclick = null;
-                        chooseBtn2.onclick = () => {
-                            notSupportedModal.hide();
-                            modal.hide();
-                            localStorage.setItem(`lernapp_${userKey}_storage_chosen`, '1');
-                            console.log('[LernApp] Speicherort nicht unterstützt: gewählt');
-                        };
-                        cancelBtn2.onclick = () => {
-                            notSupportedModal.hide();
-                            console.log('[LernApp] Speicherort nicht unterstützt: abgebrochen');
-                        };
-                        notSupportedModal.show();
-                    } else {
-                        await window.lernappCloudStorage.chooseDirectory(false);
-                        localStorage.setItem(`lernapp_${userKey}_storage_chosen`, '1');
-                        modal.hide();
-                        console.log('[LernApp] Speicherort gewählt');
+
+    loadUserData() {
+        // Zentrale Datenverwaltung: Nur noch questionManager wird genutzt
+        if (!window.questionManager) return;
+        if (this.isDemo) {
+            // Demo-Modus: Demo-Testfragen zentral laden
+            window.questionManager.loadUserData({
+                categories: ['Textfragen', 'Bilderquiz'],
+                questions: [
+                    {
+                        mainCategory: 'Textfragen',
+                        group: 'Demo Testfragen',
+                        question: 'Was ist die Hauptstadt von Deutschland?',
+                        answer: 'Berlin',
+                        description: 'Berlin ist die größte Stadt Deutschlands.'
+                    },
+                    {
+                        mainCategory: 'Textfragen',
+                        group: 'Demo Testfragen',
+                        question: 'Wie viele Kontinente gibt es?',
+                        answer: '7',
+                        description: 'Die Kontinente sind Europa, Asien, Afrika, Nordamerika, Südamerika, Australien und Antarktis.'
+                    },
+                    {
+                        mainCategory: 'Textfragen',
+                        group: 'Demo Testfragen',
+                        question: 'Welches Element hat das chemische Symbol "O"?',
+                        answer: 'Sauerstoff',
+                        description: 'Sauerstoff ist lebenswichtig für die Atmung.'
+                    },
+                    {
+                        mainCategory: 'Textfragen',
+                        group: 'Demo Testfragen',
+                        question: 'Wer schrieb "Faust"?',
+                        answer: 'Goethe',
+                        description: 'Johann Wolfgang von Goethe ist einer der bekanntesten deutschen Dichter.'
+                    },
+                    {
+                        mainCategory: 'Textfragen',
+                        group: 'Demo Testfragen',
+                        question: 'Was ist das Ergebnis von 9 x 7?',
+                        answer: '63',
+                        description: '9 mal 7 ergibt 63.'
                     }
-                };
-                modal.show();
-                console.log('[LernApp] Speicherort-Dialog angezeigt');
-            };
-            // Fallback: Modal nach DOM-Ready oder mit Timeout anzeigen
-            if (document.readyState === 'complete' || document.readyState === 'interactive') {
-                setTimeout(showModal, 0);
+                ],
+                statistics: {
+                    totalQuestions: 0,
+                    correctAnswers: 0,
+                    categoriesPlayed: {},
+                    lastPlayed: null
+                }
+            });
+        } else if (this.currentUser) {
+            // Userdaten laden
+            if (!this.users[this.currentUser]) {
+                // Kein User vorhanden
+                window.questionManager.loadUserData({categories: [], questions: [], statistics: {}});
             } else {
-                document.addEventListener('DOMContentLoaded', showModal);
+                const userObjStr = localStorage.getItem(`lernapp_user_${this.currentUser}`);
+                if (userObjStr) {
+                    try {
+                        const userObj = JSON.parse(userObjStr);
+                        window.questionManager.loadUserData(userObj);
+                        // Optionale Felder
+                        if (userObj.settings) this.users[this.currentUser].settings = userObj.settings;
+                        if (userObj.storage) this.users[this.currentUser].storage = userObj.storage;
+                        console.log('[LernApp][loadUserData] Userpaket geladen:', userObj);
+                    } catch (e) {
+                        window.questionManager.loadUserData({categories: [], questions: [], statistics: {}});
+                        console.log('[LernApp][loadUserData] Fehler beim Parsen, Daten zurückgesetzt.');
+                    }
+                } else {
+                    window.questionManager.loadUserData({categories: [], questions: [], statistics: {}});
+                    console.log('[LernApp][loadUserData] Kein Userpaket gefunden, Daten zurückgesetzt.');
+                }
+                // Wenn neue User keine Fragen haben, Demo-Testfragen übernehmen
+                if (!window.questionManager.questions || window.questionManager.questions.length === 0) {
+                    // Demo-Fragen mit vollständiger Struktur wie in addQuestion
+                    const demoQuestions = [
+                        {
+                            mainCategory: 'Textfragen',
+                            group: 'Demo Testfragen',
+                            question: 'Was ist die Hauptstadt von Deutschland?',
+                            answer: 'Berlin',
+                            answerType: 'text',
+                            questionImage: null,
+                            answerImage: null,
+                            description: 'Berlin ist die größte Stadt Deutschlands.'
+                        },
+                        {
+                            mainCategory: 'Textfragen',
+                            group: 'Demo Testfragen',
+                            question: 'Wie viele Kontinente gibt es?',
+                            answer: '7',
+                            answerType: 'text',
+                            questionImage: null,
+                            answerImage: null,
+                            description: 'Die Kontinente sind Europa, Asien, Afrika, Nordamerika, Südamerika, Australien und Antarktis.'
+                        },
+                        {
+                            mainCategory: 'Textfragen',
+                            group: 'Demo Testfragen',
+                            question: 'Welches Element hat das chemische Symbol "O"?',
+                            answer: 'Sauerstoff',
+                            answerType: 'text',
+                            questionImage: null,
+                            answerImage: null,
+                            description: 'Sauerstoff ist lebenswichtig für die Atmung.'
+                        },
+                        {
+                            mainCategory: 'Textfragen',
+                            group: 'Demo Testfragen',
+                            question: 'Wer schrieb "Faust"?',
+                            answer: 'Goethe',
+                            answerType: 'text',
+                            questionImage: null,
+                            answerImage: null,
+                            description: 'Johann Wolfgang von Goethe ist einer der bekanntesten deutschen Dichter.'
+                        },
+                        {
+                            mainCategory: 'Textfragen',
+                            group: 'Demo Testfragen',
+                            question: 'Was ist das Ergebnis von 9 x 7?',
+                            answer: '63',
+                            answerType: 'text',
+                            questionImage: null,
+                            answerImage: null,
+                            description: '9 mal 7 ergibt 63.'
+                        }
+                    ];
+                    const demoData = {
+                        categories: ['Textfragen', 'Bilderquiz'],
+                        questions: demoQuestions,
+                        statistics: {
+                            totalQuestions: 0,
+                            correctAnswers: 0,
+                            categoriesPlayed: {},
+                            lastPlayed: null
+                        }
+                    };
+                    window.questionManager.loadUserData(demoData);
+                    // Userpaket im localStorage mit Demo-Fragen aktualisieren
+                    if (this.currentUser && this.users[this.currentUser]) {
+                        const userObj = {
+                            ...this.users[this.currentUser],
+                            categories: demoData.categories,
+                            questions: demoData.questions,
+                            statistics: demoData.statistics
+                        };
+                        localStorage.setItem(`lernapp_user_${this.currentUser}`, JSON.stringify(userObj));
+                    }
+                }
             }
-        } else {
-            // 2. Login und später: Speicherort im Hintergrund verbinden
-            if (window.lernappCloudStorage.dirHandle == null) {
-                await window.lernappCloudStorage.loadDirHandle();
-            }
         }
+        // Proxy für Kompatibilität (kann später entfernt werden)
+        this.categories = window.questionManager.categories;
+        this.questions = window.questionManager.questions;
+        this.statistics = window.questionManager.statistics;
+        // Daten-Integrität prüfen
+        this.validateDataIntegrity();
     }
-    // Umschalten der Felder je nach Kategorie
-    onCategorySelectChange() {
-        const select = document.getElementById('question-category');
-        const imageOnlyFields = document.getElementById('imageonly-fields');
-        const defaultFields = document.getElementById('default-fields');
-        const catName = select.value;
-        const catObj = this.getCategoryObj ? this.getCategoryObj(catName) : null;
-        if (catObj && catObj.nurBildAntworten) {
-            imageOnlyFields.style.display = '';
-            defaultFields.style.display = 'none';
-        } else {
-            imageOnlyFields.style.display = 'none';
-            defaultFields.style.display = '';
-        }
-    }
-    // Zeigt den aktuellen Speicherort im Header an (sofern Cloud/Ordner gewählt)
-    updateStorageLocationInfo() {
-        const infoElem = document.getElementById('storage-location-info');
-        const nameElem = document.getElementById('storage-location-name');
-        if (!window.lernappCloudStorage || !infoElem || !nameElem) return;
-        const dirHandle = window.lernappCloudStorage.dirHandle;
-        if (dirHandle && dirHandle.name) {
-            nameElem.textContent = dirHandle.name;
-            infoElem.classList.remove('d-none');
-        } else {
-            nameElem.textContent = '';
-            infoElem.classList.add('d-none');
-        }
-    }
-    // ========== ADMIN USER MANAGEMENT ==========
-    async renderAdminUsersList() {
-        const container = document.getElementById('admin-users-list');
-        if (!container) return;
-        // Lade User-Liste frisch aus dem Storage (async!)
-        let usersObj = await this.loadFromStorage('users', true);
-        if (!usersObj) usersObj = {};
-        this.users = usersObj;
-        const users = Object.values(this.users);
-        if (users.length === 0) {
-            container.innerHTML = '<p class="text-muted">Keine Benutzer vorhanden.</p>';
-            return;
-        }
-        container.innerHTML = `<div class="table-responsive"><table class="table table-sm align-middle"><thead><tr><th>Benutzername</th><th>Anzeigename</th><th>Letzter Login</th><th>Logins</th><th>Aktionen</th></tr></thead><tbody>
-            ${users.map(u => `
-                <tr>
-                    <td>${u.username}</td>
-                    <td>${u.displayName || ''}</td>
-                    <td>${u.lastLogin ? new Date(u.lastLogin).toLocaleString('de-DE') : '-'}</td>
-                    <td>${u.loginCount || 0}</td>
-                    <td>
-                        <button class="btn btn-sm btn-outline-info me-1" onclick="app.adminShowUserData('${u.username}')"><i class='bi bi-database'></i> Daten</button>
-                        <button class="btn btn-sm btn-outline-warning me-1" onclick="app.adminResetPassword('${u.username}')"><i class='bi bi-key'></i> Passwort zurücksetzen</button>
-                        <button class="btn btn-sm btn-outline-danger" onclick="app.adminDeleteUser('${u.username}')"><i class='bi bi-trash'></i> Löschen</button>
-                    </td>
-                </tr>`).join('')}
-            </tbody></table></div>`;
-    }
-
-    adminShowUserData(username) {
-        const container = document.getElementById('admin-user-data');
-        if (!container) return;
-        const user = this.users[username];
-        if (!user) {
-            container.innerHTML = '<div class="alert alert-danger">Benutzer nicht gefunden.</div>';
-            return;
-        }
-        // User-Daten laden
-        const userKey = `user_${username}`;
-        const categories = this.loadFromStorage(`${userKey}_categories`) || [];
-        const questions = this.loadFromStorage(`${userKey}_questions`) || [];
-        const statistics = this.loadFromStorage(`${userKey}_statistics`) || {};
-        container.innerHTML = `
-            <div class="card">
-                <div class="card-header bg-light"><strong>Daten von ${user.displayName || username}</strong></div>
-                <div class="card-body">
-                    <p><strong>Kategorien:</strong> ${categories.length}</p>
-                    <p><strong>Fragen:</strong> ${questions.length}</p>
-                    <p><strong>Statistiken:</strong> ${Object.keys(statistics).length > 0 ? 'vorhanden' : 'keine'}</p>
-                    <button class="btn btn-outline-secondary btn-sm me-2" onclick="app.adminExportUserData('${username}')"><i class='bi bi-download'></i> Exportieren</button>
-                </div>
-            </div>
-        `;
-    }
-
-    // Quiz-Logik (jetzt über questionManager)
     startQuiz(mainCategory, group) {
-        if (!mainCategory || !group) {
-            this.showAlert('Bitte wählen Sie eine Hauptkategorie und eine Gruppe!', 'danger');
-            return;
-        }
+        // ...existing code...
         const questions = questionManager.getQuestions(mainCategory, group);
+        console.log('[LernApp][startQuiz] Fragen für Quiz:', questions);
         if (questions.length < 4) {
             this.showAlert('Diese Gruppe hat weniger als 4 Fragen! Bitte fügen Sie mehr Fragen hinzu.', 'warning');
             return;
@@ -376,7 +533,7 @@ class LernApp {
             this.currentUser = 'demo';
         } else if (sessionUser) {
             this.currentUser = sessionUser;
-            // loginCount NICHT erhöhen! Nur beim echten Login in loginUser.
+            // Kein automatischer Speicherort-Dialog mehr beim Reload
         }
     }
 
@@ -564,7 +721,7 @@ class LernApp {
             storage: { chosen: false, folder: '', cloud: false },
             statistics: { totalQuestions: 0, correctAnswers: 0, lastPlayed: null, categoriesPlayed: {} },
             settings: {},
-            categories: ['Textfragen', 'Bilderquiz'],
+            categories: ['Allgemein', 'Ordne zu'],
             questions: []
         };
         this.users[username] = newUser;
@@ -713,129 +870,7 @@ class LernApp {
         document.getElementById('profile-confirm-password').value = '';
     }
 
-    loadUserData() {
-        if (this.isDemo) {
-            // Demo-Daten
-            this.categories = ['Textfragen', 'Bilderquiz'];
-            this.questions = this.generateDemoQuestions();
-            this.statistics = {
-                totalQuestions: 0,
-                correctAnswers: 0,
-                categoriesPlayed: {},
-                lastPlayed: null
-            };
-        } else if (this.currentUser) {
-            // Prüfe, ob User in zentraler Userliste existiert
-            if (!this.users[this.currentUser]) {
-                // Sicherheit: auch zentrales Userpaket entfernen, falls noch vorhanden
-                localStorage.removeItem(`lernapp_user_${this.currentUser}`);
-                this.categories = ['Textfragen', 'Bilderquiz'];
-                this.questions = [];
-                this.statistics = {
-                    totalQuestions: 0,
-                    correctAnswers: 0,
-                    categoriesPlayed: {},
-                    lastPlayed: null
-                };
-                return;
-            }
-            // Debug-Ausgaben zu Beginn
-            if (this.currentUser) {
-                console.log('[LernApp][loadUserData] users:', JSON.stringify(this.users));
-                console.log('[LernApp][loadUserData] localStorage:', Object.keys(localStorage).filter(k => k.includes(this.currentUser)));
-            }
-            // Zentrales Userpaket laden
-            const userObjStr = localStorage.getItem(`lernapp_user_${this.currentUser}`);
-            if (userObjStr) {
-                try {
-                    const userObj = JSON.parse(userObjStr);
-                    // Wenn das Userpaket leer ist, keine Altlasten übernehmen
-                    this.categories = Array.isArray(userObj.categories) ? userObj.categories : ['Textfragen', 'Bilderquiz'];
-                    this.questions = Array.isArray(userObj.questions) ? userObj.questions : [];
-                    this.statistics = (userObj.statistics && typeof userObj.statistics === 'object') ? userObj.statistics : {
-                        totalQuestions: 0,
-                        correctAnswers: 0,
-                        categoriesPlayed: {},
-                        lastPlayed: null
-                    };
-                    // Optionale Felder
-                    if (userObj.settings) this.users[this.currentUser].settings = userObj.settings;
-                    if (userObj.storage) this.users[this.currentUser].storage = userObj.storage;
-                    // NICHT das zentrale User-Objekt überschreiben, damit loginCount erhalten bleibt
-                    console.log('[LernApp][loadUserData] Userpaket geladen:', userObj);
-                } catch (e) {
-                    // Fallback: leere Daten
-                    this.categories = ['Textfragen', 'Bilderquiz'];
-                    this.questions = [];
-                    this.statistics = {
-                        totalQuestions: 0,
-                        correctAnswers: 0,
-                        categoriesPlayed: {},
-                        lastPlayed: null
-                    };
-                    console.log('[LernApp][loadUserData] Fehler beim Parsen, Daten zurückgesetzt.');
-                }
-            } else {
-                // Kein Paket vorhanden: Fallback auf leere Daten
-                this.categories = ['Textfragen', 'Bilderquiz'];
-                this.questions = [];
-                this.statistics = {
-                    totalQuestions: 0,
-                    correctAnswers: 0,
-                    categoriesPlayed: {},
-                    lastPlayed: null
-                };
-                console.log('[LernApp][loadUserData] Kein Userpaket gefunden, Daten zurückgesetzt.');
-            }
-            // Wenn neue User keine Daten haben, Beispieldaten laden
-            if (!this.questions || this.questions.length === 0) {
-                this.loadSampleData();
-            }
-        }
-        // Daten-Integrität prüfen
-        this.validateDataIntegrity();
-    }
 
-    generateDemoQuestions() {
-        return [
-            {
-                id: 'demo1',
-                // entfernt
-                question: 'Was ist 2 + 2?',
-                answerType: 'text',
-                answer: '4',
-                questionImage: null,
-                answerImage: null
-            },
-            {
-                id: 'demo2',
-                // entfernt
-                question: 'Wie viele Beine hat eine Spinne?',
-                answerType: 'text',
-                answer: '8',
-                questionImage: null,
-                answerImage: null
-            },
-            {
-                id: 'demo3',
-                // entfernt
-                question: 'Was ist die Hauptstadt von Deutschland?',
-                answerType: 'text',
-                answer: 'Berlin',
-                questionImage: null,
-                answerImage: null
-            },
-            {
-                id: 'demo4',
-                // entfernt
-                question: 'Welches Jahr haben wir aktuell?',
-                answerType: 'text',
-                answer: '2025',
-                questionImage: null,
-                answerImage: null
-            }
-        ];
-    }
 
     // ==================== DATA SHARING ====================
 
@@ -1083,124 +1118,17 @@ class LernApp {
 
         if (confirm('Möchten Sie wirklich ALLE Ihre Daten löschen? Diese Aktion kann nicht rückgängig gemacht werden!')) {
             if (confirm('Sind Sie sich wirklich sicher? Alle Kategorien, Fragen und Statistiken werden gelöscht!')) {
-                const username = this.currentUser;
-                // Entferne alle lokalen Storage-Keys, die den Usernamen enthalten, aber NICHT das User-Objekt selbst
-                const userKeyRegex = new RegExp(`(^|[_-])${username}([_-]|$)`, 'i');
-                Object.keys(localStorage).forEach(key => {
-                    // User-Objekt NICHT löschen:
-                    if (userKeyRegex.test(key) && !key.startsWith('lernapp_user_' + username)) {
-                        localStorage.removeItem(key);
-                    }
-                });
-                // Entferne bekannte Datenstrukturen (Fragen, Kategorien, Statistiken, Flags, Cloud, Altlasten)
-                localStorage.removeItem(`lernapp_user_${username}_categories`);
-                localStorage.removeItem(`lernapp_user_${username}_questions`);
-                localStorage.removeItem(`lernapp_user_${username}_statistics`);
-                localStorage.removeItem(`lernapp_user_${username}_storage_chosen`);
-                localStorage.removeItem(`lernapp_stats_${username}`);
-                localStorage.removeItem(`lernapp_flags_${username}`);
-                localStorage.removeItem(`lernapp_questions_${username}`);
-                localStorage.removeItem(`lernapp_categories_${username}`);
-                localStorage.removeItem(`lernapp_cloud_dir_${username}`);
-                localStorage.removeItem(`lernapp_cloud_hint_${username}`);
-                // Altlasten und globale Daten (falls vorhanden)
-                localStorage.removeItem('lernapp_userdata');
-                localStorage.removeItem('lernapp_questions');
-                localStorage.removeItem('lernapp_categories');
-                localStorage.removeItem('lernapp_stats');
-                localStorage.removeItem('lernapp_flags');
-                localStorage.removeItem('lernapp_cloud_dir');
-                localStorage.removeItem('lernapp_cloud_hint');
-                // Session- und temporäre Flags NICHT löschen, damit der User eingeloggt bleibt
+                // Zentrales Userpaket entfernen
+                localStorage.removeItem(`lernapp_user_${this.currentUser}`);
 
-                // Benutzerdaten im Speicher zurücksetzen
-                this.categories = ['Allgemein', 'Ordne zu'];
-                this.questions = [];
-                this.statistics = {
-                    totalQuestions: 0,
-                    correctAnswers: 0,
-                    categoriesPlayed: {},
-                    lastPlayed: null
-                };
-                // Zähler zurücksetzen
-                if (this.users && this.currentUser && this.users[this.currentUser]) {
-                    this.users[this.currentUser].loginCount = 1;
-                    // Speicherort-Flag entfernen, damit die Abfrage wieder erscheint
-                    localStorage.removeItem(`lernapp_user_${this.currentUser}_storage_chosen`);
-                    // Zentrales User-Objekt sofort mit loginCount=1 speichern
-                    const userObj = {
-                        ...this.users[this.currentUser],
-                        categories: this.categories,
-                        questions: this.questions,
-                        statistics: this.statistics,
-                        settings: this.users[this.currentUser].settings || {},
-                        storage: this.users[this.currentUser].storage || {}
-                    };
-                    localStorage.setItem(`lernapp_user_${this.currentUser}`, JSON.stringify(userObj));
-                    // WICHTIG: Auch verschlüsselten Storage sofort aktualisieren!
-                    this.saveToStorage('users', this.users, true);
-                }
-                this.saveUserData();
+                this.loadUserData();
                 this.updateDashboard();
                 this.renderCategories();
                 this.renderCategoriesList();
                 this.renderQuestionsList();
                 this.renderStatistics();
+
                 this.showAlert('Alle Daten wurden zurückgesetzt!', 'success');
-                // Nach Reset: Dashboard anzeigen
-                showPage('home');
-                // Speicherort-Dialog nach Reset erneut anzeigen (Flag wurde entfernt)
-                setTimeout(() => {
-                    const modalEl = document.getElementById('storageLocationModal');
-                    if (typeof bootstrap !== 'undefined' && modalEl && !modalEl.classList.contains('show')) {
-                        // Fallback: Modal-Backdrops entfernen, falls noch vorhanden
-                        document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
-                        document.body.classList.remove('modal-open');
-                        document.body.style.overflow = '';
-                        document.body.style.paddingRight = '';
-                        // Modal anzeigen
-                        const modal = new bootstrap.Modal(modalEl);
-                        // Event-Handler für Buttons neu binden
-                        const userKey = `user_${this.currentUser}`;
-                        const skipBtn = document.getElementById('storage-location-skip');
-                        const chooseBtn = document.getElementById('storage-location-choose');
-                        if (skipBtn) {
-                            skipBtn.onclick = () => {
-                                localStorage.setItem(`lernapp_${userKey}_storage_chosen`, '1');
-                                modal.hide();
-                                console.log('[LernApp] Speicherort-Dialog: Abbrechen (nach Reset)');
-                            };
-                        }
-                        if (chooseBtn) {
-                            chooseBtn.onclick = async () => {
-                                if (!window.lernappCloudStorage || !window.lernappCloudStorage.supported) {
-                                    // Zeige eigenes Modal statt alert
-                                    const notSupportedModalElem = document.getElementById('storageNotSupportedModal');
-                                    const notSupportedModal = new bootstrap.Modal(notSupportedModalElem, { backdrop: 'static', keyboard: false });
-                                    const chooseBtn2 = document.getElementById('storage-not-supported-choose');
-                                    const cancelBtn2 = document.getElementById('storage-not-supported-cancel');
-                                    if (chooseBtn2) chooseBtn2.onclick = () => {
-                                        notSupportedModal.hide();
-                                        modal.hide();
-                                        localStorage.setItem(`lernapp_${userKey}_storage_chosen`, '1');
-                                        console.log('[LernApp] Speicherort nicht unterstützt: gewählt (nach Reset)');
-                                    };
-                                    if (cancelBtn2) cancelBtn2.onclick = () => {
-                                        notSupportedModal.hide();
-                                        console.log('[LernApp] Speicherort nicht unterstützt: abgebrochen (nach Reset)');
-                                    };
-                                    notSupportedModal.show();
-                                } else {
-                                    await window.lernappCloudStorage.chooseDirectory(false);
-                                    localStorage.setItem(`lernapp_${userKey}_storage_chosen`, '1');
-                                    modal.hide();
-                                    console.log('[LernApp] Speicherort gewählt (nach Reset)');
-                                }
-                            };
-                        }
-                        modal.show();
-                    }
-                }, 600);
             }
         }
     }
@@ -1457,7 +1385,7 @@ class LernApp {
                 // Geografie - Text-Fragen mit Text-Antworten
                 {
                     id: 1,
-                    // entfernt
+                    category: 'Geografie',
                     question: 'Was ist die Hauptstadt von Deutschland?',
                     answerType: 'text',
                     answer: 'Berlin',
@@ -1466,7 +1394,7 @@ class LernApp {
                 },
                 {
                     id: 2,
-                    // entfernt
+                    category: 'Geografie', 
                     question: 'Was ist die Hauptstadt von Frankreich?',
                     answerType: 'text',
                     answer: 'Paris',
@@ -1475,7 +1403,7 @@ class LernApp {
                 },
                 {
                     id: 3,
-                    // entfernt
+                    category: 'Geografie',
                     question: 'Was ist die Hauptstadt von Italien?',
                     answerType: 'text',
                     answer: 'Rom',
@@ -1484,7 +1412,7 @@ class LernApp {
                 },
                 {
                     id: 4,
-                    // entfernt
+                    category: 'Geografie',
                     question: 'Was ist die Hauptstadt von Spanien?',
                     answerType: 'text',
                     answer: 'Madrid',
@@ -1493,7 +1421,7 @@ class LernApp {
                 },
                 {
                     id: 5,
-                    // entfernt
+                    category: 'Geografie',
                     question: 'Was ist die Hauptstadt von England?',
                     answerType: 'text',
                     answer: 'London',
@@ -1503,7 +1431,7 @@ class LernApp {
                 // Beispiel für "Ordne zu" - Text-Fragen mit Bild-Antworten
                 {
                     id: 6,
-                    // entfernt
+                    category: 'Ordne zu',
                     question: 'Finde den Apfel',
                     answerType: 'image',
                     answer: null,
@@ -1512,7 +1440,7 @@ class LernApp {
                 },
                 {
                     id: 7,
-                    // entfernt
+                    category: 'Ordne zu',
                     question: 'Finde die Banane',
                     answerType: 'image',
                     answer: null,
@@ -1521,7 +1449,7 @@ class LernApp {
                 },
                 {
                     id: 8,
-                    // entfernt
+                    category: 'Ordne zu',
                     question: 'Finde die Orange',
                     answerType: 'image',
                     answer: null,
@@ -1530,7 +1458,7 @@ class LernApp {
                 },
                 {
                     id: 9,
-                    // entfernt
+                    category: 'Ordne zu',
                     question: 'Finde die Traube',
                     answerType: 'image',
                     answer: null,
@@ -2166,51 +2094,63 @@ class LernApp {
         this.showQuestion();
     }
 
-    // Quiz-Logik
-    startQuiz(category) {
-        if (!category) {
-            category = document.getElementById('quiz-category').value;
-            if (!category) {
-                this.showAlert('Bitte wählen Sie eine Kategorie!', 'danger');
-                return;
-            }
+    // Quiz-Logik: Akzeptiert (category) oder (main, groupPath)
+    startQuiz(mainOrCategory, group) {
+        // Flexible Parameter: (main, groupPath) oder (category)
+        let mainCategory = null;
+        let groupPath = null;
+        if (group !== undefined) {
+            mainCategory = mainOrCategory;
+            groupPath = group;
+        } else {
+            mainCategory = null;
+            groupPath = mainOrCategory;
         }
 
-        const categoryQuestions = this.questions.filter(q => q.category === category || (category && category.startsWith('Ordne zu') && q.category && q.category.startsWith('Ordne zu')));
-        if (categoryQuestions.length < 4) {
+        // Logging
+        console.log('[LernApp][startQuiz] mainCategory:', mainCategory, 'groupPath:', groupPath);
+
+        // Fragen holen über questionManager
+        let questions = [];
+        if (mainCategory && groupPath) {
+            // Gruppenpfad als String (z.B. "Unterkategorie 1>Quizfragengruppe 1")
+            const groupPathArr = groupPath.split('>').map(s => s.trim());
+            questions = questionManager.getQuestionsByGroupPath(mainCategory, groupPathArr);
+        } else if (groupPath) {
+            // Fallback: Nur Gruppe (wie bisher)
+            questions = questionManager.getQuestionsByGroup(groupPath);
+        } else {
+            this.showAlert('Bitte wählen Sie eine Kategorie!', 'danger');
+            return;
+        }
+
+        if (!questions || questions.length < 4) {
             this.showAlert('Diese Kategorie hat weniger als 4 Fragen! Bitte fügen Sie mehr Fragen hinzu.', 'warning');
             return;
         }
 
         // Quiz initialisieren
         this.currentQuiz = {
-            questions: this.shuffleArray(categoryQuestions).slice(0, 10), // Max 10 Fragen
+            questions: this.shuffleArray(questions).slice(0, 10), // Max 10 Fragen
             currentIndex: 0,
             score: 0,
-            selectedCategory: category,
+            selectedCategory: mainCategory ? `${mainCategory} - ${groupPath}` : groupPath,
             answers: []
         };
 
         // Erste Frage vorbereiten
         const firstQuestion = this.currentQuiz.questions[0];
-        const questionsPool = this.questions.filter(q => q.category === category || (category && category.startsWith('Ordne zu') && q.category && q.category.startsWith('Ordne zu')));
-        if (category && category.startsWith('Ordne zu')) {
-            // Spezielle Behandlung für "Ordne zu" und Unterkategorien
-            const multipleChoiceQuestion = this.generateOrderQuestion(firstQuestion, questionsPool);
-            if (!multipleChoiceQuestion) {
-                this.showAlert('Nicht genügend Fragen für ein Quiz verfügbar!', 'danger');
-                return;
-            }
-            this.currentQuiz.questions[0] = { ...firstQuestion, ...multipleChoiceQuestion };
+        let multipleChoiceQuestion = null;
+        if (firstQuestion && firstQuestion.category && firstQuestion.category.startsWith('Ordne zu')) {
+            multipleChoiceQuestion = this.generateOrderQuestion(firstQuestion, questions);
         } else {
-            // Normale Multiple-Choice-Frage
-            const multipleChoiceQuestion = this.generateMultipleChoiceQuestion(firstQuestion, questionsPool);
-            if (!multipleChoiceQuestion) {
-                this.showAlert('Nicht genügend Fragen für ein Quiz verfügbar!', 'danger');
-                return;
-            }
-            this.currentQuiz.questions[0] = { ...firstQuestion, ...multipleChoiceQuestion };
+            multipleChoiceQuestion = this.generateMultipleChoiceQuestion(firstQuestion, questions);
         }
+        if (!multipleChoiceQuestion) {
+            this.showAlert('Nicht genügend Fragen für ein Quiz verfügbar!', 'danger');
+            return;
+        }
+        this.currentQuiz.questions[0] = { ...firstQuestion, ...multipleChoiceQuestion };
 
         // Zur Quiz-Seite wechseln und Quiz-Container einblenden
         showPage('quiz');
@@ -2972,11 +2912,13 @@ function showPage(pageId) {
     // Alle Seiten ausblenden
     document.querySelectorAll('.page').forEach(page => {
         page.classList.add('d-none');
+        page.classList.remove('app-hidden'); // Sichtbar machen, falls initial versteckt
     });
     // Gewünschte Seite anzeigen
     const targetPage = document.getElementById(`${pageId}-page`);
     if (targetPage) {
         targetPage.classList.remove('d-none');
+        targetPage.classList.remove('app-hidden');
     }
     // Aktiven Navbar-Link setzen
     document.querySelectorAll('.nav-link').forEach(link => {
@@ -2986,15 +2928,44 @@ function showPage(pageId) {
     if (activeLink) {
         activeLink.classList.add('active');
     }
+    // Zuletzt besuchte Seite merken (außer login/register)
+    if (pageId && pageId !== 'login' && pageId !== 'register') {
+        sessionStorage.setItem('lernapp_last_page', pageId);
+        console.log('[DEBUG] lernapp_last_page gesetzt auf:', pageId);
+    }
     // Quiz-Container zurücksetzen 
     if (pageId === 'home') {
         document.getElementById('quiz-container').classList.remove('d-none');
         document.getElementById('quiz-result').classList.add('d-none');
     }
-    // Quiz-Seite: Kategorie-Auswahl einblenden, Quiz-Container ausblenden
+// Logge den Wert von lernapp_last_page beim Laden der Seite
+window.addEventListener('DOMContentLoaded', function() {
+    console.log('[DEBUG] lernapp_last_page beim Laden:', sessionStorage.getItem('lernapp_last_page'));
+});
+    // Quiz-Seite: Zeige Quiz-Container nur, wenn ein Quiz läuft
     if (pageId === 'quiz') {
-        document.getElementById('category-selection').classList.remove('d-none');
-        document.getElementById('quiz-container').classList.add('d-none');
+        console.log('[DEBUG] showPage("quiz") aufgerufen');
+        const quizRunning = window.app && window.app.currentQuiz && Array.isArray(window.app.currentQuiz.questions) && window.app.currentQuiz.questions.length > 0;
+        if (quizRunning) {
+            document.getElementById('category-selection').classList.add('d-none');
+            document.getElementById('quiz-container').classList.remove('d-none');
+        } else {
+            document.getElementById('category-selection').classList.remove('d-none');
+            document.getElementById('quiz-container').classList.add('d-none');
+            // Buttons immer direkt nach dem Anzeigen der Quiz-Seite rendern
+            setTimeout(() => {
+                try {
+                    console.log('[DEBUG] Versuche renderMainCategories in showPage("quiz")');
+                    if (window.app && typeof window.app.renderMainCategories === 'function') {
+                        window.app.renderMainCategories();
+                    } else {
+                        console.log('[DEBUG] window.app.renderMainCategories NICHT verfügbar!');
+                    }
+                } catch(e) {
+                    console.error('[DEBUG] Fehler beim Rendern der Hauptkategorien:', e);
+                }
+            }, 0);
+        }
         document.getElementById('quiz-result').classList.add('d-none');
     }
 }
@@ -3004,3 +2975,9 @@ function showPage(pageId) {
 window.showPage = showPage;
 // LernApp-Instanz global verfügbar machen
 window.app = new LernApp();
+
+// Methode global verfügbar machen
+window.renderMainCategories = function() { window.app.renderMainCategories(); };
+
+// Methode global verfügbar machen
+window.renderMainCategories = function() { window.app.renderMainCategories(); };
