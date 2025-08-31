@@ -623,18 +623,32 @@ window.showPage = showPage;
                     <!-- Kategorie-Auswahl -->
                     <div id="category-selection" class="card mb-4">
                         <div class="card-body">
-                            <h5 class="card-title">Kategorie wählen</h5>
-                            <div id="category-buttons" class="d-flex flex-wrap gap-2">
-                                <!-- Kategorien werden hier dynamisch eingefügt -->
-                            </div>
-                            <!-- UI für Untergruppe hinzufügen -->
-                            <div id="add-subgroup-ui" class="mt-3">
-                                <div class="input-group">
-                                    <input type="text" class="form-control" id="subgroup-name-input" placeholder="Name der Untergruppe">
-                                    <button class="btn btn-outline-secondary" id="add-subgroup-btn" type="button">Untergruppe hinzufügen</button>
-                                </div>
-                                <small class="text-muted">Fügt eine Untergruppe zur aktuell angezeigten Gruppe/Hauptkategorie hinzu.</small>
-                            </div>
+                                                        <h5 class="card-title">Kategorie wählen</h5>
+                                                        <div id="category-buttons" class="d-flex flex-wrap gap-2">
+                                                                <!-- Kategorien werden hier dynamisch eingefügt -->
+                                                        </div>
+                                                        <!-- UI für Unterkategorie hinzufügen (Ebene 1) -->
+                                                        <div id="add-category-ui" class="mt-3">
+                                                            <div class="input-group">
+                                                                <input type="text" class="form-control" id="category-name-input" placeholder="Name der Unterkategorie">
+                                                                <button class="btn btn-outline-secondary" id="add-category-btn" type="button">Unterkategorie hinzufügen</button>
+                                                            </div>
+                                                            <small class="text-muted">Fügt eine Unterkategorie zur aktuellen Hauptkategorie hinzu.</small>
+                                                        </div>
+                                                        <!-- UI für Untergruppe hinzufügen (Ebene 2+) -->
+                                                        <div id="add-subgroup-ui" class="mt-3">
+                                                            <div class="row g-0">
+                                                                <div class="col-12">
+                                                                    <div class="input-group">
+                                                                        <input type="text" class="form-control" id="subgroup-name-input" placeholder="Name der Untergruppe">
+                                                                        <button class="btn btn-outline-secondary" id="add-subgroup-btn" type="button">Untergruppe hinzufügen</button>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="col-12 pt-1">
+                                                                    <small class="text-muted">Fügt eine Untergruppe zur aktuell angezeigten Gruppe/Hauptkategorie hinzu.</small>
+                                                                </div>
+                                                            </div>
+                                                        </div>
                             </div>
                         </div>
                     </div>

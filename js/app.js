@@ -108,12 +108,23 @@ class LernApp {
 
     // Erweiterte showNestedGroups, merkt sich den Pfad
     showNestedGroups(mainCategory, groupPath = []) {
+        // Nur fortfahren, wenn mainCategory gültig ist
+        const validMainCat = Array.isArray(questionManager.categories) && questionManager.categories.includes(mainCategory);
+        if (!validMainCat) {
+            // Felder sicher verstecken
+            const catUI = document.getElementById('add-category-ui');
+            if (catUI) catUI.style.display = 'none';
+            const subUI = document.getElementById('add-subgroup-ui');
+            if (subUI) subUI.style.display = 'none';
+            return;
+        }
         this.lastMainCategory = mainCategory;
         this.lastGroupPath = groupPath;
         const container = document.getElementById('category-buttons');
         if (!container) return;
+        console.log('[DEBUG] showNestedGroups:', mainCategory, groupPath);
         // Hole Untergruppen für den aktuellen Pfad
-    const subgroups = questionManager.getNestedGroups(mainCategory, groupPath);
+        const subgroups = questionManager.getNestedGroups(mainCategory, groupPath);
         container.innerHTML = '';
         // Buttons für Untergruppen anzeigen
         if (subgroups && subgroups.length > 0) {
@@ -133,22 +144,54 @@ class LernApp {
             info.textContent = 'Keine weiteren Untergruppen.';
             container.appendChild(info);
         }
-        // UI für Untergruppen anlegen nur ab Ebene 1 anzeigen
-        const ui = document.getElementById('add-subgroup-ui');
-    // ...
-        if (ui) {
-            // Zeige das Feld, sobald eine Hauptkategorie gewählt ist (also immer, außer im Hauptmenü)
-            if (typeof mainCategory === 'string' && mainCategory.length > 0) {
-                ui.style.display = 'flex';
-                container.appendChild(ui);
-                // Fokus auf das Eingabefeld setzen (optional)
+        // Feld für Unterkategorie (Ebene 1) IMMER anzeigen, wenn groupPath.length === 0
+        const catUI = document.getElementById('add-category-ui');
+        if (catUI) {
+            const validMainCat = Array.isArray(questionManager.categories) && questionManager.categories.includes(mainCategory);
+            if (groupPath.length === 0 && validMainCat) {
+                catUI.style.display = 'block';
+                catUI.style.visibility = 'visible';
+                // Nach dem Button-Container einfügen
+                if (container.nextSibling !== catUI) {
+                    container.parentNode.insertBefore(catUI, container.nextSibling);
+                }
+                const input = document.getElementById('category-name-input');
+                if (input) input.focus();
+                console.log('[DEBUG] add-category-ui sichtbar');
+            } else {
+                catUI.style.display = 'none';
+            }
+        }
+        // Feld für Untergruppe (Ebene 2+)
+        const subUI = document.getElementById('add-subgroup-ui');
+        if (subUI) {
+            if (groupPath.length >= 1) {
+                subUI.style.display = 'flex';
+                container.appendChild(subUI);
                 const input = document.getElementById('subgroup-name-input');
                 if (input) input.focus();
             } else {
-                ui.style.display = 'none';
+                subUI.style.display = 'none';
             }
         }
         this._showAddSubgroupUI();
+        this._showAddCategoryUI();
+    }
+
+    // Bindet das Event für das UI zum Hinzufügen von Unterkategorien (Ebene 1)
+    _showAddCategoryUI() {
+        const btn = document.getElementById('add-category-btn');
+        const input = document.getElementById('category-name-input');
+        if (!btn || !input) return;
+        btn.onclick = () => {
+            const name = input.value.trim();
+            if (!name) return alert('Bitte gib einen Namen für die Unterkategorie ein!');
+            // Füge Unterkategorie zum aktuellen Hauptkategorie hinzu
+            questionManager.addNestedGroup(this.lastMainCategory, name, []);
+            // Nach dem Hinzufügen: Anzeige aktualisieren
+            this.showNestedGroups(this.lastMainCategory, []);
+            input.value = '';
+        };
     }
 
     // Hilfsfunktion: Finde Knoten in nestedGroups nach Pfad
@@ -200,8 +243,11 @@ class LernApp {
             container.innerHTML = '<div class="text-muted">Keine Kategorien vorhanden.</div>';
             return;
         }
+    // Feld für Unterkategorie in Ebene 0 immer verstecken
+    const catUI = document.getElementById('add-category-ui');
+    if (catUI) catUI.style.display = 'none';
         for (const cat of mainCats) {
-            container.innerHTML += `<button class=\"btn btn-primary m-2\" onclick=\"window.app.showNestedGroups('${cat}')\">${cat}</button>`;
+            container.innerHTML += `<button class=\"btn btn-primary m-2\" onclick=\"window.app.showNestedGroups('${cat}', [])\">${cat}</button>`;
         }
         // Untergruppen-Feld im Hauptmenü immer ausblenden
         const ui = document.getElementById('add-subgroup-ui');
@@ -2919,6 +2965,19 @@ function showPage(pageId) {
     if (targetPage) {
         targetPage.classList.remove('d-none');
         targetPage.classList.remove('app-hidden');
+        // Quiz-Seite: Felder für Unterkategorie/Untergruppe immer neu initialisieren
+        if (pageId === 'quiz' && window.app && typeof window.app.showNestedGroups === 'function') {
+            // Letzten Zustand wiederherstellen, aber wenn kein groupPath gesetzt, immer [] (Ebene 1)
+            const mainCat = window.app.lastMainCategory || (window.questionManager && window.questionManager.categories && window.questionManager.categories[0]);
+            let groupPath = Array.isArray(window.app.lastGroupPath) ? window.app.lastGroupPath : [];
+            if (!groupPath || groupPath.length === undefined) groupPath = [];
+            // Wenn kein letzter Zustand, immer Ebene 1 anzeigen
+            if (!window.app.lastMainCategory || !window.app.lastGroupPath || groupPath.length === 0) {
+                if (mainCat) window.app.showNestedGroups(mainCat, []);
+            } else {
+                if (mainCat) window.app.showNestedGroups(mainCat, groupPath);
+            }
+        }
     }
     // Aktiven Navbar-Link setzen
     document.querySelectorAll('.nav-link').forEach(link => {
