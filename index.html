@@ -100,9 +100,14 @@ window.showPage = showPage;
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
-                    <!-- Nur sichtbar wenn eingeloggt -->
+                    <!-- Home-Button (Haus) vor Quiz-Link -->
                     <li class="nav-item user-only" style="display: none;">
-                        <a class="nav-link" href="#" onclick="showPage('quiz')">Quiz</a>
+                        <a class="nav-link" href="#" onclick="showPage('home')">
+                            <i class="bi bi-house-fill me-2"></i>Home
+                        </a>
+                    </li>
+                    <li class="nav-item user-only" style="display: none;">
+                        <a class="nav-link" href="#" onclick="window.app.goToAddress({ level: 0 })">Quiz</a>
                     </li>
                     <li class="nav-item user-only" style="display: none;">
                         <a class="nav-link" href="#" onclick="showPage('sharing')">
@@ -271,8 +276,8 @@ window.showPage = showPage;
                 <div class="col-md-10 mx-auto">
                     <div class="d-flex justify-content-between align-items-center mb-4">
                         <h2><i class="bi bi-share me-2"></i>Daten teilen</h2>
-                        <button class="btn btn-secondary" onclick="showPage('home')">
-                            <i class="bi bi-house-fill me-2"></i>Zurück
+                        <button class="btn btn-secondary" id="quiz-back-btn" type="button" onclick="window.app.navigateQuizBack()">
+                            <i class="bi bi-arrow-left me-2"></i>Zurück
                         </button>
                     </div>
 
@@ -396,7 +401,7 @@ window.showPage = showPage;
                 <div class="col-md-6">
                     <div class="d-flex justify-content-between align-items-center mb-4">
                         <h2><i class="bi bi-person-gear me-2"></i>Profil</h2>
-                        <button class="btn btn-secondary" onclick="showPage('home')">
+                        <button class="btn btn-secondary" onclick="window.app.navigateQuizBack()">
                             <i class="bi bi-house-fill me-2"></i>Zurück
                         </button>
                     </div>
@@ -532,7 +537,7 @@ window.showPage = showPage;
                                         <i class="bi bi-question-circle-fill text-primary fs-1 mb-3"></i>
                                         <h5 class="card-title">Quiz starten</h5>
                                         <p class="card-text">Teste dein Wissen mit deinen Fragen</p>
-                                        <button class="btn btn-primary" onclick="showPage('quiz')">Los geht's</button>
+                                        <button class="btn btn-primary" onclick="window.app.goToAddress({ level: 0 })">Los geht's</button>
                                     </div>
                                 </div>
                             </div>
@@ -615,7 +620,7 @@ window.showPage = showPage;
                 <div class="col-md-8 mx-auto">
                     <div class="d-flex justify-content-between align-items-center mb-4">
                         <h2>Quiz</h2>
-                        <button class="btn btn-secondary" onclick="showPage('home')">
+                        <button class="btn btn-secondary" onclick="window.app.navigateQuizBack()">
                             <i class="bi bi-house-fill me-2"></i>Zurück
                         </button>
                     </div>
@@ -629,7 +634,7 @@ window.showPage = showPage;
                                                         </div>
                                                         <!-- UI für Unterkategorie hinzufügen (Ebene 1) -->
                                                         <div id="add-category-ui" class="mt-3">
-                                                            <div class="input-group">
+                                                            <div class="input-group" style="display:none">
                                                                 <input type="text" class="form-control" id="category-name-input" placeholder="Name der Unterkategorie">
                                                                 <button class="btn btn-outline-secondary" id="add-category-btn" type="button">Unterkategorie hinzufügen</button>
                                                             </div>
@@ -637,7 +642,7 @@ window.showPage = showPage;
                                                         </div>
                                                         <!-- UI für Untergruppe hinzufügen (Ebene 2+) -->
                                                         <div id="add-subgroup-ui" class="mt-3">
-                                                            <div class="row g-0">
+                                                            <div class="row g-0" style="display:none">
                                                                 <div class="col-12">
                                                                     <div class="input-group">
                                                                         <input type="text" class="form-control" id="subgroup-name-input" placeholder="Name der Untergruppe">
@@ -718,7 +723,7 @@ window.showPage = showPage;
                 <div class="col-md-10 mx-auto">
                     <div class="d-flex justify-content-between align-items-center mb-4">
                         <h2>Verwaltung</h2>
-                        <button class="btn btn-secondary" onclick="showPage('home')">
+                        <button class="btn btn-secondary" onclick="window.app.navigateQuizBack()">
                             <i class="bi bi-house-fill me-2"></i>Zurück
                         </button>
                     </div>
@@ -925,7 +930,7 @@ window.showPage = showPage;
                 <div class="col-md-8 mx-auto">
                     <div class="d-flex justify-content-between align-items-center mb-4">
                         <h2>Statistiken</h2>
-                        <button class="btn btn-secondary" onclick="showPage('home')">
+                        <button class="btn btn-secondary" onclick="window.app.navigateQuizBack()">
                             <i class="bi bi-house-fill me-2"></i>Zurück
                         </button>
                     </div>

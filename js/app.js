@@ -1,3 +1,12 @@
+// Nach jedem Seiten-Refresh: Quiz-Seite korrekt initialisieren
+window.addEventListener('DOMContentLoaded', function() {
+    setTimeout(function() {
+        var quizPage = document.getElementById('quiz-page');
+        if (quizPage && !quizPage.classList.contains('d-none') && window.app && typeof window.app.goToAddress === 'function') {
+            window.app.goToAddress({ level: 0 });
+        }
+    }, 100);
+});
 // Robuste Initialisierung: Nach DOMContentLoaded regelmäßig prüfen, ob App und questionManager bereit sind
 window.addEventListener('DOMContentLoaded', function() {
     let tries = 0;
@@ -101,379 +110,148 @@ function delegateEvent(parentSelector, childSelector, event, handler) {
 // LernApp - Hauptlogik
 
 class LernApp {
+    // Lädt die Userdaten für den aktuellen User aus dem zentralen Userpaket
+    loadUserData() {
+        if (!this.currentUser) return;
+        const userObjStr = localStorage.getItem(`lernapp_user_${this.currentUser}`);
+        if (userObjStr) {
+            try {
+                const userObj = JSON.parse(userObjStr);
+                this.categories = Array.isArray(userObj.categories) ? userObj.categories : ['textfragen', 'bilderquiz', 'demo-ketegorie'];
+                this.questions = Array.isArray(userObj.questions) ? userObj.questions : [];
+                this.statistics = (userObj.statistics && typeof userObj.statistics === 'object') ? userObj.statistics : {
+                    totalQuestions: 0,
+                    correctAnswers: 0,
+                    categoriesPlayed: {},
+                    lastPlayed: null
+                };
+                if (userObj.settings) this.users[this.currentUser].settings = userObj.settings;
+                if (userObj.storage) this.users[this.currentUser].storage = userObj.storage;
+            } catch (e) {
+                this.categories = ['textfragen', 'bilderquiz', 'demo-ketegorie'];
+                this.questions = [];
+                this.statistics = {
+                    totalQuestions: 0,
+                    correctAnswers: 0,
+                    categoriesPlayed: {},
+                    lastPlayed: null
+                };
+            }
+        } else {
+            this.categories = ['textfragen', 'bilderquiz', 'demo-ketegorie'];
+            this.questions = [];
+            this.statistics = {
+                totalQuestions: 0,
+                correctAnswers: 0,
+                categoriesPlayed: {},
+                lastPlayed: null
+            };
+        }
+    }
+    // Flag für Back-Navigation, damit der Zustand nicht zu früh gelöscht wird
+    _backNavigationActive = false;
+    // Navigiert in der Quiz-Hierarchie eine Ebene zurück oder ins Hauptmenü
+    navigateQuizBack() {
+        const prev = this.getPreviousAddress();
+        if (prev === null) {
+            if (typeof window.showPage === 'function') window.showPage('home');
+        } else {
+            this.goToAddress(prev);
+        }
+    }
     // Speichert den zuletzt angezeigten Hauptkategorie-Namen (für Untergruppen-UI)
     lastMainCategory = null;
     // Speichert den zuletzt angezeigten Gruppenpfad (als Array)
     lastGroupPath = [];
 
-    // Erweiterte showNestedGroups, merkt sich den Pfad
-    showNestedGroups(mainCategory, groupPath = []) {
-        // Nur fortfahren, wenn mainCategory gültig ist
-        const validMainCat = Array.isArray(questionManager.categories) && questionManager.categories.includes(mainCategory);
-        if (!validMainCat) {
-            // Felder sicher verstecken
-            const catUI = document.getElementById('add-category-ui');
-            if (catUI) catUI.style.display = 'none';
-            const subUI = document.getElementById('add-subgroup-ui');
-            if (subUI) subUI.style.display = 'none';
-            return;
+    // Zentrale Adress-Navigation für Quiz-UI
+    goToAddress(address) {
+        // Quiz-Seite aktivieren
+        if (typeof window.showPage === 'function') window.showPage('quiz');
+        // Fallback: Immer vollständiges Objekt
+        if (!address || typeof address.level !== 'number') {
+            address = { level: 0 };
         }
-        this.lastMainCategory = mainCategory;
-        this.lastGroupPath = groupPath;
-        const container = document.getElementById('category-buttons');
-        if (!container) return;
-        console.log('[DEBUG] showNestedGroups:', mainCategory, groupPath);
-        // Hole Untergruppen für den aktuellen Pfad
-        const subgroups = questionManager.getNestedGroups(mainCategory, groupPath);
-        container.innerHTML = '';
-        // Buttons für Untergruppen anzeigen
-        if (subgroups && subgroups.length > 0) {
-            subgroups.forEach(subgroup => {
-                const btn = document.createElement('button');
-                btn.className = 'btn btn-secondary m-1';
-                btn.textContent = subgroup.name;
-                btn.onclick = () => {
-                    this.showNestedGroups(mainCategory, subgroup.path);
-                };
-                container.appendChild(btn);
-            });
-        } else {
-            // Wenn keine weiteren Untergruppen, ggf. Hinweis
-            const info = document.createElement('div');
-            info.className = 'text-muted m-2';
-            info.textContent = 'Keine weiteren Untergruppen.';
-            container.appendChild(info);
-        }
-        // Feld für Unterkategorie (Ebene 1) IMMER anzeigen, wenn groupPath.length === 0
+        this.currentAddress = { ...address };
+        const level = address.level;
+        // UI-Elemente holen
         const catUI = document.getElementById('add-category-ui');
-        if (catUI) {
-            const validMainCat = Array.isArray(questionManager.categories) && questionManager.categories.includes(mainCategory);
-            if (groupPath.length === 0 && validMainCat) {
-                catUI.style.display = 'block';
-                catUI.style.visibility = 'visible';
-                // Nach dem Button-Container einfügen
-                if (container.nextSibling !== catUI) {
-                    container.parentNode.insertBefore(catUI, container.nextSibling);
-                }
-                const input = document.getElementById('category-name-input');
-                if (input) input.focus();
-                console.log('[DEBUG] add-category-ui sichtbar');
-            } else {
-                catUI.style.display = 'none';
-            }
-        }
-        // Feld für Untergruppe (Ebene 2+)
         const subUI = document.getElementById('add-subgroup-ui');
-        if (subUI) {
-            if (groupPath.length >= 1) {
-                subUI.style.display = 'flex';
-                container.appendChild(subUI);
-                const input = document.getElementById('subgroup-name-input');
-                if (input) input.focus();
-            } else {
-                subUI.style.display = 'none';
-            }
-        }
-        this._showAddSubgroupUI();
-        this._showAddCategoryUI();
-    }
-
-    // Bindet das Event für das UI zum Hinzufügen von Unterkategorien (Ebene 1)
-    _showAddCategoryUI() {
-        const btn = document.getElementById('add-category-btn');
-        const input = document.getElementById('category-name-input');
-        if (!btn || !input) return;
-        btn.onclick = () => {
-            const name = input.value.trim();
-            if (!name) return alert('Bitte gib einen Namen für die Unterkategorie ein!');
-            // Füge Unterkategorie zum aktuellen Hauptkategorie hinzu
-            questionManager.addNestedGroup(this.lastMainCategory, name, []);
-            // Nach dem Hinzufügen: Anzeige aktualisieren
-            this.showNestedGroups(this.lastMainCategory, []);
-            input.value = '';
-        };
-    }
-
-    // Hilfsfunktion: Finde Knoten in nestedGroups nach Pfad
-    _getNodeByPath(mainCategory, pathArr) {
-        let node = questionManager.nestedGroups[mainCategory];
-        for (const part of pathArr) {
-            let found = node.find(g => g.name === part);
-            if (!found) return [];
-            node = found.children;
-        }
-        return node;
-    }
-
-    // Bindet das Event für das UI zum Hinzufügen von Untergruppen
-    _showAddSubgroupUI() {
-        const btn = document.getElementById('add-subgroup-btn');
-        const input = document.getElementById('subgroup-name-input');
-        if (!btn || !input) return;
-        btn.onclick = () => {
-            const name = input.value.trim();
-            if (!name) return alert('Bitte gib einen Namen für die Untergruppe ein!');
-            // Füge Untergruppe zum aktuellen Pfad hinzu
-            questionManager.addNestedGroup(this.lastMainCategory, name, this.lastGroupPath);
-            // Nach dem Hinzufügen: Anzeige aktualisieren
-            this.showNestedGroups(this.lastMainCategory, this.lastGroupPath);
-            input.value = '';
-        };
-    }
-    // Zeigt die Hauptkategorie-Buttons im UI an
-    renderMainCategories() {
-        console.log('[DEBUG] renderMainCategories aufgerufen');
         const container = document.getElementById('category-buttons');
-        if (!container) {
-            console.log('[DEBUG] #category-buttons NICHT gefunden!');
-            return;
+        // Felder initial ausblenden
+        if (catUI) {
+            catUI.style.display = 'none';
+            const inputGroup = catUI.querySelector('.input-group');
+            if (inputGroup) inputGroup.style.display = 'none';
         }
-        let mainCats = questionManager.categories;
-        // Fallback: Demo-Kategorien initialisieren, falls leer
-        if (!mainCats || mainCats.length === 0) {
-            if (typeof questionManager.initDemoTextQuiz === 'function') {
-                questionManager.initDemoTextQuiz();
-                mainCats = questionManager.categories;
-                console.log('[DEBUG] Demo-Kategorien initialisiert:', mainCats);
-            }
+        if (subUI) {
+            subUI.style.display = 'none';
+            const row = subUI.querySelector('.row');
+            if (row) row.style.display = 'none';
         }
-        console.log('[DEBUG] Kategorien:', mainCats);
-        container.innerHTML = '';
-        if (!mainCats || mainCats.length === 0) {
-            container.innerHTML = '<div class="text-muted">Keine Kategorien vorhanden.</div>';
-            return;
-        }
-    // Feld für Unterkategorie in Ebene 0 immer verstecken
-    const catUI = document.getElementById('add-category-ui');
-    if (catUI) catUI.style.display = 'none';
-        for (const cat of mainCats) {
-            container.innerHTML += `<button class=\"btn btn-primary m-2\" onclick=\"window.app.showNestedGroups('${cat}', [])\">${cat}</button>`;
-        }
-        // Untergruppen-Feld im Hauptmenü immer ausblenden
-        const ui = document.getElementById('add-subgroup-ui');
-        if (ui) ui.style.display = 'none';
-        // Sichtbarkeits-Check
-        const style = window.getComputedStyle(container);
-        console.log('[DEBUG] #category-buttons sichtbar?', style.display !== 'none', 'display:', style.display, 'parent:', container.parentElement && container.parentElement.id);
-        let el = container.parentElement;
-        while (el) {
-            const s = window.getComputedStyle(el);
-            console.log('[DEBUG] Eltern-Element', el.id || el.className, 'display:', s.display, 'd-none:', el.classList.contains('d-none'), 'app-hidden:', el.classList.contains('app-hidden'));
-            el = el.parentElement;
-        }
-    }
-    // Rekursive Anzeige verschachtelter Gruppen als Buttons
-    renderNestedGroupButtons(mainCategory, node = null, path = []) {
-        node = node || questionManager.nestedGroups[mainCategory];
-        let html = '';
-        for (const group of node) {
-            const fullPath = [...path, group.name];
-            html += `<div style="margin-left:${path.length * 20}px">
-                <button class="btn btn-outline-primary" onclick="window.app.startQuiz('${mainCategory}', '${fullPath.join('>')}')">${group.name}</button>
-            </div>`;
-            if (group.children.length > 0) {
-                html += this.renderNestedGroupButtons(mainCategory, group.children, fullPath);
-            }
-        }
-        return html;
-    }
+        if (container) container.innerHTML = '';
 
-    // Account löschen (unverändert)
-    async deleteAccount() {
-        if (!this.currentUser) {
-            this.showAlert('Kein Benutzer eingeloggt!', 'danger');
-            return;
-        }
-        const username = this.currentUser;
-        if (!confirm(`Möchten Sie Ihren Account (${username}) und alle zugehörigen Daten unwiderruflich löschen?`)) return;
-        // Debug-Ausgaben vor Löschen
-        console.log('[LernApp][deleteAccount] users vor Löschen:', JSON.stringify(this.users));
-        console.log('[LernApp][deleteAccount] localStorage vor Cleanup:', Object.keys(localStorage).filter(k => k.includes(username)));
-        delete this.users[username];
-        await this.saveToStorage('users', this.users, true);
-    }
-
-    loadUserData() {
-        // Zentrale Datenverwaltung: Nur noch questionManager wird genutzt
-        if (!window.questionManager) return;
-        if (this.isDemo) {
-            // Demo-Modus: Demo-Testfragen zentral laden
-            window.questionManager.loadUserData({
-                categories: ['Textfragen', 'Bilderquiz'],
-                questions: [
-                    {
-                        mainCategory: 'Textfragen',
-                        group: 'Demo Testfragen',
-                        question: 'Was ist die Hauptstadt von Deutschland?',
-                        answer: 'Berlin',
-                        description: 'Berlin ist die größte Stadt Deutschlands.'
-                    },
-                    {
-                        mainCategory: 'Textfragen',
-                        group: 'Demo Testfragen',
-                        question: 'Wie viele Kontinente gibt es?',
-                        answer: '7',
-                        description: 'Die Kontinente sind Europa, Asien, Afrika, Nordamerika, Südamerika, Australien und Antarktis.'
-                    },
-                    {
-                        mainCategory: 'Textfragen',
-                        group: 'Demo Testfragen',
-                        question: 'Welches Element hat das chemische Symbol "O"?',
-                        answer: 'Sauerstoff',
-                        description: 'Sauerstoff ist lebenswichtig für die Atmung.'
-                    },
-                    {
-                        mainCategory: 'Textfragen',
-                        group: 'Demo Testfragen',
-                        question: 'Wer schrieb "Faust"?',
-                        answer: 'Goethe',
-                        description: 'Johann Wolfgang von Goethe ist einer der bekanntesten deutschen Dichter.'
-                    },
-                    {
-                        mainCategory: 'Textfragen',
-                        group: 'Demo Testfragen',
-                        question: 'Was ist das Ergebnis von 9 x 7?',
-                        answer: '63',
-                        description: '9 mal 7 ergibt 63.'
-                    }
-                ],
-                statistics: {
-                    totalQuestions: 0,
-                    correctAnswers: 0,
-                    categoriesPlayed: {},
-                    lastPlayed: null
-                }
-            });
-        } else if (this.currentUser) {
-            // Userdaten laden
-            if (!this.users[this.currentUser]) {
-                // Kein User vorhanden
-                window.questionManager.loadUserData({categories: [], questions: [], statistics: {}});
-            } else {
-                const userObjStr = localStorage.getItem(`lernapp_user_${this.currentUser}`);
-                if (userObjStr) {
-                    try {
-                        const userObj = JSON.parse(userObjStr);
-                        window.questionManager.loadUserData(userObj);
-                        // Optionale Felder
-                        if (userObj.settings) this.users[this.currentUser].settings = userObj.settings;
-                        if (userObj.storage) this.users[this.currentUser].storage = userObj.storage;
-                        console.log('[LernApp][loadUserData] Userpaket geladen:', userObj);
-                    } catch (e) {
-                        window.questionManager.loadUserData({categories: [], questions: [], statistics: {}});
-                        console.log('[LernApp][loadUserData] Fehler beim Parsen, Daten zurückgesetzt.');
-                    }
-                } else {
-                    window.questionManager.loadUserData({categories: [], questions: [], statistics: {}});
-                    console.log('[LernApp][loadUserData] Kein Userpaket gefunden, Daten zurückgesetzt.');
-                }
-                // Wenn neue User keine Fragen haben, Demo-Testfragen übernehmen
-                if (!window.questionManager.questions || window.questionManager.questions.length === 0) {
-                    // Demo-Fragen mit vollständiger Struktur wie in addQuestion
-                    const demoQuestions = [
-                        {
-                            mainCategory: 'Textfragen',
-                            group: 'Demo Testfragen',
-                            question: 'Was ist die Hauptstadt von Deutschland?',
-                            answer: 'Berlin',
-                            answerType: 'text',
-                            questionImage: null,
-                            answerImage: null,
-                            description: 'Berlin ist die größte Stadt Deutschlands.'
-                        },
-                        {
-                            mainCategory: 'Textfragen',
-                            group: 'Demo Testfragen',
-                            question: 'Wie viele Kontinente gibt es?',
-                            answer: '7',
-                            answerType: 'text',
-                            questionImage: null,
-                            answerImage: null,
-                            description: 'Die Kontinente sind Europa, Asien, Afrika, Nordamerika, Südamerika, Australien und Antarktis.'
-                        },
-                        {
-                            mainCategory: 'Textfragen',
-                            group: 'Demo Testfragen',
-                            question: 'Welches Element hat das chemische Symbol "O"?',
-                            answer: 'Sauerstoff',
-                            answerType: 'text',
-                            questionImage: null,
-                            answerImage: null,
-                            description: 'Sauerstoff ist lebenswichtig für die Atmung.'
-                        },
-                        {
-                            mainCategory: 'Textfragen',
-                            group: 'Demo Testfragen',
-                            question: 'Wer schrieb "Faust"?',
-                            answer: 'Goethe',
-                            answerType: 'text',
-                            questionImage: null,
-                            answerImage: null,
-                            description: 'Johann Wolfgang von Goethe ist einer der bekanntesten deutschen Dichter.'
-                        },
-                        {
-                            mainCategory: 'Textfragen',
-                            group: 'Demo Testfragen',
-                            question: 'Was ist das Ergebnis von 9 x 7?',
-                            answer: '63',
-                            answerType: 'text',
-                            questionImage: null,
-                            answerImage: null,
-                            description: '9 mal 7 ergibt 63.'
-                        }
-                    ];
-                    const demoData = {
-                        categories: ['Textfragen', 'Bilderquiz'],
-                        questions: demoQuestions,
-                        statistics: {
-                            totalQuestions: 0,
-                            correctAnswers: 0,
-                            categoriesPlayed: {},
-                            lastPlayed: null
-                        }
+        if (level === 0) {
+            // Hauptkategorie-Buttons, keine Felder sichtbar
+            if (container && window.questionManager && Array.isArray(window.questionManager.categories)) {
+                window.questionManager.categories.forEach(cat => {
+                    const btn = document.createElement('button');
+                    btn.className = 'btn btn-primary m-2';
+                    btn.textContent = cat;
+                    btn.onclick = () => {
+                        this.goToAddress({ level: 1, mainCategory: cat });
                     };
-                    window.questionManager.loadUserData(demoData);
-                    // Userpaket im localStorage mit Demo-Fragen aktualisieren
-                    if (this.currentUser && this.users[this.currentUser]) {
-                        const userObj = {
-                            ...this.users[this.currentUser],
-                            categories: demoData.categories,
-                            questions: demoData.questions,
-                            statistics: demoData.statistics
+                    container.appendChild(btn);
+                });
+            }
+        } else if (level === 1) {
+            // Unterkategorie-Buttons + Feld für Unterkategorie
+            this.lastMainCategory = address.mainCategory;
+            this.lastGroupPath = [];
+            if (container && window.questionManager && window.questionManager.getNestedGroups) {
+                const subcats = window.questionManager.getNestedGroups(address.mainCategory, []);
+                if (Array.isArray(subcats)) {
+                    subcats.forEach(subcat => {
+                        const btn = document.createElement('button');
+                        btn.className = 'btn btn-secondary m-1';
+                        btn.textContent = subcat.name;
+                        btn.onclick = () => {
+                            this.goToAddress({ level: 2, mainCategory: address.mainCategory, groupPath: [subcat.name] });
                         };
-                        localStorage.setItem(`lernapp_user_${this.currentUser}`, JSON.stringify(userObj));
-                    }
+                        container.appendChild(btn);
+                    });
                 }
             }
+            if (catUI) {
+                catUI.style.display = 'block';
+                const inputGroup = catUI.querySelector('.input-group');
+                if (inputGroup) inputGroup.style.display = '';
+            }
+        } else if (level === 2) {
+            // Untergruppen-Buttons + Feld für Untergruppe
+            this.lastMainCategory = address.mainCategory;
+            this.lastGroupPath = address.groupPath || [];
+            if (container && window.questionManager && window.questionManager.getNestedGroups) {
+                const subgroups = window.questionManager.getNestedGroups(address.mainCategory, address.groupPath || []);
+                if (Array.isArray(subgroups)) {
+                    subgroups.forEach(subgroup => {
+                        const btn = document.createElement('button');
+                        btn.className = 'btn btn-secondary m-1';
+                        btn.textContent = subgroup.name;
+                        btn.onclick = () => {
+                            this.goToAddress({ level: 2, mainCategory: address.mainCategory, groupPath: [...(address.groupPath || []), subgroup.name] });
+                        };
+                        container.appendChild(btn);
+                    });
+                }
+            }
+
+            if (subUI) {
+                subUI.style.display = 'flex';
+                const row = subUI.querySelector('.row');
+                if (row) row.style.display = '';
+            }
         }
-        // Proxy für Kompatibilität (kann später entfernt werden)
-        this.categories = window.questionManager.categories;
-        this.questions = window.questionManager.questions;
-        this.statistics = window.questionManager.statistics;
-        // Daten-Integrität prüfen
-        this.validateDataIntegrity();
-    }
-    startQuiz(mainCategory, group) {
-        // ...existing code...
-        const questions = questionManager.getQuestions(mainCategory, group);
-        console.log('[LernApp][startQuiz] Fragen für Quiz:', questions);
-        if (questions.length < 4) {
-            this.showAlert('Diese Gruppe hat weniger als 4 Fragen! Bitte fügen Sie mehr Fragen hinzu.', 'warning');
-            return;
-        }
-        this.currentQuiz = {
-            questions: this.shuffleArray(questions).slice(0, 10),
-            currentIndex: 0,
-            score: 0,
-            selectedCategory: `${mainCategory} / ${group}`,
-            answers: []
-        };
-        this.showQuestion();
-        document.getElementById('quiz-container').classList.remove('d-none');
-        document.getElementById('quiz-result').classList.add('d-none');
-        document.getElementById('next-question').classList.add('d-none');
-        document.getElementById('finish-quiz').classList.add('d-none');
-        document.getElementById('submit-answer').classList.remove('d-none');
     }
 
     adminResetPassword(username) {
@@ -609,7 +387,7 @@ class LernApp {
             guestElements.forEach(el => el.style.display = 'block');
             showPage('login');
         }
-        // User-Login deaktivieren, wenn Admin eingeloggt
+        // User-Login deaktivieren, wenn Admin eingeloggt ist
         this.disableUserLoginIfAdmin();
     }
 
@@ -767,7 +545,7 @@ class LernApp {
             storage: { chosen: false, folder: '', cloud: false },
             statistics: { totalQuestions: 0, correctAnswers: 0, lastPlayed: null, categoriesPlayed: {} },
             settings: {},
-            categories: ['Allgemein', 'Ordne zu'],
+            categories: ['textfragen', 'bilderquiz', 'demo-ketegorie'],
             questions: []
         };
         this.users[username] = newUser;
@@ -950,7 +728,7 @@ class LernApp {
         document.getElementById('share-code-display').value = shareCode;
         if (this.isDemo) {
             // Demo-Daten
-            this.categories = ['Allgemein', 'Ordne zu', 'Demo'];
+            this.categories = ['textfragen', 'bilderquiz', 'demo-ketegorie', 'demo-fragen'];
             this.questions = this.generateDemoQuestions();
             this.statistics = {
                 totalQuestions: 0,
@@ -963,7 +741,7 @@ class LernApp {
             if (!this.users[this.currentUser]) {
                 // Sicherheit: auch zentrales Userpaket entfernen, falls noch vorhanden
                 localStorage.removeItem(`lernapp_user_${this.currentUser}`);
-                this.categories = ['Allgemein', 'Ordne zu'];
+                this.categories = ['textfragen', 'bilderquiz', 'demo-ketegorie'];
                 this.questions = [];
                 this.statistics = {
                     totalQuestions: 0,
@@ -984,7 +762,7 @@ class LernApp {
                 try {
                     userObj = JSON.parse(userObjStr);
                     // Wenn das Userpaket leer ist, keine Altlasten übernehmen
-                    this.categories = Array.isArray(userObj.categories) ? userObj.categories : ['Allgemein', 'Ordne zu'];
+                    this.categories = Array.isArray(userObj.categories) ? userObj.categories : ['textfragen', 'bilderquiz', 'demo-ketegorie'];
                     this.questions = Array.isArray(userObj.questions) ? userObj.questions : [];
                     this.statistics = (userObj.statistics && typeof userObj.statistics === 'object') ? userObj.statistics : {
                         totalQuestions: 0,
@@ -998,7 +776,7 @@ class LernApp {
                     console.log('[LernApp][loadUserData] Userpaket geladen:', userObj);
                 } catch (e) {
                     // Fallback: leere Daten
-                    this.categories = ['Allgemein', 'Ordne zu'];
+                    this.categories = ['textfragen', 'bilderquiz', 'demo-ketegorie'];
                     this.questions = [];
                     this.statistics = {
                         totalQuestions: 0,
@@ -1010,7 +788,7 @@ class LernApp {
                 }
             } else {
                 // Kein Paket vorhanden: Fallback auf leere Daten
-                this.categories = ['Allgemein', 'Ordne zu'];
+                this.categories = ['textfragen', 'bilderquiz', 'demo-ketegorie'];
                 this.questions = [];
                 this.statistics = {
                     totalQuestions: 0,
@@ -1232,7 +1010,7 @@ class LernApp {
 
     showAdminInterface() {
         // Standardkategorien sicherstellen
-        const standardKategorien = ['Allgemein', 'Ordne zu'];
+    const standardKategorien = ['textfragen', 'bilderquiz', 'demo-ketegorie'];
         standardKategorien.forEach(kat => {
             if (!this.categories.includes(kat)) this.categories.unshift(kat);
         });
@@ -1387,7 +1165,7 @@ class LernApp {
         try {
             // Kategorien validieren
             if (!Array.isArray(this.categories)) {
-                this.categories = ['Allgemein', 'Ordne zu'];
+                this.categories = ['textfragen', 'bilderquiz', 'demo-ketegorie'];
             }
 
             // Fragen validieren
@@ -1411,7 +1189,7 @@ class LernApp {
             this.showAlert('Fehler bei der Datenvalidierung. Daten werden zurückgesetzt.', 'warning');
             
             // Daten zurücksetzen
-            this.categories = ['Allgemein', 'Ordne zu'];
+            this.categories = ['textfragen', 'bilderquiz', 'demo-ketegorie'];
             this.questions = [];
             this.statistics = {
                 totalQuestions: 0,
@@ -1425,104 +1203,7 @@ class LernApp {
     }
 
     // Beispieldaten laden (nur beim ersten Start)
-    loadSampleData() {
-        if (this.questions.length === 0) {
-            const sampleQuestions = [
-                // Geografie - Text-Fragen mit Text-Antworten
-                {
-                    id: 1,
-                    category: 'Geografie',
-                    question: 'Was ist die Hauptstadt von Deutschland?',
-                    answerType: 'text',
-                    answer: 'Berlin',
-                    questionImage: null,
-                    answerImage: null
-                },
-                {
-                    id: 2,
-                    category: 'Geografie', 
-                    question: 'Was ist die Hauptstadt von Frankreich?',
-                    answerType: 'text',
-                    answer: 'Paris',
-                    questionImage: null,
-                    answerImage: null
-                },
-                {
-                    id: 3,
-                    category: 'Geografie',
-                    question: 'Was ist die Hauptstadt von Italien?',
-                    answerType: 'text',
-                    answer: 'Rom',
-                    questionImage: null,
-                    answerImage: null
-                },
-                {
-                    id: 4,
-                    category: 'Geografie',
-                    question: 'Was ist die Hauptstadt von Spanien?',
-                    answerType: 'text',
-                    answer: 'Madrid',
-                    questionImage: null,
-                    answerImage: null
-                },
-                {
-                    id: 5,
-                    category: 'Geografie',
-                    question: 'Was ist die Hauptstadt von England?',
-                    answerType: 'text',
-                    answer: 'London',
-                    questionImage: null,
-                    answerImage: null
-                },
-                // Beispiel für "Ordne zu" - Text-Fragen mit Bild-Antworten
-                {
-                    id: 6,
-                    category: 'Ordne zu',
-                    question: 'Finde den Apfel',
-                    answerType: 'image',
-                    answer: null,
-                    questionImage: null,
-                    answerImage: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iNTAiIGN5PSI1MCIgcj0iNDAiIGZpbGw9InJlZCIvPjx0ZXh0IHg9IjUwIiB5PSI1NSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0id2hpdGUiIGZvbnQtc2l6ZT0iMTQiPkFwZmVsPC90ZXh0Pjwvc3ZnPg=='
-                },
-                {
-                    id: 7,
-                    category: 'Ordne zu',
-                    question: 'Finde die Banane',
-                    answerType: 'image',
-                    answer: null,
-                    questionImage: null,
-                    answerImage: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGVsbGlwc2UgY3g9IjUwIiBjeT0iNTAiIHJ4PSI0MCIgcnk9IjE1IiBmaWxsPSJ5ZWxsb3ciLz48dGV4dCB4PSI1MCIgeT0iNTUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9ImJsYWNrIiBmb250LXNpemU9IjEyIj5CYW5hbmU8L3RleHQ+PC9zdmc+'
-                },
-                {
-                    id: 8,
-                    category: 'Ordne zu',
-                    question: 'Finde die Orange',
-                    answerType: 'image',
-                    answer: null,
-                    questionImage: null,
-                    answerImage: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iNTAiIGN5PSI1MCIgcj0iNDAiIGZpbGw9Im9yYW5nZSIvPjx0ZXh0IHg9IjUwIiB5PSI1NSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iYmxhY2siIGZvbnQtc2l6ZT0iMTIiPk9yYW5nZTwvdGV4dD48L3N2Zz4='
-                },
-                {
-                    id: 9,
-                    category: 'Ordne zu',
-                    question: 'Finde die Traube',
-                    answerType: 'image',
-                    answer: null,
-                    questionImage: null,
-                    answerImage: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGVsbGlwc2UgY3g9IjUwIiBjeT0iNTAiIHJ4PSIzNSIgcnk9IjQ1IiBmaWxsPSJwdXJwbGUiLz48dGV4dCB4PSI1MCIgeT0iNTUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IndoaXRlIiBmb250LXNpemU9IjEyIj5UcmF1YmU8L3RleHQ+PC9zdmc+'
-                }
-            ];
 
-            this.questions = sampleQuestions;
-            this.saveToStorage('questions', this.questions);
-        }
-
-        // Beispiel-Kategorien hinzufügen
-        if (!this.categories.includes('Geografie')) {
-            this.categories.push('Geografie');
-            this.saveToStorage('categories', this.categories);
-        }
-    }
 
     setupEventListeners() {
         // Logout-Button (Profil Dropdown)
@@ -1665,22 +1346,19 @@ class LernApp {
         try {
             if (window.storage && window.storage.load) {
                 const data = await window.storage.load(key);
-                // Wenn aus localStorage geladen, ggf. entschlüsseln
                 if (data && typeof data === 'string') {
-                    const decrypted = this.decryptData(data);
-                    return decrypted ? JSON.parse(decrypted) : null;
+                    return JSON.parse(data);
                 }
                 return data;
             }
         } catch (error) {
             console.error('Fehler beim Laden der Daten (Storage-Utility):', error);
         }
-        // Fallback: localStorage (verschlüsselt)
+        // Fallback: localStorage (Klartext)
         try {
-            const encryptedData = localStorage.getItem(`lernapp_${key}`);
-            if (!encryptedData) return null;
-            const decryptedData = this.decryptData(encryptedData);
-            return decryptedData ? JSON.parse(decryptedData) : null;
+            const plainData = localStorage.getItem(`lernapp_${key}`);
+            if (!plainData) return null;
+            return JSON.parse(plainData);
         } catch (error) {
             console.error('Fehler beim Laden der Daten (Fallback):', error);
             return null;
@@ -1697,11 +1375,10 @@ class LernApp {
         } catch (error) {
             console.error('Fehler beim Speichern der Daten (Storage-Utility):', error);
         }
-        // Fallback: localStorage (verschlüsselt)
+        // Fallback: localStorage (Klartext)
         try {
             const jsonData = JSON.stringify(data);
-            const encryptedData = this.encryptData(jsonData);
-            localStorage.setItem(`lernapp_${key}`, encryptedData);
+            localStorage.setItem(`lernapp_${key}`, jsonData);
         } catch (error) {
             console.error('Fehler beim Speichern der Daten (Fallback):', error);
             this.showAlert('Fehler beim Speichern der Daten!', 'danger');
@@ -1766,10 +1443,7 @@ class LernApp {
     }
 
     deleteCategory(categoryName) {
-        if (categoryName === 'Allgemein' || categoryName === 'Ordne zu') {
-            this.showAlert('Diese Kategorie kann nicht gelöscht werden!', 'warning');
-            return;
-        }
+    // Keine gesperrten Kategorien mehr
 
         if (confirm(`Möchten Sie die Kategorie "${categoryName}" wirklich löschen? Alle zugehörigen Fragen werden ebenfalls gelöscht!`)) {
             // Kategorie entfernen
@@ -2099,47 +1773,6 @@ class LernApp {
         modal.show();
     }
 
-    // Spezielle Quiz-Funktion für "Ordne zu" mit allen Bild-Antworten
-    startOrderQuiz() {
-        // Alle Fragen mit Bildantworten sammeln (aus allen Kategorien)
-        const imageAnswerQuestions = this.questions.filter(q => 
-            q.answerType === 'image' && 
-            q.answerImage && 
-            q.category !== 'Ordne zu'
-        );
-        
-        if (imageAnswerQuestions.length < 4) {
-            this.showAlert('Es gibt weniger als 4 Fragen mit Bildantworten! Bitte fügen Sie mehr Fragen hinzu.', 'warning');
-            return;
-        }
-
-        // Quiz initialisieren
-        this.currentQuiz = {
-            questions: this.shuffleArray(imageAnswerQuestions).slice(0, 10), // Max 10 Fragen
-            currentIndex: 0,
-            score: 0,
-            selectedCategory: 'Ordne zu (Gemischt)',
-            answers: []
-        };
-
-        // Erste Frage vorbereiten - als "Ordne zu" Format
-        const firstQuestion = this.currentQuiz.questions[0];
-        const multipleChoiceQuestion = this.generateMixedOrderQuestion(firstQuestion, imageAnswerQuestions);
-        
-        if (!multipleChoiceQuestion) {
-            this.showAlert('Nicht genügend Fragen für ein Quiz verfügbar!', 'danger');
-            return;
-        }
-        
-        this.currentQuiz.questions[0] = { ...firstQuestion, ...multipleChoiceQuestion };
-
-        // Zur Quiz-Seite wechseln und Quiz-Container einblenden
-        showPage('quiz');
-        document.getElementById('category-selection').classList.add('d-none');
-        document.getElementById('quiz-container').classList.remove('d-none');
-        this.showQuestion();
-    }
-
     // Quiz-Logik: Akzeptiert (category) oder (main, groupPath)
     startQuiz(mainOrCategory, group) {
         // Flexible Parameter: (main, groupPath) oder (category)
@@ -2186,12 +1819,7 @@ class LernApp {
 
         // Erste Frage vorbereiten
         const firstQuestion = this.currentQuiz.questions[0];
-        let multipleChoiceQuestion = null;
-        if (firstQuestion && firstQuestion.category && firstQuestion.category.startsWith('Ordne zu')) {
-            multipleChoiceQuestion = this.generateOrderQuestion(firstQuestion, questions);
-        } else {
-            multipleChoiceQuestion = this.generateMultipleChoiceQuestion(firstQuestion, questions);
-        }
+        const multipleChoiceQuestion = this.generateMultipleChoiceQuestion(firstQuestion, questions);
         if (!multipleChoiceQuestion) {
             this.showAlert('Nicht genügend Fragen für ein Quiz verfügbar!', 'danger');
             return;
@@ -2199,7 +1827,7 @@ class LernApp {
         this.currentQuiz.questions[0] = { ...firstQuestion, ...multipleChoiceQuestion };
 
         // Zur Quiz-Seite wechseln und Quiz-Container einblenden
-        showPage('quiz');
+    if (window.app && typeof window.app.goToAddress === 'function') window.app.goToAddress({ level: 0 });
         document.getElementById('category-selection').classList.add('d-none');
         document.getElementById('quiz-container').classList.remove('d-none');
         this.showQuestion();
@@ -2207,11 +1835,6 @@ class LernApp {
 
     // Generiert eine Multiple-Choice-Frage aus einer Frage/Antwort-Kombination
     generateMultipleChoiceQuestion(questionData, availableQuestions) {
-        // Spezielle Behandlung für "Ordne zu" Kategorie und Unterkategorien
-        if (questionData.category && questionData.category.startsWith('Ordne zu')) {
-            return this.generateOrderQuestion(questionData, availableQuestions);
-        }
-
         // Normale Multiple-Choice-Frage
         const categoryQuestions = availableQuestions.filter(q => 
             q.category === questionData.category && 
@@ -2245,87 +1868,6 @@ class LernApp {
         return {
             questionText: questionData.question || 'Was ist die richtige Antwort?',
             questionImage: questionData.questionImage,
-            answers: allAnswers,
-            correctAnswerIndex: allAnswers.findIndex(a => a.isCorrect)
-        };
-    }
-
-    // Spezielle Funktion für "Ordne zu" Fragen
-    generateOrderQuestion(questionData, availableQuestions) {
-        // Nur Fragen aus "Ordne zu" Kategorie (inkl. Unterkategorien) mit Bild-Antworten
-        const orderQuestions = availableQuestions.filter(q => 
-            q.category && q.category.startsWith('Ordne zu') && 
-            q.id !== questionData.id &&
-            q.answerType === 'image' &&
-            q.answerImage
-        );
-
-        if (orderQuestions.length < 3) {
-            return null;
-        }
-
-        // 3 zufällige falsche Antwort-Bilder auswählen
-        const wrongAnswers = this.shuffleArray(orderQuestions)
-            .slice(0, 3)
-            .map(q => ({
-                text: null,
-                image: q.answerImage,
-                isCorrect: false
-            }));
-
-        // Korrekte Antwort hinzufügen
-        const correctAnswer = {
-            text: null,
-            image: questionData.answerImage,
-            isCorrect: true
-        };
-
-        // Alle Antworten mischen
-        const allAnswers = this.shuffleArray([...wrongAnswers, correctAnswer]);
-
-        return {
-            questionText: questionData.question, // Verwende den eingegebenen Frage-Text
-            questionImage: null, // Kein Frage-Bild bei "Ordne zu"
-            answers: allAnswers,
-            correctAnswerIndex: allAnswers.findIndex(a => a.isCorrect)
-        };
-    }
-
-    // Generiert gemischte "Ordne zu" Frage aus allen Kategorien mit Bild-Antworten
-    generateMixedOrderQuestion(questionData, availableQuestions) {
-        // Alle Fragen mit Bild-Antworten außer der aktuellen
-        const imageQuestions = availableQuestions.filter(q => 
-            q.id !== questionData.id &&
-            q.answerType === 'image' &&
-            q.answerImage
-        );
-
-        if (imageQuestions.length < 3) {
-            return null;
-        }
-
-        // 3 zufällige falsche Antwort-Bilder auswählen
-        const wrongAnswers = this.shuffleArray(imageQuestions)
-            .slice(0, 3)
-            .map(q => ({
-                text: null,
-                image: q.answerImage,
-                isCorrect: false
-            }));
-
-        // Korrekte Antwort hinzufügen
-        const correctAnswer = {
-            text: null,
-            image: questionData.answerImage,
-            isCorrect: true
-        };
-
-        // Alle Antworten mischen
-        const allAnswers = this.shuffleArray([...wrongAnswers, correctAnswer]);
-
-        return {
-            questionText: questionData.question, // Verwende den eingegebenen Frage-Text
-            questionImage: null, // Kein Frage-Bild bei gemischten "Ordne zu"
             answers: allAnswers,
             correctAnswerIndex: allAnswers.findIndex(a => a.isCorrect)
         };
@@ -2511,28 +2053,11 @@ class LernApp {
         // Nächste Frage vorbereiten
         const nextQuestion = this.currentQuiz.questions[this.currentQuiz.currentIndex];
         
-        if (this.currentQuiz.selectedCategory === 'Ordne zu (Gemischt)') {
-            // Für gemischte "Ordne zu" Quizzes - alle Bild-Antworten verwenden
-            const imageAnswerQuestions = this.questions.filter(q => 
-                q.answerType === 'image' && 
-                q.answerImage && 
-                q.category !== 'Ordne zu'
-            );
-            const multipleChoiceQuestion = this.generateMixedOrderQuestion(nextQuestion, imageAnswerQuestions);
-            this.currentQuiz.questions[this.currentQuiz.currentIndex] = { ...nextQuestion, ...multipleChoiceQuestion };
-        } else if (this.currentQuiz.selectedCategory && this.currentQuiz.selectedCategory.startsWith('Ordne zu')) {
-            // Für normale "Ordne zu" Quizzes und Unterkategorien
-            const questionsPool = this.questions.filter(q => q.category && q.category.startsWith('Ordne zu'));
-            const multipleChoiceQuestion = this.generateOrderQuestion(nextQuestion, questionsPool);
-            this.currentQuiz.questions[this.currentQuiz.currentIndex] = { ...nextQuestion, ...multipleChoiceQuestion };
-        } else {
-            // Für normale Multiple-Choice-Quizzes
-            const questionsPool = this.questions.filter(q => q.category === this.currentQuiz.selectedCategory);
-            const multipleChoiceQuestion = this.generateMultipleChoiceQuestion(nextQuestion, questionsPool);
-            this.currentQuiz.questions[this.currentQuiz.currentIndex] = { ...nextQuestion, ...multipleChoiceQuestion };
-        }
-        
-        this.showQuestion();
+    // Für normale Multiple-Choice-Quizzes
+    const questionsPool = this.questions.filter(q => q.category === this.currentQuiz.selectedCategory);
+    const multipleChoiceQuestion = this.generateMultipleChoiceQuestion(nextQuestion, questionsPool);
+    this.currentQuiz.questions[this.currentQuiz.currentIndex] = { ...nextQuestion, ...multipleChoiceQuestion };
+    this.showQuestion();
     }
 
     finishQuiz() {
@@ -2893,7 +2418,7 @@ class LernApp {
         // Kategorien validieren
         if (!Array.isArray(this.categories)) {
             console.warn('Kategorien-Daten beschädigt, setze Standardwerte');
-            this.categories = ['Allgemein', 'Ordne zu'];
+            this.categories = ['textfragen', 'bilderquiz', 'demo-ketegorie'];
             this.saveToStorage('categories', this.categories);
         }
 
@@ -2950,93 +2475,120 @@ class LernApp {
         const currentChecksum = this.generateChecksum(data);
         return currentChecksum === expectedChecksum;
     }
-}
 
-// showPage global verfügbar machen (wichtig für HTML-Onclick)
-// Diese Funktion muss nach ihrer Definition auf window gesetzt werden!
-function showPage(pageId) {
-    // Alle Seiten ausblenden
-    document.querySelectorAll('.page').forEach(page => {
-        page.classList.add('d-none');
-        page.classList.remove('app-hidden'); // Sichtbar machen, falls initial versteckt
-    });
-    // Gewünschte Seite anzeigen
-    const targetPage = document.getElementById(`${pageId}-page`);
-    if (targetPage) {
-        targetPage.classList.remove('d-none');
-        targetPage.classList.remove('app-hidden');
-        // Quiz-Seite: Felder für Unterkategorie/Untergruppe immer neu initialisieren
-        if (pageId === 'quiz' && window.app && typeof window.app.showNestedGroups === 'function') {
-            // Letzten Zustand wiederherstellen, aber wenn kein groupPath gesetzt, immer [] (Ebene 1)
-            const mainCat = window.app.lastMainCategory || (window.questionManager && window.questionManager.categories && window.questionManager.categories[0]);
-            let groupPath = Array.isArray(window.app.lastGroupPath) ? window.app.lastGroupPath : [];
-            if (!groupPath || groupPath.length === undefined) groupPath = [];
-            // Wenn kein letzter Zustand, immer Ebene 1 anzeigen
-            if (!window.app.lastMainCategory || !window.app.lastGroupPath || groupPath.length === 0) {
-                if (mainCat) window.app.showNestedGroups(mainCat, []);
-            } else {
-                if (mainCat) window.app.showNestedGroups(mainCat, groupPath);
+    // Robuste Navigation: Gehe zu vorheriger Adresse (mit History-Check)
+    goToAddress(address) {
+    // Immer Quiz-Seite aktivieren
+    if (typeof window.showPage === 'function') window.showPage('quiz');
+        // Fallback: Immer vollständiges Objekt
+        if (!address || typeof address.level !== 'number') {
+            address = { level: 0 };
+        }
+        this.currentAddress = { ...address };
+        const level = address.level;
+        // UI-Elemente holen
+        const catUI = document.getElementById('add-category-ui');
+        const subUI = document.getElementById('add-subgroup-ui');
+        const container = document.getElementById('category-buttons');
+        // Sichtbarkeit und Inhalte je Ebene setzen
+        if (catUI) catUI.style.display = 'none';
+        // Felder initial ausblenden
+        if (catUI) {
+            catUI.style.display = 'none';
+            const inputGroup = catUI.querySelector('.input-group');
+            if (inputGroup) inputGroup.style.display = 'none';
+        }
+        if (subUI) {
+            subUI.style.display = 'none';
+            const row = subUI.querySelector('.row');
+            if (row) row.style.display = 'none';
+        }
+        if (container) container.innerHTML = '';
+
+        if (level === 0) {
+            // Hauptkategorie-Buttons, keine Felder sichtbar
+            if (container && window.questionManager && Array.isArray(window.questionManager.categories)) {
+                window.questionManager.categories.forEach(cat => {
+                    const btn = document.createElement('button');
+                    btn.className = 'btn btn-primary m-2';
+                    btn.textContent = cat;
+                    btn.onclick = () => {
+                        this.goToAddress({ level: 1, mainCategory: cat });
+                    };
+                    container.appendChild(btn);
+                });
+            }
+        } else if (level === 1) {
+            // Unterkategorie-Buttons + Feld für Unterkategorie
+            this.lastMainCategory = address.mainCategory;
+            this.lastGroupPath = [];
+            if (container && window.questionManager && window.questionManager.getNestedGroups) {
+                const subcats = window.questionManager.getNestedGroups(address.mainCategory, []);
+                if (Array.isArray(subcats)) {
+                    subcats.forEach(subcat => {
+                        const btn = document.createElement('button');
+                        btn.className = 'btn btn-secondary m-1';
+                        btn.textContent = subcat.name;
+                        btn.onclick = () => {
+                            this.goToAddress({ level: 2, mainCategory: address.mainCategory, groupPath: [subcat.name] });
+                        };
+                        container.appendChild(btn);
+                    });
+                }
+            }
+            if (catUI) {
+                catUI.style.display = 'block';
+                const inputGroup = catUI.querySelector('.input-group');
+                if (inputGroup) inputGroup.style.display = '';
+            }
+        } else if (level === 2) {
+            // Untergruppen-Buttons + Feld für Untergruppe
+            this.lastMainCategory = address.mainCategory;
+            this.lastGroupPath = address.groupPath || [];
+            if (container && window.questionManager && window.questionManager.getNestedGroups) {
+                const subgroups = window.questionManager.getNestedGroups(address.mainCategory, address.groupPath || []);
+                if (Array.isArray(subgroups)) {
+                    subgroups.forEach(subgroup => {
+                        const btn = document.createElement('button');
+                        btn.className = 'btn btn-secondary m-1';
+                        btn.textContent = subgroup.name;
+                        btn.onclick = () => {
+                            // Noch tiefere Ebenen möglich? Dann erweitern
+                            this.goToAddress({ level: 2, mainCategory: address.mainCategory, groupPath: [...(address.groupPath || []), subgroup.name] });
+                        };
+                        container.appendChild(btn);
+                    });
+                }
+            }
+            if (subUI) {
+                subUI.style.display = 'flex';
+                const row = subUI.querySelector('.row');
+                if (row) row.style.display = '';
             }
         }
     }
-    // Aktiven Navbar-Link setzen
-    document.querySelectorAll('.nav-link').forEach(link => {
-        link.classList.remove('active');
-    });
-    const activeLink = document.querySelector(`[onclick="showPage('${pageId}')"]`);
-    if (activeLink) {
-        activeLink.classList.add('active');
-    }
-    // Zuletzt besuchte Seite merken (außer login/register)
-    if (pageId && pageId !== 'login' && pageId !== 'register') {
-        sessionStorage.setItem('lernapp_last_page', pageId);
-        console.log('[DEBUG] lernapp_last_page gesetzt auf:', pageId);
-    }
-    // Quiz-Container zurücksetzen 
-    if (pageId === 'home') {
-        document.getElementById('quiz-container').classList.remove('d-none');
-        document.getElementById('quiz-result').classList.add('d-none');
-    }
-// Logge den Wert von lernapp_last_page beim Laden der Seite
-window.addEventListener('DOMContentLoaded', function() {
-    console.log('[DEBUG] lernapp_last_page beim Laden:', sessionStorage.getItem('lernapp_last_page'));
-});
-    // Quiz-Seite: Zeige Quiz-Container nur, wenn ein Quiz läuft
-    if (pageId === 'quiz') {
-        console.log('[DEBUG] showPage("quiz") aufgerufen');
-        const quizRunning = window.app && window.app.currentQuiz && Array.isArray(window.app.currentQuiz.questions) && window.app.currentQuiz.questions.length > 0;
-        if (quizRunning) {
-            document.getElementById('category-selection').classList.add('d-none');
-            document.getElementById('quiz-container').classList.remove('d-none');
+
+    getPreviousAddress() {
+        const addr = this.currentAddress || { level: 0 };
+        if (typeof addr.level !== 'number') return { level: 0 };
+        if (addr.level === 3) {
+            return { level: 2, mainCategory: addr.mainCategory, groupPath: addr.groupPath };
+        } else if (addr.level === 2) {
+            return { level: 1 };
+        } else if (addr.level === 1) {
+            return { level: 0 };
         } else {
-            document.getElementById('category-selection').classList.remove('d-none');
-            document.getElementById('quiz-container').classList.add('d-none');
-            // Buttons immer direkt nach dem Anzeigen der Quiz-Seite rendern
-            setTimeout(() => {
-                try {
-                    console.log('[DEBUG] Versuche renderMainCategories in showPage("quiz")');
-                    if (window.app && typeof window.app.renderMainCategories === 'function') {
-                        window.app.renderMainCategories();
-                    } else {
-                        console.log('[DEBUG] window.app.renderMainCategories NICHT verfügbar!');
-                    }
-                } catch(e) {
-                    console.error('[DEBUG] Fehler beim Rendern der Hauptkategorien:', e);
-                }
-            }, 0);
+            // Von Ebene 0 zurück: Hauptmenü anzeigen
+            return null;
         }
-        document.getElementById('quiz-result').classList.add('d-none');
     }
 }
 
+// ========== HILFSFUNKTIONEN ==========
+// Methode global verfügbar machen
+window.renderMainCategories = function() { window.app.renderMainCategories(); };
 
 // showPage global verfügbar machen (wichtig für HTML-Onclick)
 window.showPage = showPage;
 // LernApp-Instanz global verfügbar machen
 window.app = new LernApp();
-
-// Methode global verfügbar machen
-window.renderMainCategories = function() { window.app.renderMainCategories(); };
-
-// Methode global verfügbar machen
-window.renderMainCategories = function() { window.app.renderMainCategories(); };
