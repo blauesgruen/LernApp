@@ -49,29 +49,6 @@ window.addEventListener('DOMContentLoaded', function() {
         }, 50);
     }
 });
-// ========== ZENTRALES LOGGING ========== 
-// Log-Buffer in sessionStorage speichern
-function lernappLog(...args) {
-    const msg = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
-    // Zeitstempel für jede Zeile
-    const line = `[${new Date().toLocaleTimeString()}] ${msg}`;
-    let log = sessionStorage.getItem('lernapp_log') || '';
-    log += line + '\n';
-    sessionStorage.setItem('lernapp_log', log);
-    // Zusätzlich normale Ausgabe
-    console._origLog.apply(console, args);
-}
-
-// console.log überschreiben, Original sichern
-if (!console._origLog) {
-    console._origLog = console.log;
-    console.log = lernappLog;
-}
-
-// Log beim Laden der Seite löschen
-window.addEventListener('DOMContentLoaded', () => {
-    sessionStorage.removeItem('lernapp_log');
-});
 // ========== HINWEIS ZUR AUSLAGERUNG ==========
 // Die Logging-Funktion kann in eine eigene Datei ausgelagert werden, z.B. js/log.js
 // Dann einfach <script src="js/log.js"></script> vor allen anderen Skripten einbinden.
@@ -92,21 +69,6 @@ if (typeof window !== 'undefined' && typeof app !== 'undefined' && typeof app.ad
 // storage.js, questions.js, groups.js werden vorher geladen
 // storage, questionManager, groupManager sind global
 
-// Utility: Sicheres Event-Binding mit Existenz-Check
-function safeAddEventListener(selector, event, handler, options) {
-    const el = typeof selector === 'string' ? document.querySelector(selector) : selector;
-    if (el) el.addEventListener(event, handler, options);
-}
-
-// Utility: Event-Delegation für dynamische Elemente
-function delegateEvent(parentSelector, childSelector, event, handler) {
-    const parent = typeof parentSelector === 'string' ? document.querySelector(parentSelector) : parentSelector;
-    if (!parent) return;
-    parent.addEventListener(event, function(e) {
-        const target = e.target.closest(childSelector);
-        if (target && parent.contains(target)) handler.call(target, e);
-    });
-}
 // LernApp - Hauptlogik
 
 class LernApp {
