@@ -4,12 +4,16 @@ window.addEventListener('DOMContentLoaded', function() {
         if (window.app && typeof window.app.goToAddress === 'function') {
             const isLoggedIn = window.app.currentUser || window.app.isDemo;
             const lastPage = sessionStorage.getItem('lernapp_last_page');
-            if (isLoggedIn && (!lastPage || lastPage === 'login')) {
-                // Nach Login: Immer Quiz-Seite und Ebene 0 anzeigen
+            if (isLoggedIn) {
+                // Nach Login: Quiz-Seite und Ebene 0 anzeigen
                 showPage('quiz');
                 window.app.goToAddress({ level: 0 });
-            } else if (lastPage && typeof window.showPage === 'function') {
-                window.showPage(lastPage);
+            } else {
+                // Nicht eingeloggt: Immer Willkommensseite anzeigen
+                window.showPage('home');
+                if (window.app && typeof window.app.updateUIForLoginState === 'function') {
+                    window.app.updateUIForLoginState();
+                }
             }
         }
     }, 100);
@@ -313,7 +317,7 @@ class LernApp {
         } else {
             userElements.forEach(el => el.style.display = 'none');
             guestElements.forEach(el => el.style.display = 'block');
-            showPage('login');
+            // Keine automatische Weiterleitung zur Login-Seite
         }
         // User-Login deaktivieren, wenn Admin eingeloggt ist
         this.disableUserLoginIfAdmin();
@@ -565,12 +569,9 @@ class LernApp {
         setTimeout(() => {
             // Sicherheit: login als letzte Seite entfernen
             if (sessionStorage.getItem('lernapp_last_page') === 'login') {
-                sessionStorage.setItem('lernapp_last_page', 'quiz');
+                sessionStorage.setItem('lernapp_last_page', 'home');
             }
-            showPage('quiz');
-            if (window.app && typeof window.app.goToAddress === 'function') {
-                window.app.goToAddress({ level: 0 });
-            }
+            showPage('home');
         }, 0);
     }
 

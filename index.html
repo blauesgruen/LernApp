@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <!-- showPage global und sofort verfügbar machen (klassisches Script, kein Modul!) -->
 <script>
 function showPage(pageId) {
@@ -295,7 +296,7 @@ window.showPage = showPage;
                                     <p>Teilen Sie Ihre Fragen und Kategorien mit anderen Benutzern:</p>
                                     
                                     <div class="mb-3">
-                                        <label class="form-label">Was möchten Sie teilen?</label>
+                                        <span class="form-label">Was möchten Sie teilen?</span>
                                         <div class="form-check">
                                             <input class="form-check-input" type="checkbox" id="share-categories" checked>
                                             <label class="form-check-label" for="share-categories">
@@ -800,7 +801,7 @@ window.showPage = showPage;
                                         
                                         <div id="imageonly-fields" style="display:none">
                                             <div class="mb-3">
-                                                <label class="form-label">Frage</label>
+                                                <span class="form-label">Frage</span>
                                                 <textarea class="form-control" id="question-input" rows="2" placeholder="z.B. Finde den Apfel" required></textarea>
                                             </div>
                                             <div class="mb-3">
@@ -815,7 +816,7 @@ window.showPage = showPage;
                                         </div>
                                         <div id="default-fields">
                                             <div class="mb-3">
-                                                <label class="form-label">Frage</label>
+                                                <span class="form-label">Frage</span>
                                                 <textarea class="form-control" id="default-question-input" rows="2" placeholder="z.B. Was ist die Hauptstadt von Deutschland?"></textarea>
                                             </div>
                                             <div class="mb-3">
@@ -825,7 +826,7 @@ window.showPage = showPage;
                                                 <small class="form-text text-muted">Wird bei der Frage angezeigt</small>
                                             </div>
                                             <div class="mb-3">
-                                                <label class="form-label">Antwort-Typ wählen</label>
+                                                <span class="form-label">Antwort-Typ wählen</span>
                                                 <div class="row">
                                                     <div class="col-md-6">
                                                         <div class="card">
@@ -894,24 +895,24 @@ window.showPage = showPage;
                                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                             </div>
                             <div class="modal-body">
-                                <label class="form-label">Fragetext</label>
+                                <span class="form-label">Fragetext</span>
                                 <input type="text" class="form-control mb-2" id="edit-question-input">
-                                <label class="form-label">Antwort</label>
+                                <span class="form-label">Antwort</span>
                                 <input type="text" class="form-control mb-2" id="edit-answer-input">
-                                <label class="form-label">Antworttyp</label>
+                                <span class="form-label">Antworttyp</span>
                                 <select class="form-select mb-2" id="edit-answer-type-select">
                                     <option value="text">Text</option>
                                     <option value="image">Bild</option>
                                 </select>
-                                <label class="form-label">Kategorie</label>
+                                <span class="form-label">Kategorie</span>
                                 <select class="form-select mb-2" id="edit-category-select"></select>
-                                <label class="form-label">Frage-Bild (optional)</label>
+                                <span class="form-label">Frage-Bild (optional)</span>
                                 <input type="file" class="form-control mb-2" id="edit-question-image-input" accept="image/*">
                                 <div id="edit-question-image-preview" class="mb-2"></div>
-                                <label class="form-label">Antwort-Bild (optional, falls Antworttyp Bild)</label>
+                                <span class="form-label">Antwort-Bild (optional, falls Antworttyp Bild)</span>
                                 <input type="file" class="form-control mb-2" id="edit-answer-image-input" accept="image/*">
                                 <div id="edit-answer-image-preview" class="mb-2"></div>
-                                <label class="form-label">Erklärung/Beschreibung (optional)</label>
+                                <span class="form-label">Erklärung/Beschreibung (optional)</span>
                                 <textarea class="form-control mb-2" id="edit-explanation-input" rows="2"></textarea>
                             </div>
                             <div class="modal-footer">
