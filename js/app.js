@@ -1,53 +1,18 @@
 // Nach jedem Seiten-Refresh: Quiz-Seite korrekt initialisieren
 window.addEventListener('DOMContentLoaded', function() {
     setTimeout(function() {
-        var quizPage = document.getElementById('quiz-page');
-        if (quizPage && !quizPage.classList.contains('d-none') && window.app && typeof window.app.goToAddress === 'function') {
-            window.app.goToAddress({ level: 0 });
-        }
-    }, 100);
-});
-// Robuste Initialisierung: Nach DOMContentLoaded regelmäßig prüfen, ob App und questionManager bereit sind
-window.addEventListener('DOMContentLoaded', function() {
-    let tries = 0;
-    const maxTries = 40;
-    const interval = setInterval(() => {
-        tries++;
-        if (window.app && window.questionManager) {
-            clearInterval(interval);
+        if (window.app && typeof window.app.goToAddress === 'function') {
+            const isLoggedIn = window.app.currentUser || window.app.isDemo;
             const lastPage = sessionStorage.getItem('lernapp_last_page');
-            if (lastPage && typeof window.showPage === 'function') {
+            if (isLoggedIn && (!lastPage || lastPage === 'login')) {
+                // Nach Login: Immer Quiz-Seite und Ebene 0 anzeigen
+                showPage('quiz');
+                window.app.goToAddress({ level: 0 });
+            } else if (lastPage && typeof window.showPage === 'function') {
                 window.showPage(lastPage);
             }
-        } else if (tries >= maxTries) {
-            clearInterval(interval);
-            console.warn('[DEBUG] App-Initialisierung: window.app oder window.questionManager nicht bereit.');
         }
-    }, 50);
-});
-
-// Zentrale Initialisierung: Nach DOMContentLoaded und App-Init richtige Seite anzeigen
-window.addEventListener('DOMContentLoaded', function() {
-    function tryShowLastPage() {
-        const lastPage = sessionStorage.getItem('lernapp_last_page');
-        if (lastPage && typeof window.showPage === 'function') {
-            window.showPage(lastPage);
-        }
-    }
-    // Falls App schon da, sofort ausführen, sonst auf window.app warten
-    if (window.app) {
-        tryShowLastPage();
-    } else {
-        let tries = 0;
-        const interval = setInterval(() => {
-            if (window.app) {
-                clearInterval(interval);
-                tryShowLastPage();
-            } else if (++tries > 20) {
-                clearInterval(interval);
-            }
-        }, 50);
-    }
+    }, 100);
 });
 // ========== HINWEIS ZUR AUSLAGERUNG ==========
 // Die Logging-Funktion kann in eine eigene Datei ausgelagert werden, z.B. js/log.js
@@ -112,6 +77,11 @@ class LernApp {
     }
     // Flag für Back-Navigation, damit der Zustand nicht zu früh gelöscht wird
     _backNavigationActive = false;
+    // Speichert den zuletzt angezeigten Hauptkategorie-Namen (für Untergruppen-UI)
+    lastMainCategory = null;
+    // Speichert den zuletzt angezeigten Gruppenpfad (als Array)
+    lastGroupPath = [];
+
     // Navigiert in der Quiz-Hierarchie eine Ebene zurück oder ins Hauptmenü
     navigateQuizBack() {
         const prev = this.getPreviousAddress();
@@ -121,10 +91,6 @@ class LernApp {
             this.goToAddress(prev);
         }
     }
-    // Speichert den zuletzt angezeigten Hauptkategorie-Namen (für Untergruppen-UI)
-    lastMainCategory = null;
-    // Speichert den zuletzt angezeigten Gruppenpfad (als Array)
-    lastGroupPath = [];
 
     // Zentrale Adress-Navigation für Quiz-UI
     goToAddress(address) {
@@ -444,22 +410,34 @@ class LernApp {
 
         // Validierung
         if (username.length < 3 || username.length > 20) {
-            this.showAlert('Benutzername muss zwischen 3 und 20 Zeichen lang sein!', 'danger');
+            showAlert('Benutzername muss zwischen 3 und 20 Zeichen lang sein!', 'danger');
+            return;
+        }
+        if (!/^[a-zA-Z0-9]+$/.test(username)) {
+            showAlert('Benutzername darf nur Buchstaben und Zahlen enthalten!', 'danger');
+            return;
+        }
+        if (password.length < 6) {
+            showAlert('Passwort muss mindestens 6 Zeichen lang sein!', 'danger');
+            return;
+        }
+        if (password !== confirmPassword) {
+            showAlert('Passwörter stimmen nicht überein!', 'danger');
             return;
         }
 
         if (!/^[a-zA-Z0-9]+$/.test(username)) {
-            this.showAlert('Benutzername darf nur Buchstaben und Zahlen enthalten!', 'danger');
+            showAlert('Benutzername darf nur Buchstaben und Zahlen enthalten!', 'danger');
             return;
         }
 
         if (password.length < 6) {
-            this.showAlert('Passwort muss mindestens 6 Zeichen lang sein!', 'danger');
+            showAlert('Passwort muss mindestens 6 Zeichen lang sein!', 'danger');
             return;
         }
 
         if (password !== confirmPassword) {
-            this.showAlert('Passwörter stimmen nicht überein!', 'danger');
+            showAlert('Passwörter stimmen nicht überein!', 'danger');
             return;
         }
 
@@ -492,7 +470,7 @@ class LernApp {
 
         // 4. Jetzt erst prüfen, ob User existiert
         if (this.users[username]) {
-            this.showAlert('Benutzername existiert noch im System! Bitte Seite neu laden oder anderen Namen wählen.', 'danger');
+            showAlert('Benutzername existiert noch im System! Bitte Seite neu laden oder anderen Namen wählen.', 'danger');
             return;
         }
 
@@ -518,7 +496,7 @@ class LernApp {
         console.log('[LernApp][registerUser] users nach Anlegen:', JSON.stringify(this.users));
         console.log('[LernApp][registerUser] localStorage nach Anlegen:', Object.keys(localStorage).filter(k => k.includes(username)));
 
-        this.showAlert('Registrierung erfolgreich! Sie können sich jetzt anmelden.', 'success');
+    showAlert('Registrierung erfolgreich! Sie können sich jetzt anmelden.', 'success');
         this.switchAuthMode('login');
         // Login-Formular leeren, dann Username setzen
         document.getElementById('login-username').value = '';
@@ -535,21 +513,19 @@ class LernApp {
         }
         event.preventDefault();
         if (sessionStorage.getItem('lernapp_admin_access')) {
-            this.showAlert('Solange der Admin eingeloggt ist, kann sich kein Nutzer anmelden.', 'danger');
+            showAlert('Solange der Admin eingeloggt ist, kann sich kein Nutzer anmelden.', 'danger');
             return;
         }
         const username = document.getElementById('login-username').value.trim();
         const password = document.getElementById('login-password').value;
         // Prüfe, ob User in zentraler Userliste existiert
         if (!this.users[username]) {
-            // Sicherheit: auch zentrales Userpaket entfernen, falls noch vorhanden
-            localStorage.removeItem(`lernapp_user_${username}`);
-            this.showAlert('Benutzername nicht gefunden!', 'danger');
+            showAlert('Benutzername nicht gefunden!', 'danger');
             return;
         }
         const user = this.users[username];
         if (user.password !== this.hashPassword(password)) {
-            this.showAlert('Falsches Passwort!', 'danger');
+            showAlert('Falsches Passwort!', 'danger');
             return;
         }
         // Admin-Session beenden, falls aktiv
@@ -576,14 +552,26 @@ class LernApp {
         this.loadUserData();
         this.updateUIForLoginState();
         this.updateDashboard();
-        this.showAlert(`Willkommen zurück, ${user.displayName}!`, 'success');
+    showAlert(`Willkommen zurück, ${user.displayName}!`, 'success');
         // Speicherort-Dialog nur beim ersten Login anzeigen
         if (firstLogin) {
             this.showStorageLocationDialogIfNeeded();
         } else if (window.lernappCloudStorage && window.lernappCloudStorage.dirHandle == null && typeof window.lernappCloudStorage.loadDirHandle === 'function') {
             window.lernappCloudStorage.loadDirHandle();
         }
-        showPage('home');
+        // Nach allen UI-Updates: Navigation auf Ebene 0 (Startseite)
+        sessionStorage.setItem('lernapp_last_page', 'quiz');
+        sessionStorage.removeItem('lernapp_last_page_login'); // Sicherheit: alten Key entfernen, falls vorhanden
+        setTimeout(() => {
+            // Sicherheit: login als letzte Seite entfernen
+            if (sessionStorage.getItem('lernapp_last_page') === 'login') {
+                sessionStorage.setItem('lernapp_last_page', 'quiz');
+            }
+            showPage('quiz');
+            if (window.app && typeof window.app.goToAddress === 'function') {
+                window.app.goToAddress({ level: 0 });
+            }
+        }, 0);
     }
 
     startDemoMode() {
@@ -595,7 +583,7 @@ class LernApp {
         this.loadUserData();
         this.updateUIForLoginState();
         this.updateDashboard();
-        this.showAlert('Demo-Modus gestartet! Ihre Daten werden nicht dauerhaft gespeichert.', 'info');
+    showAlert('Demo-Modus gestartet! Ihre Daten werden nicht dauerhaft gespeichert.', 'info');
     }
 
     logoutUser(forceLogout = false) {
@@ -610,7 +598,7 @@ class LernApp {
                 // Nach Account-Löschung: sofort auf Startseite und reload
                 location.reload();
             } else {
-                this.showAlert('Erfolgreich abgemeldet!', 'success');
+                showAlert('Erfolgreich abgemeldet!', 'success');
             }
         }
     }
@@ -619,7 +607,7 @@ class LernApp {
         event.preventDefault();
         
         if (this.isDemo) {
-            this.showAlert('Im Demo-Modus können keine Profil-Änderungen vorgenommen werden!', 'warning');
+            showAlert('Im Demo-Modus können keine Profil-Änderungen vorgenommen werden!', 'warning');
             return;
         }
 
@@ -628,18 +616,22 @@ class LernApp {
         const confirmPassword = document.getElementById('profile-confirm-password').value;
 
         if (newPassword && newPassword !== confirmPassword) {
-            this.showAlert('Passwörter stimmen nicht überein!', 'danger');
+            showAlert('Passwörter stimmen nicht überein!', 'danger');
             return;
         }
 
         if (newPassword && newPassword.length < 6) {
-            this.showAlert('Passwort muss mindestens 6 Zeichen lang sein!', 'danger');
+            showAlert('Passwort muss mindestens 6 Zeichen lang sein!', 'danger');
             return;
         }
 
         // Profil aktualisieren
-        const user = this.users[this.currentUser];
-        user.displayName = displayName || user.username;
+            const user = this.users[this.currentUser];
+            user.displayName = displayName || user.username;
+        
+            if (newPassword) {
+                user.password = this.hashPassword(newPassword);
+            }
         
         if (newPassword) {
             user.password = this.hashPassword(newPassword);
@@ -649,7 +641,7 @@ class LernApp {
         this.saveToStorage('users', this.users, true);
 
         this.updateUIForLoginState();
-        this.showAlert('Profil erfolgreich aktualisiert!', 'success');
+    showAlert('Profil erfolgreich aktualisiert!', 'success');
         
         // Formular zurücksetzen
         document.getElementById('profile-new-password').value = '';
@@ -662,7 +654,7 @@ class LernApp {
 
     generateShareCode() {
         if (this.isDemo) {
-            this.showAlert('Im Demo-Modus können keine Daten geteilt werden!', 'warning');
+            showAlert('Im Demo-Modus können keine Daten geteilt werden!', 'warning');
             return;
         }
 
@@ -670,7 +662,7 @@ class LernApp {
         const shareQuestions = document.getElementById('share-questions').checked;
 
         if (!shareCategories && !shareQuestions) {
-            this.showAlert('Bitte wählen Sie aus, was Sie teilen möchten!', 'warning');
+            showAlert('Bitte wählen Sie aus, was Sie teilen möchten!', 'warning');
             return;
         }
 
