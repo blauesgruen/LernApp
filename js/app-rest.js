@@ -312,6 +312,8 @@
                 this.lockAdminFeatures();
             }
         }
+        // Logging: aktuelle Seite in Konsole anzeigen
+        console.log('[LernApp] Aktuelle Seite:', pageId);
         
         // Dashboard aktualisieren wenn zur Startseite gewechselt wird
         if (pageId === 'home') {
@@ -427,6 +429,8 @@
 
 // Globale Funktionen
 function showPage(pageId) {
+    // Logging: aktuelle Seite in Konsole anzeigen
+    console.log('[LernApp] Aktuelle Seite:', pageId);
     if (window.app) {
         window.app.showPage(pageId);
     }

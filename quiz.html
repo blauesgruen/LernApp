@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LernApp - Quiz</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <script src="js/log.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/ui.js"></script>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="home.html">
+                <i class="bi bi-mortarboard-fill me-2"></i>
+                LernApp v1.0
+            </a>
+        </div>
+    </nav>
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-md-8 mx-auto">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2>Quiz</h2>
+                        <a class="btn btn-secondary" href="home.html">
+                            <i class="bi bi-house-fill me-2"></i>Zurück
+                        </a>
+                </div>
+                <!-- Kategorie-Auswahl -->
+                <div id="category-selection" class="card mb-4">
+                    <div class="card-body">
+                        <h5 class="card-title">Kategorie wählen</h5>
+                        <div id="category-buttons" class="d-flex flex-wrap gap-2">
+                            <!-- Kategorien werden hier dynamisch eingefügt -->
+                        </div>
+                        <!-- UI für Unterkategorie hinzufügen (Ebene 1) -->
+                        <div id="add-category-ui" class="mt-3">
+                            <div class="input-group" style="display:none">
+                                <input type="text" class="form-control" id="category-name-input" placeholder="Name der Unterkategorie">
+                                <button class="btn btn-outline-secondary" id="add-category-btn" type="button">Unterkategorie hinzufügen</button>
+                            </div>
+                            <small class="text-muted">Fügt eine Unterkategorie zur aktuellen Hauptkategorie hinzu.</small>
+                        </div>
+                        <!-- UI für Untergruppe hinzufügen (Ebene 2+) -->
+                        <div id="add-subgroup-ui" class="mt-3">
+                            <div class="row g-0" style="display:none">
+                                <div class="col-12">
+                                    <div class="input-group">
+                                        <input type="text" class="form-control" id="subgroup-name-input" placeholder="Name der Untergruppe">
+                                        <button class="btn btn-outline-secondary" id="add-subgroup-btn" type="button">Untergruppe hinzufügen</button>
+                                    </div>
+                                </div>
+                                <div class="col-12 pt-1">
+                                    <small class="text-muted">Fügt eine Untergruppe zur aktuell angezeigten Gruppe/Hauptkategorie hinzu.</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Quiz-Bereich -->
+                    <div id="quiz-container">
+                    <div class="card shadow-lg">
+                        <div class="card-header bg-primary text-white">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span id="question-progress" class="fw-bold">Frage 1 von 10</span>
+                                <span id="current-category" class="badge bg-light text-dark"></span>
+                            </div>
+                            <div class="progress mt-2" style="height: 8px;">
+                                <div id="progress-bar" class="progress-bar bg-warning" role="progressbar" style="width: 10%"></div>
+                            </div>
+                        </div>
+                        <div class="card-body p-4">
+                            <!-- Frage-Bild -->
+                            <div id="question-image" class="text-center mb-4 d-none">
+                                <div id="question-image" class="text-center mb-4">
+                                <!-- Wird dynamisch gefüllt -->
+                            </div>
+                            <!-- Frage-Text -->
+                            <div class="text-center mb-4">
+                                <h3 id="question-text" class="text-primary fw-bold"></h3>
+                            </div>
+                            <!-- Antwortoptionen -->
+                            <div id="answers-container" class="row">
+                                <!-- Antwortoptionen werden hier eingefügt -->
+                            </div>
+                            <!-- Action Buttons -->
+                            <div class="text-center mt-4">
+                                <button id="submit-answer" class="btn btn-primary btn-lg px-4" disabled onclick="window.app.submitAnswer()">
+                                        <i class="bi bi-check-circle me-2"></i>Antwort bestätigen
+                                    </button>
+                                    <button id="next-question" class="btn btn-success btn-lg px-4">
+                                        <i class="bi bi-arrow-right me-2"></i>Nächste Frage
+                                    </button>
+                                    <button id="finish-quiz" class="btn btn-warning btn-lg px-4">
+                                        <i class="bi bi-flag-checkered me-2"></i>Quiz beenden
+                                    </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Ergebnis -->
+                    <div id="quiz-result" class="card">
+                    <div class="card-body">
+                        <div class="text-center mb-4">
+                            <h3><i class="bi bi-trophy-fill text-warning me-2"></i>Quiz beendet!</h3>
+                        </div>
+                        <div id="result-stats">
+                            <!-- Ergebnisse und detaillierte Übersicht werden hier angezeigt -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

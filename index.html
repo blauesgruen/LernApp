@@ -1,308 +1,36 @@
 <!DOCTYPE html>
-<!-- showPage global und sofort verfügbar machen (klassisches Script, kein Modul!) -->
-<script>
-function showPage(pageId) {
-    document.querySelectorAll('.page').forEach(page => {
-        page.classList.add('d-none');
-        page.classList.remove('app-hidden'); // Sichtbar machen, falls initial versteckt
-    });
-    var targetPage = document.getElementById(pageId + '-page');
-    if (targetPage) {
-        targetPage.classList.remove('d-none');
-        targetPage.classList.remove('app-hidden');
-    }
-    // Optional: Aktiven Navbar-Link setzen
-    document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
-    var activeLink = document.querySelector('[onclick="showPage(\'' + pageId + '\')"]');
-    if (activeLink) activeLink.classList.add('active');
-    // Zuletzt besuchte Seite merken (außer login/register)
-    if (pageId && pageId !== 'login' && pageId !== 'register') {
-        sessionStorage.setItem('lernapp_last_page', pageId);
-    }
-}
-window.showPage = showPage;
-
-</script>
-<!DOCTYPE html>
 <html lang="de">
 <head>
-    <style>
-    /* Verhindert FOUC: Alle Seiten initial verstecken, bis App bereit */
-    .app-hidden { display: none !important; }
-    </style>
+        <script>
+            console.log('[LernApp][LOGCHAIN] index.html geladen, Meta-Redirect zu home.html folgt');
+            window.addEventListener('DOMContentLoaded', function() {
+                // Fallback: Falls Meta-Redirect nicht funktioniert, leite per JS weiter
+                setTimeout(function() {
+                    if (!window.location.href.includes('home.html')) {
+                        console.log('[LernApp][LOGCHAIN] JS-Fallback: window.location.replace("home.html")');
+                        window.location.replace('home.html');
+                    }
+                }, 1200);
+            });
+        </script>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    
-    <!-- Sicherheits-Headers -->
-    <meta http-equiv="Content-Security-Policy" content="
-        default-src 'self'; 
-        script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; 
-        style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; 
-        font-src 'self' https://cdn.jsdelivr.net; 
-        img-src 'self' data: blob:;
-        connect-src 'self';
-    ">
-    <meta http-equiv="X-Content-Type-Options" content="nosniff">
-    <!-- <meta http-equiv="X-Frame-Options" content="DENY"> -->
-    <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
-    
-    <title>LernApp - Interaktives Lernen</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css">
-    <script src="js/log.js"></script>
-    <script src="js/utils.js"></script>
-    <script src="js/ui.js"></script>
+        <meta http-equiv="refresh" content="0; url=home.html">
+        <script>
+            console.log('[LernApp] index.html geladen, Weiterleitung zu home.html');
+            window.addEventListener('DOMContentLoaded', function() {
+                console.log('[LernApp] [index.html] DOMContentLoaded, Meta-Redirect aktiv');
+            });
+        </script>
+    <title>LernApp – Weiterleitung</title>
 </head>
 <body>
-    <!-- Modal: Speicherort wählen (mit Cloud-Hinweis) -->
-    <div class="modal fade" id="storageLocationModal" tabindex="-1" aria-labelledby="storageLocationLabel" aria-hidden="true">
-      <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title" id="storageLocationLabel">Speicherort wählen</h5>
-          </div>
-          <div class="modal-body">
-            <p>Bitte wählen Sie einen Speicherort für Ihre Daten.<br><span style="font-size:0.95em;color:#888;">Tipp: Ein Cloud-Ordner (z.B. Dropbox, Nextcloud, OneDrive) ermöglicht Synchronisation auf mehreren Geräten.</span></p>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-primary" id="storage-location-choose">Speicherort wählen</button>
-            <button type="button" class="btn btn-secondary" id="storage-location-skip">Abbrechen</button>
-          </div>
-        </div>
-      </div>
+    <div style="text-align:center; margin-top: 5em;">
+        <h1>LernApp</h1>
+        <p>Du wirst zur Startseite weitergeleitet...</p>
+        <p><a href="home.html">Falls die Weiterleitung nicht funktioniert, klicke hier.</a></p>
     </div>
-    <!-- Modal: Speicherort nicht unterstützt -->
-    <div class="modal fade" id="storageNotSupportedModal" tabindex="-1" aria-labelledby="storageNotSupportedLabel" aria-hidden="true">
-      <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title" id="storageNotSupportedLabel">Speicherort nicht unterstützt</h5>
-          </div>
-          <div class="modal-body">
-            <p>Ihr Browser unterstützt die automatische Ordnerauswahl nicht.<br>Bitte nutzen Sie den Datei-Export/Import.</p>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-primary" id="storage-not-supported-choose">Speicherort wählen</button>
-            <button type="button" class="btn btn-secondary" id="storage-not-supported-cancel" data-bs-dismiss="modal">Abbrechen</button>
-          </div>
-        </div>
-      </div>
-    </div>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-        <div class="container">
-            <a class="navbar-brand" href="#">
-                <i class="bi bi-mortarboard-fill me-2"></i>
-                LernApp v1.0
-            </a>
-            <span id="storage-location-info" class="text-light small ms-3 d-none">
-                <i class="bi bi-hdd-network me-1"></i>
-                <span id="storage-location-name"></span>
-            </span>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav ms-auto">
-                    <!-- Home-Button (Haus) vor Quiz-Link -->
-                    <li class="nav-item user-only" style="display: none;">
-                        <a class="nav-link" href="#" onclick="showPage('home')">
-                            <i class="bi bi-house-fill me-2"></i>Home
-                        </a>
-                    </li>
-                    <li class="nav-item user-only" style="display: none;">
-                        <a class="nav-link" href="#" onclick="window.app.goToAddress({ level: 0 })">Quiz</a>
-                    </li>
-                    <li class="nav-item user-only" style="display: none;">
-                        <a class="nav-link" href="#" onclick="showPage('sharing')">
-                            <i class="bi bi-share"></i> Teilen
-                        </a>
-                    </li>
-                    <li class="nav-item user-only" style="display: none;">
-                        <a class="nav-link" href="#" onclick="showPage('stats')">Statistiken</a>
-                    </li>
-                    <li class="nav-item" id="admin-nav-item" style="display: none;">
-                        <a class="nav-link" href="#" onclick="showPage('admin')">Verwaltung</a>
-                    </li>
-                    
-                    <!-- User-Info und Logout (nur sichtbar wenn eingeloggt) -->
-                    <li class="nav-item dropdown user-only" style="display: none;">
-                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                            <i class="bi bi-person-circle"></i> 
-                            <span id="current-username">Benutzer</span>
-                        </a>
-                        <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="#" onclick="showPage('profile')">
-                                <i class="bi bi-person-gear"></i> Profil
-                            </a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="#" onclick="app.logoutUser()">
-                                <i class="bi bi-box-arrow-right"></i> Abmelden
-                            </a></li>
-                        </ul>
-                    </li>
-                    
-                    <!-- Login-Buttons (nur sichtbar wenn nicht eingeloggt) -->
-                    <li class="nav-item guest-only">
-                        <a class="nav-link" href="#" onclick="app.showUserLogin()">
-                            <i class="bi bi-person-plus"></i> Anmelden
-                        </a>
-                    </li>
-                    <li class="nav-item guest-only">
-                        <a class="nav-link" href="#" onclick="app.showAdminLogin()" id="admin-login-link">
-                            <i class="bi bi-shield-lock"></i> Admin
-                        </a>
-                    </li>
-                    <li class="nav-item" id="admin-logout-item" style="display: none;">
-                        <a class="nav-link" href="#" onclick="app.logoutAdmin()">
-                            <i class="bi bi-box-arrow-right"></i> Logout
-                        </a>
-                    </li>
-        <!-- Log-Button -->
-        <li class="nav-item">
-            <a class="nav-link" href="#" onclick="showLernAppLogModal()">
-                <i class="bi bi-file-earmark-text"></i> Logs
-            </a>
-        </li>
-                </ul>
-            </div>
-        </div>
-    </nav>
-
-    <div class="container mt-4">
-    <!-- Log-Modal -->
-    <div class="modal fade" id="lernappLogModal" tabindex="-1" aria-labelledby="lernappLogModalLabel" aria-hidden="true">
-      <div class="modal-dialog modal-lg modal-dialog-centered">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title" id="lernappLogModalLabel">LernApp Log-Ausgaben</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
-          </div>
-          <div class="modal-body">
-            <pre id="lernapp-log-content" style="max-height:60vh;overflow:auto;background:#f8f9fa;padding:1em;border-radius:6px;"></pre>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Schließen</button>
-            <button type="button" class="btn btn-outline-primary" onclick="downloadLernAppLog()"><i class="bi bi-download"></i> Log herunterladen</button>
-          </div>
-        </div>
-      </div>
-    </div>
-        <!-- User Login/Registration Seite -->
-    <div id="login-page" class="page app-hidden">
-            <div class="row justify-content-center">
-                <div class="col-md-6">
-                    <div class="card shadow">
-                        <div class="card-header text-center bg-primary text-white">
-                            <h4><i class="bi bi-person-circle me-2"></i>Benutzer-Anmeldung</h4>
-                        </div>
-                        <div class="card-body">
-                            <!-- Login/Register Toggle -->
-                            <div class="btn-group w-100 mb-4" role="group">
-                                <button type="button" class="btn btn-outline-primary active" id="login-tab">
-                                    <i class="bi bi-box-arrow-in-right me-2"></i>Anmelden
-                                </button>
-                                <button type="button" class="btn btn-outline-primary" id="register-tab">
-                                    <i class="bi bi-person-plus me-2"></i>Registrieren
-                                </button>
-                            </div>
-
-                            <!-- Login Form -->
-                            <div id="login-form">
-                                <form id="login-form-inner">
-                                    <div class="mb-3">
-                                        <label for="login-username" class="form-label">Benutzername</label>
-                                        <input type="text" class="form-control" id="login-username" required>
-                                    </div>
-                                    <div class="mb-3">
-                                        <label for="login-password" class="form-label">Passwort</label>
-                                        <input type="password" class="form-control" id="login-password" required>
-                                    </div>
-                                    <button type="submit" class="btn btn-primary w-100" id="login-btn">
-                                        <i class="bi bi-box-arrow-in-right me-2"></i>Anmelden
-                                    </button>
-                                </form>
-                            </div>
-
-                            <!-- Register Form -->
-                            <div id="register-form" class="d-none">
-                                <form id="register-form-inner">
-                                    <div class="mb-3">
-                                        <label for="register-username" class="form-label">Benutzername</label>
-                                        <input type="text" class="form-control" id="register-username" required>
-                                        <small class="form-text text-muted">3-20 Zeichen, nur Buchstaben und Zahlen</small>
-                                    </div>
-                                    <div class="mb-3">
-                                        <label for="register-password" class="form-label">Passwort</label>
-                                        <input type="password" class="form-control" id="register-password" required>
-                                        <small class="form-text text-muted">Mindestens 6 Zeichen</small>
-                                    </div>
-                                    <div class="mb-3">
-                                        <label for="register-password-confirm" class="form-label">Passwort bestätigen</label>
-                                        <input type="password" class="form-control" id="register-password-confirm" required>
-                                    </div>
-                                    <div class="mb-3">
-                                        <label for="register-display-name" class="form-label">Anzeigename (optional)</label>
-                                        <input type="text" class="form-control" id="register-display-name" placeholder="Wie sollen andere Sie sehen?">
-                                    </div>
-                                    <button type="submit" class="btn btn-success w-100">
-                                        <i class="bi bi-person-plus me-2"></i>Registrieren
-                                    </button>
-                                </form>
-                            </div>
-
-                            <div class="text-center mt-3">
-                                <small class="text-muted">
-                                    Ihre Daten werden lokal auf Ihrem Gerät gespeichert.<br>
-                                    Sie können Ihre Fragen optional mit anderen Benutzern teilen.
-                                </small>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Demo-Modus -->
-                    <div class="card mt-3">
-                        <div class="card-body text-center">
-                            <h6>Demo-Modus</h6>
-                            <p class="text-muted mb-2">Möchten Sie die App ohne Anmeldung testen?</p>
-                            <button class="btn btn-outline-secondary" onclick="app.startDemoMode()">
-                                <i class="bi bi-play-circle me-2"></i>Demo starten
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Sharing/Datenteilung Seite -->
-    <div id="sharing-page" class="page d-none app-hidden">
-            <div class="row">
-                <div class="col-md-10 mx-auto">
-                    <div class="d-flex justify-content-between align-items-center mb-4">
-                        <h2><i class="bi bi-share me-2"></i>Daten teilen</h2>
-                        <button class="btn btn-secondary" id="quiz-back-btn" type="button" onclick="window.app.navigateQuizBack()">
-                            <i class="bi bi-arrow-left me-2"></i>Zurück
-                        </button>
-                    </div>
-
-                    <div class="row">
-                        <!-- Eigene Daten teilen -->
-                        <div class="col-md-6 mb-4">
-                            <div class="card">
-                                <div class="card-header bg-success text-white">
-                                    <h5 class="mb-0"><i class="bi bi-upload me-2"></i>Meine Daten teilen</h5>
-                                </div>
-                                <div class="card-body">
-                                    <p>Teilen Sie Ihre Fragen und Kategorien mit anderen Benutzern:</p>
-                                    
-                                    <div class="mb-3">
-                                        <span class="form-label">Was möchten Sie teilen?</span>
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" id="share-categories" checked>
-                                            <label class="form-check-label" for="share-categories">
-                                                Meine Kategorien (<span id="my-categories-count">0</span>)
-                                            </label>
-                                        </div>
+</body>
+</html>
                                         <div class="form-check">
                                             <input class="form-check-input" type="checkbox" id="share-questions" checked>
                                             <label class="form-check-label" for="share-questions">
@@ -400,37 +128,6 @@ window.showPage = showPage;
         </div>
 
         <!-- Profil Seite -->
-    <div id="profile-page" class="page d-none app-hidden">
-            <div class="row justify-content-center">
-                <div class="col-md-6">
-                    <div class="d-flex justify-content-between align-items-center mb-4">
-                        <h2><i class="bi bi-person-gear me-2"></i>Profil</h2>
-                        <button class="btn btn-secondary" onclick="window.app.navigateQuizBack()">
-                            <i class="bi bi-house-fill me-2"></i>Zurück
-                        </button>
-                    </div>
-
-                    <div class="card">
-                        <div class="card-body">
-                            <form onsubmit="app.updateProfile(event)">
-                                <div class="mb-3">
-                                    <label for="profile-username" class="form-label">Benutzername</label>
-                                    <input type="text" class="form-control" id="profile-username" readonly>
-                                    <small class="form-text text-muted">Der Benutzername kann nicht geändert werden</small>
-                                </div>
-                                <div class="mb-3">
-                                    <label for="profile-display-name" class="form-label">Anzeigename</label>
-                                    <input type="text" class="form-control" id="profile-display-name">
-                                </div>
-                                <div class="mb-3">
-                                    <label for="profile-new-password" class="form-label">Neues Passwort (optional)</label>
-                                    <input type="password" class="form-control" id="profile-new-password">
-                                </div>
-                                <div class="mb-3">
-                                    <label for="profile-confirm-password" class="form-label">Passwort bestätigen</label>
-                                    <input type="password" class="form-control" id="profile-confirm-password">
-                                </div>
-                                <button type="submit" class="btn btn-primary">
                                     <i class="bi bi-save me-2"></i>Änderungen speichern
                                 </button>
                             </form>
@@ -470,43 +167,7 @@ window.showPage = showPage;
         </div>
 
         <!-- Startseite -->
-    <div id="home-page" class="page app-hidden">
-            <!-- Welcome für nicht-eingeloggte Benutzer -->
-            <div id="guest-welcome" class="guest-only">
-                <div class="row">
-                    <div class="col-md-8 mx-auto text-center">
-                        <h1 class="display-4 mb-4">Willkommen zur LernApp</h1>
-                        <p class="lead mb-4">Erstellen Sie Ihr Benutzerkonto, um Ihre eigenen Fragen zu erstellen und mit anderen zu teilen!</p>
-                        
-                        <div class="row g-3 mb-4">
-                            <div class="col-md-4">
-                                <div class="card h-100">
-                                    <div class="card-body text-center">
-                                        <i class="bi bi-person-plus-fill text-primary fs-1 mb-3"></i>
-                                        <h5 class="card-title">Registrieren</h5>
-                                        <p class="card-text">Erstellen Sie Ihr kostenloses Benutzerkonto</p>
-                                        <button class="btn btn-primary" onclick="app.showUserLogin('register')">
-                                            Jetzt registrieren
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-4">
-                                <div class="card h-100">
-                                    <div class="card-body text-center">
-                                        <i class="bi bi-box-arrow-in-right text-success fs-1 mb-3"></i>
-                                        <h5 class="card-title">Anmelden</h5>
-                                        <p class="card-text">Melden Sie sich mit Ihrem bestehenden Konto an</p>
-                                        <button class="btn btn-success" onclick="app.showUserLogin('login')">
-                                            Anmelden
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-4">
-                                <div class="card h-100">
-                                    <div class="card-body text-center">
-                                        <i class="bi bi-play-circle text-info fs-1 mb-3"></i>
+    <!-- Home-Page ist jetzt eine eigene Datei -->
                                         <h5 class="card-title">Demo-Modus</h5>
                                         <p class="card-text">Testen Sie die App ohne Anmeldung</p>
                                         <button class="btn btn-info" onclick="app.startDemoMode()">
@@ -619,180 +280,8 @@ window.showPage = showPage;
         </div>
 
         <!-- Quiz Seite -->
-    <div id="quiz-page" class="page d-none app-hidden">
-            <div class="row">
-                <div class="col-md-8 mx-auto">
-                    <div class="d-flex justify-content-between align-items-center mb-4">
-                        <h2>Quiz</h2>
-                        <button class="btn btn-secondary" onclick="window.app.navigateQuizBack()">
-                            <i class="bi bi-house-fill me-2"></i>Zurück
-                        </button>
-                    </div>
-
-                    <!-- Kategorie-Auswahl -->
-                    <div id="category-selection" class="card mb-4">
-                        <div class="card-body">
-                                                        <h5 class="card-title">Kategorie wählen</h5>
-                                                        <div id="category-buttons" class="d-flex flex-wrap gap-2">
-                                                                <!-- Kategorien werden hier dynamisch eingefügt -->
-                                                        </div>
-                                                        <!-- UI für Unterkategorie hinzufügen (Ebene 1) -->
-                                                        <div id="add-category-ui" class="mt-3">
-                                                            <div class="input-group" style="display:none">
-                                                                <input type="text" class="form-control" id="category-name-input" placeholder="Name der Unterkategorie">
-                                                                <button class="btn btn-outline-secondary" id="add-category-btn" type="button">Unterkategorie hinzufügen</button>
-                                                            </div>
-                                                            <small class="text-muted">Fügt eine Unterkategorie zur aktuellen Hauptkategorie hinzu.</small>
-                                                        </div>
-                                                        <!-- UI für Untergruppe hinzufügen (Ebene 2+) -->
-                                                        <div id="add-subgroup-ui" class="mt-3">
-                                                            <div class="row g-0" style="display:none">
-                                                                <div class="col-12">
-                                                                    <div class="input-group">
-                                                                        <input type="text" class="form-control" id="subgroup-name-input" placeholder="Name der Untergruppe">
-                                                                        <button class="btn btn-outline-secondary" id="add-subgroup-btn" type="button">Untergruppe hinzufügen</button>
-                                                                    </div>
-                                                                </div>
-                                                                <div class="col-12 pt-1">
-                                                                    <small class="text-muted">Fügt eine Untergruppe zur aktuell angezeigten Gruppe/Hauptkategorie hinzu.</small>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Quiz-Bereich -->
-                    <div id="quiz-container" class="d-none">
-                        <div class="card shadow-lg">
-                            <div class="card-header bg-primary text-white">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <span id="question-progress" class="fw-bold">Frage 1 von 10</span>
-                                    <span id="current-category" class="badge bg-light text-dark"></span>
-                                </div>
-                                <div class="progress mt-2" style="height: 8px;">
-                                    <div id="progress-bar" class="progress-bar bg-warning" role="progressbar" style="width: 10%"></div>
-                                </div>
-                            </div>
-                            <div class="card-body p-4">
-                                <!-- Frage-Bild -->
-                                <div id="question-image" class="text-center mb-4 d-none">
-                                    <!-- Wird dynamisch gefüllt -->
-                                </div>
-                                
-                                <!-- Frage-Text -->
-                                <div class="text-center mb-4">
-                                    <h3 id="question-text" class="text-primary fw-bold"></h3>
-                                </div>
-                                
-                                <!-- Antwortoptionen -->
-                                <div id="answers-container" class="row">
-                                    <!-- Antwortoptionen werden hier eingefügt -->
-                                </div>
-                                
-                                <!-- Action Buttons -->
-                                <div class="text-center mt-4">
-                                    <button id="submit-answer" class="btn btn-primary btn-lg px-4" disabled onclick="window.app.submitAnswer()">
-                                        <i class="bi bi-check-circle me-2"></i>Antwort bestätigen
-                                    </button>
-                                    <button id="next-question" class="btn btn-success btn-lg px-4 d-none" onclick="window.app.nextQuestion()">
-                                        <i class="bi bi-arrow-right me-2"></i>Nächste Frage
-                                    </button>
-                                    <button id="finish-quiz" class="btn btn-warning btn-lg px-4 d-none" onclick="window.app.finishQuiz()">
-                                        <i class="bi bi-flag-checkered me-2"></i>Quiz beenden
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Ergebnis -->
-                    <div id="quiz-result" class="card d-none">
-                        <div class="card-body">
-                            <div class="text-center mb-4">
-                                <h3><i class="bi bi-trophy-fill text-warning me-2"></i>Quiz beendet!</h3>
-                            </div>
-                            <div id="result-stats">
-                                <!-- Ergebnisse und detaillierte Übersicht werden hier angezeigt -->
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
 
         <!-- Admin Seite -->
-    <div id="admin-page" class="page d-none app-hidden">
-            <div class="row">
-                <div class="col-md-10 mx-auto">
-                    <div class="d-flex justify-content-between align-items-center mb-4">
-                        <h2>Verwaltung</h2>
-                        <button class="btn btn-secondary" onclick="window.app.navigateQuizBack()">
-                            <i class="bi bi-house-fill me-2"></i>Zurück
-                        </button>
-                    </div>
-
-                    <!-- User-Management für Admin -->
-                    <div class="card mb-4">
-                        <div class="card-header bg-warning">
-                            <h5 class="mb-0"><i class="bi bi-people me-2"></i>Benutzerkonten verwalten</h5>
-                        </div>
-                        <div class="card-body">
-                            <div id="admin-users-list"></div>
-                            <div id="admin-user-data" class="mt-4"></div>
-                        </div>
-                    </div>
-
-                    <div class="row">
-                        <!-- Kategorie-Verwaltung -->
-        <div class="col-md-6 mb-4">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="mb-0">Kategorien verwalten</h5>
-                </div>
-                <div class="card-body">
-                    <div class="mb-3">
-                        <label for="new-category" class="form-label">Neue Kategorie</label>
-                        <div class="input-group">
-                            <input type="text" class="form-control" id="new-category" placeholder="Kategorie-Name">
-                            <button class="btn btn-primary" onclick="window.app.addCategory()">
-                                <i class="bi bi-plus-lg"></i>
-                            </button>
-                        </div>
-                    </div>
-                    <div id="categories-list">
-                        <!-- Kategorien-Liste wird hier angezeigt -->
-                    </div>
-                    <div id="edit-category-modal" class="modal fade" tabindex="-1">
-                        <div class="modal-dialog">
-                            <div class="modal-content">
-                                <div class="modal-header">
-                                    <h5 class="modal-title">Kategorie bearbeiten</h5>
-                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                </div>
-                                <div class="modal-body">
-                                    <input type="text" class="form-control" id="edit-category-input">
-                                </div>
-                                <div class="modal-footer">
-                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
-                                    <button type="button" class="btn btn-primary" id="save-category-edit">Speichern</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-                        <!-- Frage und Antwort hinzufügen -->
-                        <div class="col-md-6 mb-4">
-                            <div class="card">
-                                <div class="card-header">
-                                    <h5 class="mb-0">Neue Frage/Antwort hinzufügen</h5>
-                                </div>
-                                <div class="card-body">
-                                    <form id="question-form">
-                                        <div class="mb-3">
                                             <label for="question-category" class="form-label">Kategorie</label>
                                             <select class="form-select" id="question-category" required onchange="app.onCategorySelectChange && app.onCategorySelectChange()">
                                                 <option value="">Kategorie wählen...</option>
@@ -929,22 +418,6 @@ window.showPage = showPage;
         </div>
 
         <!-- Statistiken Seite -->
-    <div id="stats-page" class="page d-none app-hidden">
-            <div class="row">
-                <div class="col-md-8 mx-auto">
-                    <div class="d-flex justify-content-between align-items-center mb-4">
-                        <h2>Statistiken</h2>
-                        <button class="btn btn-secondary" onclick="window.app.navigateQuizBack()">
-                            <i class="bi bi-house-fill me-2"></i>Zurück
-                        </button>
-                    </div>
-
-                    <div id="stats-container">
-                        <!-- Statistiken werden hier angezeigt -->
-                    </div>
-                </div>
-            </div>
-        </div>
     </div>
 
 
@@ -1044,44 +517,7 @@ window.addEventListener('DOMContentLoaded', () => {
     }, 150);
 });
 
-// Zentrales Event-Binding für Login/Register/Admin (Fallback für alle Browser)
-document.addEventListener('DOMContentLoaded', () => {
-    const loginTab = document.getElementById('login-tab');
-    const registerTab = document.getElementById('register-tab');
-    if (loginTab) {
-        loginTab.onclick = (e) => {
-            e.preventDefault();
-            window.app && window.app.switchAuthMode && window.app.switchAuthMode('login');
-        };
-    }
-    if (registerTab) {
-        registerTab.onclick = (e) => {
-            e.preventDefault();
-            window.app && window.app.switchAuthMode && window.app.switchAuthMode('register');
-        };
-    }
-    const loginForm = document.getElementById('login-form-inner');
-    if (loginForm) {
-        loginForm.onsubmit = (e) => {
-            e.preventDefault();
-            window.app && window.app.loginUser && window.app.loginUser(e);
-        };
-    }
-    const registerForm = document.getElementById('register-form-inner');
-    if (registerForm) {
-        registerForm.onsubmit = (e) => {
-            e.preventDefault();
-            window.app && window.app.registerUser && window.app.registerUser(e);
-        };
-    }
-    const adminLoginLink = document.getElementById('admin-login-link');
-    if (adminLoginLink) {
-        adminLoginLink.onclick = (e) => {
-            e.preventDefault();
-            window.app && window.app.showAdminLogin && window.app.showAdminLogin();
-        };
-    }
-});
+// Login/Register werden jetzt über eigene Seiten abgewickelt
 </script>
 </body>
 </html>

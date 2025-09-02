@@ -1,49 +1,145 @@
-// Nach jedem Seiten-Refresh: Quiz-Seite korrekt initialisieren
-window.addEventListener('DOMContentLoaded', function() {
-    setTimeout(function() {
-        if (window.app && typeof window.app.goToAddress === 'function') {
-            const isLoggedIn = window.app.currentUser || window.app.isDemo;
-            const lastPage = sessionStorage.getItem('lernapp_last_page');
-            if (isLoggedIn) {
-                // Nach Login: Quiz-Seite und Ebene 0 anzeigen
-                showPage('quiz');
-                window.app.goToAddress({ level: 0 });
-            } else {
-                // Nicht eingeloggt: Immer Willkommensseite anzeigen
-                window.showPage('home');
-                if (window.app && typeof window.app.updateUIForLoginState === 'function') {
-                    window.app.updateUIForLoginState();
-                }
-            }
-        }
-    }, 100);
-});
-// ========== HINWEIS ZUR AUSLAGERUNG ==========
-// Die Logging-Funktion kann in eine eigene Datei ausgelagert werden, z.B. js/log.js
-// Dann einfach <script src="js/log.js"></script> vor allen anderen Skripten einbinden.
-// Ebenso können weitere Hilfsfunktionen (z.B. für Storage, Validierung, UI) ausgelagert werden.
-// Empfohlene Struktur:
-// - js/log.js (Logging)
-// - js/storage.js (Storage-Logik)
-// - js/validation.js (Validierungen)
-// - js/ui.js (UI-Hilfen)
-// - js/app.js (nur noch Hauptlogik und App-Klasse)
-// addCategory global verfügbar machen (wie showPage)
-if (typeof window !== 'undefined' && typeof app !== 'undefined' && typeof app.addCategory === 'function') {
-    window.addCategory = function() { window.app.addCategory(); };
-}
+// === DEBUG-LOGGING: Storage und Redirects ===
+(function() {
+    // Logge alle Storage-Keys nach jedem Seitenaufruf
+    console.log('[LernApp][DEBUG] localStorage:', Object.keys(localStorage));
+    console.log('[LernApp][DEBUG] sessionStorage:', Object.keys(sessionStorage));
 
-// storage.js als zentrale Storage-Utility importieren
-// (klassisches Script, keine Module mehr)
-// storage.js, questions.js, groups.js werden vorher geladen
-// storage, questionManager, groupManager sind global
-
-// LernApp - Hauptlogik
+    // Logge alle Redirects
+    const origReplace = window.location.replace;
+    window.location.replace = function(url) {
+        console.log('[LernApp][DEBUG] window.location.replace aufgerufen mit:', url, new Error().stack);
+        origReplace.call(window.location, url);
+    };
+})();
 
 class LernApp {
-    // Lädt die Userdaten für den aktuellen User aus dem zentralen Userpaket
+    // Zeigt einen einfachen Dialog zur Speicherort-Auswahl beim ersten Login
+    async showStorageLocationDialogIfNeeded() {
+        const user = this.users[this.currentUser];
+        if (user && user.storage && !user.storage.chosen) {
+            // Einfacher Dialog (window.prompt für Demo-Zweck)
+            const choice = window.prompt('Wo möchten Sie Ihre Daten speichern?\nGeben Sie "lokal" für lokalen Speicher oder "cloud" für Cloud-Speicher ein:', 'lokal');
+            if (choice && choice.toLowerCase() === 'cloud') {
+                user.storage.chosen = true;
+                user.storage.cloud = true;
+                user.storage.folder = '';
+            } else {
+                user.storage.chosen = true;
+                user.storage.cloud = false;
+                user.storage.folder = '';
+            }
+            this.users[this.currentUser] = user;
+            localStorage.setItem(`lernapp_user_${this.currentUser}`, JSON.stringify(user));
+            await this.saveToStorage('users', this.users, true);
+            showAlert('Speicherort gespeichert: ' + (user.storage.cloud ? 'Cloud' : 'Lokal'), 'info');
+        }
+    }
+    // Admin: Benutzer löschen
+    async adminDeleteUser(username) {
+        if (!username || !this.users[username]) {
+            this.showAlert('Benutzer nicht gefunden!', 'danger');
+            return;
+        }
+        if (!confirm(`Benutzer "${username}" wirklich löschen?`)) return;
+        delete this.users[username];
+        await this.saveToStorage('users', this.users, true);
+        localStorage.removeItem(`lernapp_user_${username}`);
+        this.showAlert(`Benutzer "${username}" wurde gelöscht.`, 'success');
+        setTimeout(() => {
+            this.renderAdminUsersList();
+            document.getElementById('admin-user-data').innerHTML = '';
+        }, 100);
+    }
+
+    // Admin: User-Details anzeigen
+    async adminShowUserData(username) {
+        if (!username || !this.users[username]) {
+            this.showAlert('Benutzer nicht gefunden!', 'danger');
+            return;
+        }
+        const user = this.users[username];
+        const detailsHtml = `
+            <div class="card mt-3">
+                <div class="card-header bg-info text-white"><strong>Details für ${user.displayName || username}</strong></div>
+                <div class="card-body">
+                    <p><strong>Benutzername:</strong> ${username}</p>
+                    <p><strong>Erstellt am:</strong> ${user.createdAt ? new Date(user.createdAt).toLocaleString('de-DE') : '-'}</p>
+                    <p><strong>Letzter Login:</strong> ${user.lastLogin ? new Date(user.lastLogin).toLocaleString('de-DE') : '-'}</p>
+                    <p><strong>Logins:</strong> ${user.loginCount || 0}</p>
+                    <p><strong>Kategorien:</strong> ${(user.categories || []).join(', ')}</p>
+                    <p><strong>Fragen:</strong> ${(user.questions || []).length}</p>
+                    <button class="btn btn-outline-secondary mt-2" onclick="document.getElementById('admin-user-data').innerHTML = ''">Schließen</button>
+                </div>
+            </div>
+        `;
+        document.getElementById('admin-user-data').innerHTML = detailsHtml;
+    }
+
+    // Admin: Passwort zurücksetzen
+    async adminResetPassword(username) {
+        if (!username || !this.users[username]) {
+            this.showAlert('Benutzer nicht gefunden!', 'danger');
+            return;
+        }
+        const newPassword = prompt(`Neues Passwort für "${username}" eingeben:`);
+        if (!newPassword || newPassword.length < 6) {
+            this.showAlert('Passwort muss mindestens 6 Zeichen lang sein!', 'danger');
+            return;
+        }
+        this.users[username].password = this.hashPassword(newPassword);
+        await this.saveToStorage('users', this.users, true);
+        localStorage.setItem(`lernapp_user_${username}`, JSON.stringify(this.users[username]));
+        this.showAlert(`Passwort für "${username}" wurde geändert.`, 'success');
+    }
+    // Platzhalter: Zeigt die Liste der Benutzer im Admin-Bereich an
+    async renderAdminUsersList() {
+        const listElem = document.getElementById('admin-users-list');
+        // Userliste frisch laden
+        let users = await this.loadFromStorage('users', true);
+        if (!users) users = {};
+        this.users = users;
+        if (listElem) {
+            if (this.users && Object.keys(this.users).length > 0) {
+                listElem.innerHTML = `
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Benutzername</th>
+                                <th>Aktionen</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${Object.keys(this.users).map(u => `
+                                <tr>
+                                    <td>${u}</td>
+                                    <td>
+                                        <button class="btn btn-outline-info btn-sm me-1" onclick="app.adminShowUserData('${u}')"><i class="bi bi-info-circle"></i> Details</button>
+                                        <button class="btn btn-outline-warning btn-sm me-1" onclick="app.adminResetPassword('${u}')"><i class="bi bi-key"></i> Passwort</button>
+                                        <button class="btn btn-outline-danger btn-sm" onclick="app.adminDeleteUser('${u}')"><i class="bi bi-trash"></i> Löschen</button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            } else {
+                listElem.innerHTML = '<div class="alert alert-warning">Keine Benutzer gefunden.</div>';
+            }
+        }
+    }
+    // Lädt die Userdaten aus localStorage und setzt Kategorien, Fragen, Statistik
     loadUserData() {
-        if (!this.currentUser) return;
+        if (!this.currentUser || !this.users || !this.users[this.currentUser]) {
+            this.categories = ['textfragen', 'bilderquiz', 'demo-ketegorie'];
+            this.questions = [];
+            this.statistics = {
+                totalQuestions: 0,
+                correctAnswers: 0,
+                categoriesPlayed: {},
+                lastPlayed: null
+            };
+            return;
+        }
         const userObjStr = localStorage.getItem(`lernapp_user_${this.currentUser}`);
         if (userObjStr) {
             try {
@@ -79,245 +175,53 @@ class LernApp {
             };
         }
     }
-    // Flag für Back-Navigation, damit der Zustand nicht zu früh gelöscht wird
-    _backNavigationActive = false;
-    // Speichert den zuletzt angezeigten Hauptkategorie-Namen (für Untergruppen-UI)
-    lastMainCategory = null;
-    // Speichert den zuletzt angezeigten Gruppenpfad (als Array)
-    lastGroupPath = [];
-
-    // Navigiert in der Quiz-Hierarchie eine Ebene zurück oder ins Hauptmenü
-    navigateQuizBack() {
-        const prev = this.getPreviousAddress();
-        if (prev === null) {
-            if (typeof window.showPage === 'function') window.showPage('home');
-        } else {
-            this.goToAddress(prev);
-        }
-    }
-
-    // Zentrale Adress-Navigation für Quiz-UI
-    goToAddress(address) {
-        // Quiz-Seite aktivieren
-        if (typeof window.showPage === 'function') window.showPage('quiz');
-        // Fallback: Immer vollständiges Objekt
-        if (!address || typeof address.level !== 'number') {
-            address = { level: 0 };
-        }
-        this.currentAddress = { ...address };
-        const level = address.level;
-        // UI-Elemente holen
-        const catUI = document.getElementById('add-category-ui');
-        const subUI = document.getElementById('add-subgroup-ui');
-        const container = document.getElementById('category-buttons');
-        // Felder initial ausblenden
-        if (catUI) {
-            catUI.style.display = 'none';
-            const inputGroup = catUI.querySelector('.input-group');
-            if (inputGroup) inputGroup.style.display = 'none';
-        }
-        if (subUI) {
-            subUI.style.display = 'none';
-            const row = subUI.querySelector('.row');
-            if (row) row.style.display = 'none';
-        }
-        if (container) container.innerHTML = '';
-
-        if (level === 0) {
-            // Hauptkategorie-Buttons, keine Felder sichtbar
-            if (container && window.questionManager && Array.isArray(window.questionManager.categories)) {
-                window.questionManager.categories.forEach(cat => {
-                    const btn = document.createElement('button');
-                    btn.className = 'btn btn-primary m-2';
-                    btn.textContent = cat;
-                    btn.onclick = () => {
-                        this.goToAddress({ level: 1, mainCategory: cat });
-                    };
-                    container.appendChild(btn);
-                });
-            }
-        } else if (level === 1) {
-            // Unterkategorie-Buttons + Feld für Unterkategorie
-            this.lastMainCategory = address.mainCategory;
-            this.lastGroupPath = [];
-            if (container && window.questionManager && window.questionManager.getNestedGroups) {
-                const subcats = window.questionManager.getNestedGroups(address.mainCategory, []);
-                if (Array.isArray(subcats)) {
-                    subcats.forEach(subcat => {
-                        const btn = document.createElement('button');
-                        btn.className = 'btn btn-secondary m-1';
-                        btn.textContent = subcat.name;
-                        btn.onclick = () => {
-                            this.goToAddress({ level: 2, mainCategory: address.mainCategory, groupPath: [subcat.name] });
-                        };
-                        container.appendChild(btn);
-                    });
-                }
-            }
-            if (catUI) {
-                catUI.style.display = 'block';
-                const inputGroup = catUI.querySelector('.input-group');
-                if (inputGroup) inputGroup.style.display = '';
-            }
-        } else if (level === 2) {
-            // Untergruppen-Buttons + Feld für Untergruppe
-            this.lastMainCategory = address.mainCategory;
-            this.lastGroupPath = address.groupPath || [];
-            if (container && window.questionManager && window.questionManager.getNestedGroups) {
-                const subgroups = window.questionManager.getNestedGroups(address.mainCategory, address.groupPath || []);
-                if (Array.isArray(subgroups)) {
-                    subgroups.forEach(subgroup => {
-                        const btn = document.createElement('button');
-                        btn.className = 'btn btn-secondary m-1';
-                        btn.textContent = subgroup.name;
-                        btn.onclick = () => {
-                            this.goToAddress({ level: 2, mainCategory: address.mainCategory, groupPath: [...(address.groupPath || []), subgroup.name] });
-                        };
-                        container.appendChild(btn);
-                    });
-                }
-            }
-
-            if (subUI) {
-                subUI.style.display = 'flex';
-                const row = subUI.querySelector('.row');
-                if (row) row.style.display = '';
-            }
-        }
-    }
-
-    adminResetPassword(username) {
-        // Dummy-Implementierung für Passwort-Reset (hier ggf. Logik ergänzen)
-        alert('Passwort wurde geändert!');
-        this.saveToStorage('users', this.users, true);
-    }
-
-    async adminDeleteUser(username) {
-        if (!confirm(`Benutzer ${username} und alle zugehörigen Daten unwiderruflich löschen?`)) return;
-        // Debug-Ausgaben vor Löschen
-        console.log('[LernApp][adminDeleteUser] users vor Löschen:', JSON.stringify(this.users));
-        console.log('[LernApp][adminDeleteUser] localStorage vor Cleanup:', Object.keys(localStorage).filter(k => k.includes(username)));
-        delete this.users[username];
-        await this.saveToStorage('users', this.users, true);
-        // Zentrales Userpaket und alle zugehörigen Daten explizit entfernen
-        localStorage.removeItem(`lernapp_user_${username}`);
-        localStorage.removeItem(`lernapp_user_${username}_categories`);
-        localStorage.removeItem(`lernapp_user_${username}_questions`);
-        localStorage.removeItem(`lernapp_user_${username}_statistics`);
-        // Speicherort-Flag entfernen
-        localStorage.removeItem(`lernapp_user_${username}_storage_chosen`);
-        // Zusätzlich: Alle lokalen Storage-Keys, die den Usernamen enthalten, entfernen (Altlasten!)
-        const userKeyRegex = new RegExp(`(^|[_-])${username}([_-]|$)`, 'i');
-        Object.keys(localStorage).forEach(key => {
-            if (userKeyRegex.test(key)) {
-                localStorage.removeItem(key);
-            }
-        });
-        // Debug-Ausgaben nach Löschen
-        console.log('[LernApp][adminDeleteUser] users nach Löschen:', JSON.stringify(this.users));
-        console.log('[LernApp][adminDeleteUser] localStorage nach Cleanup:', Object.keys(localStorage).filter(k => k.includes(username)));
-        // Userliste garantiert frisch laden
-        this.users = await this.loadFromStorage('users', true) || {};
-        this.renderAdminUsersList();
-        document.getElementById('admin-user-data').innerHTML = '';
-        alert('Benutzer und Daten gelöscht!');
-        // Seite sofort neu laden, damit alle Instanzen synchron sind
-        location.reload();
-    }
-    constructor() {
-        // User Management System
-        this.currentUser = null;
-        this.isDemo = false;
-        this.users = {};
-        this.sharedData = {};
-        // Current user's data (wird dynamisch geladen)
-        this.categories = [];
-        this.questions = [];
-        this.statistics = {};
-        this.currentQuiz = {
-            questions: [],
-            currentIndex: 0,
-            score: 0,
-            selectedCategory: null,
-            answers: []
-        };
-        this.init();
-    }
-
-    async init() {
-        // User- und SharedData asynchron laden
-        this.users = await this.loadFromStorage('users', true) || {};
-        // Migration: Falls Userdaten noch nicht zentralisiert sind, migrieren
-        let migrationNeeded = false;
-        Object.keys(this.users).forEach(username => {
-            const user = this.users[username];
-            if (!user.statistics) { user.statistics = { totalQuestions: 0, correctAnswers: 0, lastPlayed: null, categoriesPlayed: {} }; migrationNeeded = true; }
-            if (!user.settings) { user.settings = {}; migrationNeeded = true; }
-            if (!user.storage) { user.storage = { chosen: false, folder: '', cloud: false }; migrationNeeded = true; }
-            if (!user.displayName) { user.displayName = username; migrationNeeded = true; }
-            if (!user.createdAt) { user.createdAt = new Date().toISOString(); migrationNeeded = true; }
-            if (typeof user.loginCount !== 'number') { user.loginCount = 0; migrationNeeded = true; }
-        });
-        if (migrationNeeded) await this.saveToStorage('users', this.users, true);
-        this.sharedData = await this.loadFromStorage('shared_data', true) || {};
-
-        // Prüfen ob User eingeloggt ist
-        this.checkUserSession();
-
-        if (this.currentUser || this.isDemo) {
-            this.loadUserData();
-            this.updateCategorySelects();
-            this.renderCategories();
-            this.renderCategoriesList();
-            this.renderQuestionsList();
-            this.renderStatistics();
-            this.updateDashboard();
-        }
-
-        this.setupEventListeners();
-        this.checkAdminAccess();
-        this.updateUIForLoginState();
-    }
-
-    // ==================== USER MANAGEMENT ====================
-
-    checkUserSession() {
-        const sessionUser = sessionStorage.getItem('lernapp_current_user');
-        const sessionDemo = sessionStorage.getItem('lernapp_demo_mode');
-        if (sessionDemo) {
-            this.isDemo = true;
-            this.currentUser = 'demo';
-        } else if (sessionUser) {
-            this.currentUser = sessionUser;
-            // Kein automatischer Speicherort-Dialog mehr beim Reload
-        }
-    }
-
     updateUIForLoginState() {
+        console.log('[LernApp][DEBUG] updateUIForLoginState START:', {
+            currentUser: this.currentUser,
+            isDemo: this.isDemo,
+            pathname: window.location.pathname,
+            sessionStorage: Object.assign({}, sessionStorage)
+        });
+        // Gastmodus auf home.html erlauben
+        if (!this.currentUser && !this.isDemo) {
+            if (window.location.pathname.endsWith('home.html')) {
+                console.log('[LernApp][DEBUG] Kein User -> Gastmodus auf Home-Seite erlaubt (KEIN Redirect)');
+                return;
+            }
+            console.log('[LernApp][DEBUG] Kein User -> Redirect Login ausgelöst!', new Error().stack);
+            window.location.href = 'login.html';
+            return;
+        }
         const userElements = document.querySelectorAll('.user-only');
         const guestElements = document.querySelectorAll('.guest-only');
+        const adminNavItem = document.getElementById('admin-nav-item');
+        if (sessionStorage.getItem('lernapp_admin_access')) {
+            if (adminNavItem) adminNavItem.style.display = 'block';
+        } else {
+            if (adminNavItem) adminNavItem.style.display = 'none';
+        }
         if (this.currentUser || this.isDemo) {
             userElements.forEach(el => el.style.display = 'block');
             guestElements.forEach(el => el.style.display = 'none');
             if (this.currentUser && !this.isDemo) {
                 const userData = this.users[this.currentUser];
-                document.getElementById('current-username').textContent = 
-                    userData.displayName || this.currentUser;
+                const currentUsernameElem = document.getElementById('current-username');
+                if (currentUsernameElem) currentUsernameElem.textContent = userData.displayName || this.currentUser;
                 let loginInfo = userData.lastLogin ? new Date(userData.lastLogin).toLocaleString('de-DE') : '-';
                 loginInfo += ` (Logins: ${userData.loginCount || 0})`;
                 const lastLoginElem = document.getElementById('last-login-time');
                 if (lastLoginElem) lastLoginElem.textContent = loginInfo;
-                document.getElementById('dashboard-username').textContent = 
-                    userData.displayName || this.currentUser;
+                const dashboardUsernameElem = document.getElementById('dashboard-username');
+                if (dashboardUsernameElem) dashboardUsernameElem.textContent = userData.displayName || this.currentUser;
             } else if (this.isDemo) {
                 document.getElementById('current-username').textContent = 'Demo-Modus';
                 document.getElementById('dashboard-username').textContent = 'Demo-Benutzer';
             }
-            // showPage('home') entfällt, Weiterleitung erfolgt explizit nach Login
         } else {
+            // Gastansicht: KEIN Redirect auf login.html, sondern Gast-Elemente anzeigen
             userElements.forEach(el => el.style.display = 'none');
             guestElements.forEach(el => el.style.display = 'block');
-            // Keine automatische Weiterleitung zur Login-Seite
+            console.log('[LernApp][Gastmodus] Gastansicht aktiv, kein Redirect auf login.html!');
         }
         // User-Login deaktivieren, wenn Admin eingeloggt ist
         this.disableUserLoginIfAdmin();
@@ -336,63 +240,7 @@ class LernApp {
         }
     }
 
-    showUserLogin(mode = 'login') {
-        showPage('login');
-        // Umschalt-Buttons neu binden (wichtig bei dynamischem DOM)
-        const loginTab = document.getElementById('login-tab');
-        const registerTab = document.getElementById('register-tab');
-        if (loginTab) {
-            loginTab.onclick = (e) => {
-                e.preventDefault();
-                this.switchAuthMode('login');
-            };
-        }
-        if (registerTab) {
-            registerTab.onclick = (e) => {
-                e.preventDefault();
-                this.switchAuthMode('register');
-            };
-        }
-        // Formulare neu binden
-        const loginForm = document.getElementById('login-form-inner');
-        if (loginForm) {
-            loginForm.onsubmit = (e) => {
-                e.preventDefault();
-                this.loginUser(e);
-            };
-        }
-        const registerForm = document.getElementById('register-form-inner');
-        if (registerForm) {
-            registerForm.onsubmit = (e) => {
-                e.preventDefault();
-                this.registerUser(e);
-            };
-        }
-        if (mode === 'register') {
-            this.switchAuthMode('register');
-        } else {
-            this.switchAuthMode('login');
-        }
-    }
-
-    switchAuthMode(mode) {
-        const loginTab = document.getElementById('login-tab');
-        const registerTab = document.getElementById('register-tab');
-        const loginForm = document.getElementById('login-form');
-        const registerForm = document.getElementById('register-form');
-
-        if (mode === 'login') {
-            loginTab.classList.add('active');
-            registerTab.classList.remove('active');
-            loginForm.classList.remove('d-none');
-            registerForm.classList.add('d-none');
-        } else {
-            loginTab.classList.remove('active');
-            registerTab.classList.add('active');
-            loginForm.classList.add('d-none');
-            registerForm.classList.remove('d-none');
-        }
-    }
+    // Login und Registrierung werden jetzt über eigene Seiten abgewickelt
 
     async registerUser(event) {
         event.preventDefault();
@@ -400,7 +248,7 @@ class LernApp {
         // Username und Felder holen
         const username = document.getElementById('register-username').value.trim();
         const password = document.getElementById('register-password').value;
-        const confirmPassword = document.getElementById('register-password-confirm').value;
+    const confirmPassword = document.getElementById('register-confirm-password').value;
         const displayName = document.getElementById('register-display-name').value.trim();
 
         // 1. Userliste frisch laden
@@ -556,10 +404,10 @@ class LernApp {
         this.loadUserData();
         this.updateUIForLoginState();
         this.updateDashboard();
-    showAlert(`Willkommen zurück, ${user.displayName}!`, 'success');
+    showAlert(`Willkommen, ${user.displayName}!`, 'success');
         // Speicherort-Dialog nur beim ersten Login anzeigen
         if (firstLogin) {
-            this.showStorageLocationDialogIfNeeded();
+            await this.showStorageLocationDialogIfNeeded();
         } else if (window.lernappCloudStorage && window.lernappCloudStorage.dirHandle == null && typeof window.lernappCloudStorage.loadDirHandle === 'function') {
             window.lernappCloudStorage.loadDirHandle();
         }
@@ -571,7 +419,8 @@ class LernApp {
             if (sessionStorage.getItem('lernapp_last_page') === 'login') {
                 sessionStorage.setItem('lernapp_last_page', 'home');
             }
-            showPage('home');
+            console.log('[LernApp][DEBUG] Login erfolgreich, Weiterleitung zu dashboard.html', new Error().stack);
+            window.location.href = 'dashboard.html';
         }, 0);
     }
 
@@ -588,18 +437,36 @@ class LernApp {
     }
 
     logoutUser(forceLogout = false) {
+        // Alle Cookies löschen
+        document.cookie.split(';').forEach(function(c) {
+            document.cookie = c.trim().split('=')[0] + '=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/';
+        });
+        console.log('[LernApp][LOGCHAIN] Logout-Button geklickt');
         if (forceLogout || confirm('Möchten Sie sich wirklich abmelden?')) {
+            console.log('[LernApp] Logout gestartet');
             this.currentUser = null;
             this.isDemo = false;
             sessionStorage.removeItem('lernapp_current_user');
             sessionStorage.removeItem('lernapp_demo_mode');
             sessionStorage.removeItem('lernapp_admin_access');
+            // Logging: UI-Update für Gastansicht
+            console.log('[LernApp] updateUIForLoginState() für Gastansicht nach Logout');
             this.updateUIForLoginState();
+            console.log('[LernApp] SessionStorage nach Logout:', {
+                currentUser: sessionStorage.getItem('lernapp_current_user'),
+                demoMode: sessionStorage.getItem('lernapp_demo_mode'),
+                adminAccess: sessionStorage.getItem('lernapp_admin_access')
+            });
             if (forceLogout) {
-                // Nach Account-Löschung: sofort auf Startseite und reload
+                console.log('[LernApp][DEBUG] Force-Logout: Reload');
                 location.reload();
             } else {
-                showAlert('Erfolgreich abgemeldet!', 'success');
+                showAlert('Erfolgreich abgemeldet! Sie sehen jetzt die Gastansicht.', 'success');
+                console.log('[LernApp][DEBUG] Weiterleitung zu home.html in 600ms (Gastansicht)');
+                setTimeout(function() {
+                    console.log('[LernApp][DEBUG] [Logout] window.location.href = "home.html" ausgelöst (Gastansicht)', new Error().stack);
+                    window.location.href = 'home.html';
+                }, 600);
             }
         }
     }
@@ -925,20 +792,23 @@ class LernApp {
         }
 
         // Dashboard-Statistiken aktualisieren
-        document.getElementById('dashboard-categories').textContent = this.categories.length;
-        document.getElementById('dashboard-questions').textContent = this.questions.length;
-        
+        const dashboardCategoriesElem = document.getElementById('dashboard-categories');
+        if (dashboardCategoriesElem) dashboardCategoriesElem.textContent = this.categories.length;
+        const dashboardQuestionsElem = document.getElementById('dashboard-questions');
+        if (dashboardQuestionsElem) dashboardQuestionsElem.textContent = this.questions.length;
         const totalQuizzes = Object.values(this.statistics.categoriesPlayed || {})
             .reduce((sum, cat) => sum + (cat.gamesPlayed || 0), 0);
-        document.getElementById('dashboard-total-played').textContent = totalQuizzes;
-        
+        const dashboardTotalPlayedElem = document.getElementById('dashboard-total-played');
+        if (dashboardTotalPlayedElem) dashboardTotalPlayedElem.textContent = totalQuizzes;
         const successRate = this.statistics.totalQuestions > 0 ? 
             Math.round((this.statistics.correctAnswers / this.statistics.totalQuestions) * 100) : 0;
-        document.getElementById('dashboard-success-rate').textContent = `${successRate}%`;
-
+        const dashboardSuccessRateElem = document.getElementById('dashboard-success-rate');
+        if (dashboardSuccessRateElem) dashboardSuccessRateElem.textContent = `${successRate}%`;
         // Sharing-Seite aktualisieren
-        document.getElementById('my-categories-count').textContent = this.categories.length;
-        document.getElementById('my-questions-count').textContent = this.questions.length;
+        const myCategoriesCountElem = document.getElementById('my-categories-count');
+        if (myCategoriesCountElem) myCategoriesCountElem.textContent = this.categories.length;
+    const myQuestionsCountElem = document.getElementById('my-questions-count');
+    if (myQuestionsCountElem) myQuestionsCountElem.textContent = this.questions.length;
         this.updateSharedContentList();
 
         // Last login time + login count (wie im Dashboard oben)
@@ -965,13 +835,16 @@ class LernApp {
 
     showAdminInterface() {
         // Standardkategorien sicherstellen
-    const standardKategorien = ['textfragen', 'bilderquiz', 'demo-ketegorie'];
+        if (!Array.isArray(this.categories)) this.categories = [];
+        const standardKategorien = ['textfragen', 'bilderquiz', 'demo-ketegorie'];
         standardKategorien.forEach(kat => {
             if (!this.categories.includes(kat)) this.categories.unshift(kat);
         });
         // Admin-Navigation anzeigen
-        document.getElementById('admin-nav-item').style.display = 'block';
-        document.getElementById('admin-logout-item').style.display = 'block';
+    const adminNavItem = document.getElementById('admin-nav-item');
+    if (adminNavItem) adminNavItem.style.display = 'block';
+    const adminLogoutItem = document.getElementById('admin-logout-item');
+    if (adminLogoutItem) adminLogoutItem.style.display = 'block';
         const adminLoginLink = document.getElementById('admin-login-link');
         if (adminLoginLink) {
             adminLoginLink.style.display = 'none';
@@ -985,8 +858,13 @@ class LernApp {
         }
 
         // User-Liste anzeigen
-        this.renderAdminUsersList();
-        document.getElementById('admin-user-data').innerHTML = '';
+        if (typeof this.renderAdminUsersList === 'function') {
+            this.renderAdminUsersList();
+            document.getElementById('admin-user-data').innerHTML = '';
+        } else {
+            // Fallback: einfach weiterleiten
+            window.location.href = 'admin.html';
+        }
         // Kategorien und Fragen anzeigen
         this.renderCategories();
         this.renderCategoriesList();
@@ -994,13 +872,13 @@ class LernApp {
     }
 
     hideAdminInterface() {
-        // Admin-Navigation verstecken
-        document.getElementById('admin-nav-item').style.display = 'none';
-        document.getElementById('admin-logout-item').style.display = 'none';
-        const adminLoginLink = document.getElementById('admin-login-link');
-        if (adminLoginLink) {
-            adminLoginLink.style.display = 'block';
-        }
+    // Admin-Navigation verstecken (nur wenn vorhanden)
+    const adminNavItem = document.getElementById('admin-nav-item');
+    if (adminNavItem) adminNavItem.style.display = 'none';
+    const adminLogoutItem = document.getElementById('admin-logout-item');
+    if (adminLogoutItem) adminLogoutItem.style.display = 'none';
+    const adminLoginLink = document.getElementById('admin-login-link');
+    if (adminLoginLink) adminLoginLink.style.display = 'block';
     }
 
     showAdminLogin() {
@@ -1061,7 +939,7 @@ class LernApp {
             sessionStorage.removeItem('lernapp_demo_mode');
             this.updateUIForLoginState();
             sessionStorage.setItem('lernapp_admin_access', 'granted');
-            this.showAlert('Admin-Anmeldung erfolgreich!', 'success');
+            window.showAlert('Admin-Anmeldung erfolgreich!', 'success');
 
             // Modal schließen und aus dem DOM entfernen
             const modalElem = document.getElementById('adminLoginModal');
@@ -1073,17 +951,13 @@ class LernApp {
                 if (modalElem && modalElem.parentNode) {
                     modalElem.parentNode.removeChild(modalElem);
                 }
-                // Backdrop und Modal-Open-Status entfernen (UI-Blockade verhindern)
                 document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
                 document.body.classList.remove('modal-open');
                 document.body.style.overflow = '';
                 document.body.style.paddingRight = '';
-                // Admin-Interface aktivieren
-                this.showAdminInterface();
-                // Direkt auf Admin-Seite umschalten
-                showPage('admin');
-                console.log('[DEBUG] showPage("admin") aufgerufen:', document.getElementById('admin-page'));
-            }, 350); // Bootstrap-Animation abwarten
+                // Direkt auf Admin-Seite umschalten (ohne weitere UI-Operationen dazwischen)
+                window.location.href = 'admin.html';
+            }, 350);
         } else {
             const errorDiv = document.getElementById('login-error');
             errorDiv.textContent = 'Falsches Passwort!';
@@ -1941,7 +1815,7 @@ class LernApp {
             console.log('Antwort ausgewählt:', answerIndex);
         } else {
             console.error('Antwort-Option nicht gefunden für Index:', answerIndex);
-        }
+               }
 
         // Submit Button aktivieren
         const submitButton = document.getElementById('submit-answer');
@@ -2353,120 +2227,8 @@ class LernApp {
         const currentChecksum = this.generateChecksum(data);
         return currentChecksum === expectedChecksum;
     }
-
-    // Robuste Navigation: Gehe zu vorheriger Adresse (mit History-Check)
-    goToAddress(address) {
-    // Immer Quiz-Seite aktivieren
-    if (typeof window.showPage === 'function') window.showPage('quiz');
-        // Fallback: Immer vollständiges Objekt
-        if (!address || typeof address.level !== 'number') {
-            address = { level: 0 };
-        }
-        this.currentAddress = { ...address };
-        const level = address.level;
-        // UI-Elemente holen
-        const catUI = document.getElementById('add-category-ui');
-        const subUI = document.getElementById('add-subgroup-ui');
-        const container = document.getElementById('category-buttons');
-        // Sichtbarkeit und Inhalte je Ebene setzen
-        if (catUI) catUI.style.display = 'none';
-        // Felder initial ausblenden
-        if (catUI) {
-            catUI.style.display = 'none';
-            const inputGroup = catUI.querySelector('.input-group');
-            if (inputGroup) inputGroup.style.display = 'none';
-        }
-        if (subUI) {
-            subUI.style.display = 'none';
-            const row = subUI.querySelector('.row');
-            if (row) row.style.display = 'none';
-        }
-        if (container) container.innerHTML = '';
-
-        if (level === 0) {
-            // Hauptkategorie-Buttons, keine Felder sichtbar
-            if (container && window.questionManager && Array.isArray(window.questionManager.categories)) {
-                window.questionManager.categories.forEach(cat => {
-                    const btn = document.createElement('button');
-                    btn.className = 'btn btn-primary m-2';
-                    btn.textContent = cat;
-                    btn.onclick = () => {
-                        this.goToAddress({ level: 1, mainCategory: cat });
-                    };
-                    container.appendChild(btn);
-                });
-            }
-        } else if (level === 1) {
-            // Unterkategorie-Buttons + Feld für Unterkategorie
-            this.lastMainCategory = address.mainCategory;
-            this.lastGroupPath = [];
-            if (container && window.questionManager && window.questionManager.getNestedGroups) {
-                const subcats = window.questionManager.getNestedGroups(address.mainCategory, []);
-                if (Array.isArray(subcats)) {
-                    subcats.forEach(subcat => {
-                        const btn = document.createElement('button');
-                        btn.className = 'btn btn-secondary m-1';
-                        btn.textContent = subcat.name;
-                        btn.onclick = () => {
-                            this.goToAddress({ level: 2, mainCategory: address.mainCategory, groupPath: [subcat.name] });
-                        };
-                        container.appendChild(btn);
-                    });
-                }
-            }
-            if (catUI) {
-                catUI.style.display = 'block';
-                const inputGroup = catUI.querySelector('.input-group');
-                if (inputGroup) inputGroup.style.display = '';
-            }
-        } else if (level === 2) {
-            // Untergruppen-Buttons + Feld für Untergruppe
-            this.lastMainCategory = address.mainCategory;
-            this.lastGroupPath = address.groupPath || [];
-            if (container && window.questionManager && window.questionManager.getNestedGroups) {
-                const subgroups = window.questionManager.getNestedGroups(address.mainCategory, address.groupPath || []);
-                if (Array.isArray(subgroups)) {
-                    subgroups.forEach(subgroup => {
-                        const btn = document.createElement('button');
-                        btn.className = 'btn btn-secondary m-1';
-                        btn.textContent = subgroup.name;
-                        btn.onclick = () => {
-                            // Noch tiefere Ebenen möglich? Dann erweitern
-                            this.goToAddress({ level: 2, mainCategory: address.mainCategory, groupPath: [...(address.groupPath || []), subgroup.name] });
-                        };
-                        container.appendChild(btn);
-                    });
-                }
-            }
-            if (subUI) {
-                subUI.style.display = 'flex';
-                const row = subUI.querySelector('.row');
-                if (row) row.style.display = '';
-            }
-        }
-    }
-
-    getPreviousAddress() {
-        const addr = this.currentAddress || { level: 0 };
-        if (typeof addr.level !== 'number') return { level: 0 };
-        if (addr.level === 3) {
-            return { level: 2, mainCategory: addr.mainCategory, groupPath: addr.groupPath };
-        } else if (addr.level === 2) {
-            return { level: 1 };
-        } else if (addr.level === 1) {
-            return { level: 0 };
-        } else {
-            // Von Ebene 0 zurück: Hauptmenü anzeigen
-            return null;
-        }
-    }
 }
 
 // ========== HILFSFUNKTIONEN ==========
-// Methode global verfügbar machen
-window.renderMainCategories = function() { window.app.renderMainCategories(); };
-
-// showPage global verfügbar machen (wichtig für HTML-Onclick)
-window.showPage = showPage;
 // LernApp-Instanz global verfügbar machen
-window.app = new LernApp();
+window.LernApp = new LernApp();
