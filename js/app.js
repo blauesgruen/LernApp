@@ -136,7 +136,7 @@ class LernApp {
     // Admin: User-Details anzeigen
     async adminShowUserData(username) {
         if (!username || !this.users[username]) {
-            this.showAlert('Benutzer nicht gefunden!', 'danger');
+            window.showAlert('Benutzer nicht gefunden!', 'danger');
             return;
         }
         const user = this.users[username];
@@ -160,18 +160,18 @@ class LernApp {
     // Admin: Passwort zurücksetzen
     async adminResetPassword(username) {
         if (!username || !this.users[username]) {
-            this.showAlert('Benutzer nicht gefunden!', 'danger');
+            window.showAlert('Benutzer nicht gefunden!', 'danger');
             return;
         }
         const newPassword = prompt(`Neues Passwort für "${username}" eingeben:`);
         if (!newPassword || newPassword.length < 6) {
-            this.showAlert('Passwort muss mindestens 6 Zeichen lang sein!', 'danger');
+            window.showAlert('Passwort muss mindestens 6 Zeichen lang sein!', 'danger');
             return;
         }
         this.users[username].password = this.hashPassword(newPassword);
         await this.saveToStorage('users', this.users, true);
         localStorage.setItem(`lernapp_user_${username}`, JSON.stringify(this.users[username]));
-        this.showAlert(`Passwort für "${username}" wurde geändert.`, 'success');
+        window.showAlert(`Passwort für "${username}" wurde geändert.`, 'success');
     }
     // Platzhalter: Zeigt die Liste der Benutzer im Admin-Bereich an
     async renderAdminUsersList() {
@@ -615,7 +615,20 @@ class LernApp {
         // Fügt im Profilbereich einen Button zum Cloud-Verzeichnis wählen/ändern ein
         const container = document.getElementById('profile-cloud-btn-container');
         if (!container) return;
-        container.innerHTML = `<button class="btn btn-outline-primary" id="profile-cloud-btn"><i class="bi bi-hdd-network"></i> Cloud-Verzeichnis wählen/ändern</button>`;
+        container.classList.add('mt-3'); // Abstand nach oben
+        // Button + Verzeichnisanzeige
+        let dirText = '';
+        if (window.lernappCloudStorage && window.lernappCloudStorage.dirHandle && window.lernappCloudStorage.dirHandle.name) {
+            dirText = `<div class="mt-2 text-muted small">Aktuelles Verzeichnis: <strong>${window.lernappCloudStorage.dirHandle.name}</strong></div>`;
+        } else {
+            dirText = `<div class="mt-2 text-muted small">Kein Cloud-Verzeichnis gewählt.</div>`;
+        }
+        container.innerHTML = `
+            <button class="btn btn-outline-primary mb-2" id="profile-cloud-btn">
+                <i class="bi bi-hdd-network"></i> Cloud-Verzeichnis wählen/ändern
+            </button>
+            ${dirText}
+        `;
         document.getElementById('profile-cloud-btn').onclick = () => this.enableCloudMode();
     }
 
@@ -757,7 +770,7 @@ class LernApp {
         this.renderCategoriesList();
         this.renderQuestionsList();
 
-        this.showAlert(`Import erfolgreich! ${importedCategories} Kategorien und ${importedQuestions} Fragen importiert.`, 'success');
+        window.showAlert(`Import erfolgreich! ${importedCategories} Kategorien und ${importedQuestions} Fragen importiert.`, 'success');
         this.cancelImport();
     }
 
@@ -805,7 +818,7 @@ class LernApp {
             delete this.sharedData[code];
             this.saveToStorage('shared_data', this.sharedData, true);
             this.updateSharedContentList();
-            this.showAlert('Geteilter Inhalt gelöscht!', 'success');
+            window.showAlert('Geteilter Inhalt gelöscht!', 'success');
         }
     }
 
@@ -833,7 +846,7 @@ class LernApp {
 
     exportUserData() {
         if (this.isDemo) {
-            this.showAlert('Demo-Daten können nicht exportiert werden!', 'warning');
+            window.showAlert('Demo-Daten können nicht exportiert werden!', 'warning');
             return;
         }
 
@@ -854,12 +867,12 @@ class LernApp {
         link.download = `lernapp-export-${this.currentUser}-${new Date().toISOString().split('T')[0]}.json`;
         link.click();
 
-        this.showAlert('Daten erfolgreich exportiert!', 'success');
+        window.showAlert('Daten erfolgreich exportiert!', 'success');
     }
 
     resetUserData() {
         if (this.isDemo) {
-            this.showAlert('Demo-Daten können nicht zurückgesetzt werden!', 'warning');
+            window.showAlert('Demo-Daten können nicht zurückgesetzt werden!', 'warning');
             return;
         }
 
@@ -875,7 +888,7 @@ class LernApp {
                 this.renderQuestionsList();
                 this.renderStatistics();
 
-                this.showAlert('Alle Daten wurden zurückgesetzt!', 'success');
+                window.showAlert('Alle Daten wurden zurückgesetzt!', 'success');
             }
         }
     }
@@ -1113,7 +1126,7 @@ class LernApp {
             return true;
         } catch (error) {
             console.error('Datenvalidierung fehlgeschlagen:', error);
-            this.showAlert('Fehler bei der Datenvalidierung. Daten werden zurückgesetzt.', 'warning');
+            window.showAlert('Fehler bei der Datenvalidierung. Daten werden zurückgesetzt.', 'warning');
             
             // Daten zurücksetzen
             this.categories = ['textfragen', 'bilderquiz', 'demo-ketegorie'];
@@ -1307,7 +1320,7 @@ class LernApp {
             try {
                 await cloudStorage.saveData(dbData);
             } catch (e) {
-                this.showAlert('Fehler beim Speichern im Cloud-Verzeichnis!', 'danger');
+                window.showAlert('Fehler beim Speichern im Cloud-Verzeichnis!', 'danger');
                 console.error(e);
             }
             return;
@@ -1327,7 +1340,7 @@ class LernApp {
             localStorage.setItem(`lernapp_${key}`, jsonData);
         } catch (error) {
             console.error('Fehler beim Speichern der Daten (Fallback):', error);
-            this.showAlert('Fehler beim Speichern der Daten!', 'danger');
+            window.showAlert('Fehler beim Speichern der Daten!', 'danger');
         }
     }
 
@@ -1336,7 +1349,9 @@ class LernApp {
         const dirHandle = await cloudStorage.chooseDirectory();
         if (dirHandle) {
             this.isCloudMode = true;
-            this.showAlert('Cloud-Verzeichnis erfolgreich gewählt!', 'success');
+            window.lernappCloudStorage = window.lernappCloudStorage || {};
+            window.lernappCloudStorage.dirHandle = dirHandle;
+            window.showAlert('Cloud-Verzeichnis erfolgreich gewählt!', 'success');
             // Optional: Daten aus Cloud laden
             const cloudData = await cloudStorage.loadData();
             if (cloudData) {
@@ -1350,6 +1365,8 @@ class LernApp {
                 this.renderQuestionsList();
                 this.renderStatistics();
             }
+            // Anzeige aktualisieren
+            this.renderProfileCloudButton();
         }
     }
 }

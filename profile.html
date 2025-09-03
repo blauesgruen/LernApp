@@ -69,6 +69,10 @@
                 window.location.replace('home.html');
             }
         });
+        // Cloud-Verzeichnis-Button im Profil rendern
+        if (window.app && typeof window.app.renderProfileCloudButton === 'function') {
+            window.app.renderProfileCloudButton();
+        }
     });
     </script>
 </body>
