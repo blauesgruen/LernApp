@@ -10,6 +10,8 @@
     <script src="js/log.js"></script>
     <script src="js/utils.js"></script>
     <script src="js/ui.js"></script>
+    <script src="js/local-cloud-storage.js"></script>
+    <script src="js/app-extensions.js"></script>
 </head>
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
@@ -91,25 +93,18 @@
     <script src="js/app.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // Admin-Login nur anzeigen, wenn kein Admin eingeloggt ist
             const adminAccess = sessionStorage.getItem('lernapp_admin_access');
             const loginArea = document.getElementById('admin-login-area');
             const contentArea = document.getElementById('admin-content-area');
             if (!adminAccess) {
-                loginArea.innerHTML = '<div class="alert alert-info text-center"><strong>Admin-Login erforderlich!</strong><br><button class="btn btn-warning mt-2" id="admin-login-btn">Als Admin einloggen</button></div>';
-                setTimeout(function() {
-                    var btn = document.getElementById('admin-login-btn');
-                    if (btn) {
-                        btn.onclick = function() {
-                            if (window.app && typeof window.app.showAdminLogin === 'function') {
-                                window.app.showAdminLogin();
-                            } else {
-                                alert('Admin-Login-Funktion nicht verfügbar!');
-                            }
-                        };
-                    }
-                }, 0);
+                // Direkt das Admin-Login-Modal anzeigen
+                if (window.app && typeof window.app.showAdminLogin === 'function') {
+                    window.app.showAdminLogin();
+                } else if (window.LernApp && typeof window.LernApp.showAdminLogin === 'function') {
+                    window.LernApp.showAdminLogin();
+                }
                 contentArea.style.display = 'none';
+                loginArea.innerHTML = '';
             } else {
                 loginArea.innerHTML = '<div class="text-end mb-3"><button class="btn btn-danger" id="admin-logout-btn"><i class="bi bi-box-arrow-right me-1"></i>Admin Logout</button></div>';
                 contentArea.style.display = 'block';
@@ -118,14 +113,14 @@
                     if (btn) {
                         btn.onclick = function() {
                             sessionStorage.removeItem('lernapp_admin_access');
-                            window.location.reload();
+                            window.location.href = 'home.html';
                         };
                     }
                 }, 0);
-                    // Userliste im Admin-Bereich anzeigen
-                    if (window.app && typeof window.app.renderAdminUsersList === 'function') {
-                        window.app.renderAdminUsersList();
-                    }
+                // Userliste im Admin-Bereich anzeigen
+                if (window.app && typeof window.app.renderAdminUsersList === 'function') {
+                    window.app.renderAdminUsersList();
+                }
             }
         });
     </script>

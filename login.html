@@ -22,7 +22,7 @@
             <a class="navbar-brand" href="home.html">LernApp</a>
         </div>
     </nav>
-    <main class="container">
+    <main class="container" id="login-main">
         <div class="row justify-content-center">
             <div class="col-md-6">
                 <div class="card">
@@ -42,11 +42,18 @@
                         <div class="mt-3 text-center">
                             <a href="register.html">Noch kein Konto? Jetzt registrieren!</a>
                         </div>
+                        <hr>
+                        <div class="mt-3 text-center">
+                            <button class="btn btn-warning" id="admin-login-btn" type="button">
+                                <i class="bi bi-shield-lock"></i> Admin-Login
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </main>
+    <div id="login-overlay" style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:#fff;z-index:9999;display:none"></div>
     <script src="js/ui.js"></script>
     <script src="js/app.js"></script>
     <script>
@@ -57,12 +64,43 @@
                 document.getElementById('login-username').disabled = true;
                 document.getElementById('login-password').disabled = true;
                 document.querySelector('#login-form button[type="submit"]').disabled = true;
-                showAlert('Solange der Admin eingeloggt ist, kann sich kein Nutzer anmelden.', 'danger');
+                // Nur roten Button für Admin-Logout anzeigen, kein gelbes Feld
+                if (!document.getElementById('admin-logout-btn')) {
+                    const btn = document.createElement('button');
+                    btn.id = 'admin-logout-btn';
+                    btn.className = 'btn btn-danger btn-sm w-100 mt-3';
+                    btn.textContent = 'Admin abmelden';
+                    btn.onclick = function() { window.app.logoutAdmin(); };
+                    document.getElementById('login-form').appendChild(btn);
+                }
+            } else {
+                // Entferne Admin-Logout-Button falls vorhanden
+                const logoutBtn = document.getElementById('admin-logout-btn');
+                if (logoutBtn) logoutBtn.remove();
             }
         });
         document.getElementById('login-form').addEventListener('submit', function(e) {
             window.LernApp.loginUser(e);
         });
+        // Admin-Login-Button aktivieren
+        document.getElementById('admin-login-btn').addEventListener('click', function() {
+            if (window.LernApp && typeof window.LernApp.showAdminLogin === 'function') {
+                window.LernApp.showAdminLogin();
+            } else {
+                alert('Admin-Login-Funktion nicht verfügbar!');
+            }
+        });
+        // Entferne den gelben Admin-Login-Button
+        const adminLoginBtn = document.getElementById('admin-login-btn');
+        if (adminLoginBtn) adminLoginBtn.style.display = 'none';
+
+        // Weiterleitung nach erfolgreichem Admin-Login
+        if (sessionStorage.getItem('lernapp_admin_access')) {
+            document.getElementById('login-overlay').style.display = 'block';
+            window.location.href = 'admin.html';
+        } else {
+            document.getElementById('login-overlay').style.display = 'none';
+        }
     </script>
 </body>
 </html>

@@ -1,3 +1,7 @@
+// Globale Alert-Funktion für die gesamte App
+window.showAlert = window.showAlert || function(msg, type = 'info') {
+    alert(msg);
+};
 // === DEBUG-LOGGING: Storage und Redirects ===
 (function() {
     // Logge alle Storage-Keys nach jedem Seitenaufruf
@@ -13,6 +17,16 @@
 })();
 
 class LernApp {
+    // Lädt die Userliste aus dem Storage (z.B. beim Seitenstart)
+    async reloadUsersFromStorage() {
+        let users = await this.loadFromStorage('users', true);
+        if (!users) users = {};
+        this.users = users;
+    }
+    // Dummy-Methode, damit kein Fehler mehr kommt
+    switchAuthMode(mode) {
+        // Hier kann später die Logik für den Wechsel zwischen Login/Registrierung ergänzt werden
+    }
     // Zeigt einen einfachen Dialog zur Speicherort-Auswahl beim ersten Login
     async showStorageLocationDialogIfNeeded() {
         const user = this.users[this.currentUser];
@@ -231,12 +245,25 @@ class LernApp {
     disableUserLoginIfAdmin() {
         const loginForm = document.getElementById('login-form');
         const loginBtn = document.getElementById('login-btn');
+        const adminInfo = document.getElementById('admin-login-info');
+        const adminAlert = document.getElementById('admin-login-alert');
         if (sessionStorage.getItem('lernapp_admin_access')) {
             if (loginForm) loginForm.querySelectorAll('input,button').forEach(el => el.disabled = true);
             if (loginBtn) loginBtn.disabled = true;
+            // Entferne die rote Alert-Meldung, falls vorhanden
+            if (adminAlert) adminAlert.remove();
+            // Zeige die gelbe Info mit Admin-Logout-Button
+            if (!adminInfo && loginForm) {
+                const infoDiv = document.createElement('div');
+                infoDiv.id = 'admin-login-info';
+                infoDiv.className = 'alert alert-warning mt-3';
+                infoDiv.innerHTML = 'Admin ist eingeloggt. <button class="btn btn-danger btn-sm ms-2" onclick="window.app.logoutAdmin()">Admin abmelden</button>';
+                loginForm.appendChild(infoDiv);
+            }
         } else {
             if (loginForm) loginForm.querySelectorAll('input,button').forEach(el => el.disabled = false);
             if (loginBtn) loginBtn.disabled = false;
+            if (adminInfo) adminInfo.remove();
         }
     }
 
@@ -252,9 +279,7 @@ class LernApp {
         const displayName = document.getElementById('register-display-name').value.trim();
 
         // 1. Userliste frisch laden
-        let users = await this.loadFromStorage('users', true);
-        if (!users) users = {};
-        this.users = users;
+        await this.reloadUsersFromStorage();
 
         // Debug-Ausgaben: Userliste und localStorage vor dem Anlegen
         console.log('[LernApp][registerUser] users vor Validierung:', JSON.stringify(this.users));
@@ -263,68 +288,43 @@ class LernApp {
         // Validierung
         if (username.length < 3 || username.length > 20) {
             showAlert('Benutzername muss zwischen 3 und 20 Zeichen lang sein!', 'danger');
-            return;
+            return false;
         }
+        if (!/^[a-zA-Z0-9]+$/.test(username)) {
+            showAlert('Benutzername darf nur Buchstaben und Zahlen enthalten!', 'danger');
+            return false;
+        }
+        if (password.length < 6) {
+            showAlert('Passwort muss mindestens 6 Zeichen lang sein!', 'danger');
+            return false;
+        }
+        if (password !== confirmPassword) {
+            showAlert('Passwörter stimmen nicht überein!', 'danger');
+            return false;
+        }
+
         if (!/^[a-zA-Z0-9]+$/.test(username)) {
             showAlert('Benutzername darf nur Buchstaben und Zahlen enthalten!', 'danger');
             return;
         }
+
         if (password.length < 6) {
             showAlert('Passwort muss mindestens 6 Zeichen lang sein!', 'danger');
             return;
         }
+
         if (password !== confirmPassword) {
             showAlert('Passwörter stimmen nicht überein!', 'danger');
             return;
         }
 
-        if (!/^[a-zA-Z0-9]+$/.test(username)) {
-            showAlert('Benutzername darf nur Buchstaben und Zahlen enthalten!', 'danger');
-            return;
+        // 2. Altlasten entfernen: Nur den einzelnen Nutzer aus localStorage und Userliste entfernen
+        // Vor dem Entfernen prüfen, ob der Nutzer wirklich existiert
+        if (this.users[username]) {
+            showAlert('Benutzername existiert bereits! Bitte wählen Sie einen anderen Namen.', 'danger');
+            return false;
         }
-
-        if (password.length < 6) {
-            showAlert('Passwort muss mindestens 6 Zeichen lang sein!', 'danger');
-            return;
-        }
-
-        if (password !== confirmPassword) {
-            showAlert('Passwörter stimmen nicht überein!', 'danger');
-            return;
-        }
-
-        // 2. Altlasten entfernen
         localStorage.removeItem(`lernapp_user_${username}`);
-        localStorage.removeItem(`lernapp_user_${username}_categories`);
-        localStorage.removeItem(`lernapp_user_${username}_questions`);
-        localStorage.removeItem(`lernapp_user_${username}_statistics`);
-        // Zusätzlich: Alle lokalen Storage-Keys, die den Usernamen enthalten, entfernen (Altlasten!)
-        const userKeyRegex = new RegExp(`(^|[_-])${username}([_-]|$)`, 'i');
-        Object.keys(localStorage).forEach(key => {
-            if (userKeyRegex.test(key)) {
-                localStorage.removeItem(key);
-            }
-        });
-        // Auch aus dem zentralen User-Objekt entfernen (falls noch vorhanden)
-        if (this.users[username]) {
-            delete this.users[username];
-            await this.saveToStorage('users', this.users, true);
-        }
-
-        // 3. Userliste erneut frisch laden (nach Cleanup!)
-        users = await this.loadFromStorage('users', true);
-        if (!users) users = {};
-        this.users = users;
-
-        // Debug-Ausgaben nach Cleanup
-        console.log('[LernApp][registerUser] users nach Cleanup:', JSON.stringify(this.users));
-        console.log('[LernApp][registerUser] localStorage nach Cleanup:', Object.keys(localStorage).filter(k => k.includes(username)));
-
-        // 4. Jetzt erst prüfen, ob User existiert
-        if (this.users[username]) {
-            showAlert('Benutzername existiert noch im System! Bitte Seite neu laden oder anderen Namen wählen.', 'danger');
-            return;
-        }
 
         // Benutzer erstellen (zentralisiert)
         const newUser = {
@@ -348,12 +348,17 @@ class LernApp {
         console.log('[LernApp][registerUser] users nach Anlegen:', JSON.stringify(this.users));
         console.log('[LernApp][registerUser] localStorage nach Anlegen:', Object.keys(localStorage).filter(k => k.includes(username)));
 
-    showAlert('Registrierung erfolgreich! Sie können sich jetzt anmelden.', 'success');
+        showAlert('Registrierung erfolgreich! Sie können sich jetzt anmelden.', 'success');
         this.switchAuthMode('login');
-        // Login-Formular leeren, dann Username setzen
-        document.getElementById('login-username').value = '';
-        document.getElementById('login-password').value = '';
-        setTimeout(() => { document.getElementById('login-username').value = username; }, 50);
+        // Login-Formular leeren, dann Username setzen (nur falls Element existiert)
+        const loginUserElem = document.getElementById('login-username');
+        const loginPassElem = document.getElementById('login-password');
+        if (loginUserElem) loginUserElem.value = '';
+        if (loginPassElem) loginPassElem.value = '';
+        setTimeout(() => {
+            if (loginUserElem) loginUserElem.value = username;
+        }, 50);
+        return true;
     }
 
     async loginUser(event) {
@@ -370,6 +375,8 @@ class LernApp {
         }
         const username = document.getElementById('login-username').value.trim();
         const password = document.getElementById('login-password').value;
+        // Userliste vor Login frisch laden
+        await this.reloadUsersFromStorage();
         // Prüfe, ob User in zentraler Userliste existiert
         if (!this.users[username]) {
             showAlert('Benutzername nicht gefunden!', 'danger');
@@ -939,7 +946,6 @@ class LernApp {
             sessionStorage.removeItem('lernapp_demo_mode');
             this.updateUIForLoginState();
             sessionStorage.setItem('lernapp_admin_access', 'granted');
-            window.showAlert('Admin-Anmeldung erfolgreich!', 'success');
 
             // Modal schließen und aus dem DOM entfernen
             const modalElem = document.getElementById('adminLoginModal');
@@ -971,8 +977,7 @@ class LernApp {
         if (confirm('Möchten Sie sich als Admin abmelden?')) {
             sessionStorage.removeItem('lernapp_admin_access');
             this.hideAdminInterface();
-            this.showAlert('Admin-Abmeldung erfolgreich!', 'success');
-            showPage('home');
+            window.location.href = 'home.html';
             this.disableUserLoginIfAdmin(); // Login sofort wieder aktivieren
         }
     }
@@ -1170,6 +1175,7 @@ class LernApp {
     }
 
     // Lokaler Speicher mit Verschlüsselung
+    async
     async loadFromStorage(key) {
         // Zentrale Storage-Utility nutzen
         try {
@@ -1832,7 +1838,8 @@ class LernApp {
         console.log('submitAnswer aufgerufen');
         
         const question = this.currentQuiz.questions[this.currentQuiz.currentIndex];
-        const selectedIndex = this.currentQuiz.selectedAnswerIndex;
+               const selectedIndex = this.currentQuiz.selectedAnswerIndex;
+        
         
         console.log('Aktueller selectedIndex:', selectedIndex);
         console.log('Korrekte Antwort:', question.correctAnswerIndex);
@@ -2232,3 +2239,4 @@ class LernApp {
 // ========== HILFSFUNKTIONEN ==========
 // LernApp-Instanz global verfügbar machen
 window.LernApp = new LernApp();
+window.app = window.LernApp;

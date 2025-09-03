@@ -55,11 +55,13 @@
             if (form && window.LernApp && typeof window.LernApp.registerUser === 'function') {
                 form.addEventListener('submit', async function(e) {
                     try {
-                        await window.LernApp.registerUser(e);
-                        // Nach erfolgreicher Registrierung (Success-Alert) weiterleiten
-                        setTimeout(function() {
-                            window.location.href = 'login.html';
-                        }, 1200);
+                        const result = await window.LernApp.registerUser(e);
+                        if (result === true) {
+                            setTimeout(function() {
+                                window.location.href = 'login.html';
+                            }, 800);
+                        }
+                        // Bei Fehler keine Weiterleitung
                     } catch (err) {
                         console.error('Fehler bei Registrierung:', err);
                         alert('Fehler bei der Registrierung! Details siehe Konsole.');

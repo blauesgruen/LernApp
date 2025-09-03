@@ -38,14 +38,15 @@
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
+                    <li class="nav-item guest-only"><a class="nav-link" href="register.html">Registrieren</a></li>
+                    <li class="nav-item guest-only"><a class="nav-link" href="login.html">Login</a></li>
+                    <li class="nav-item guest-only"><a class="nav-link" href="admin.html">Admin</a></li>
                     <li class="nav-item user-only" style="display:none"><a class="nav-link" href="dashboard.html">Dashboard</a></li>
-                    <li class="nav-item"><a class="nav-link" href="quiz.html">Quiz</a></li>
-                    <li class="nav-item"><a class="nav-link" href="sharing.html">Teilen</a></li>
-                    <li class="nav-item"><a class="nav-link" href="stats.html">Statistiken</a></li>
-                    <li class="nav-item" id="admin-nav-item"><a class="nav-link" href="admin.html">Admin</a></li>
-                    <li class="nav-item"><a class="nav-link" href="profile.html">Profil</a></li>
-                    <li class="nav-item"><a class="nav-link" href="login.html">Login</a></li>
-                    <li class="nav-item"><a class="nav-link" href="register.html">Registrieren</a></li>
+                    <li class="nav-item user-only" style="display:none"><a class="nav-link" href="quiz.html">Quiz</a></li>
+                    <li class="nav-item user-only" style="display:none"><a class="nav-link" href="sharing.html">Teilen</a></li>
+                    <li class="nav-item user-only" style="display:none"><a class="nav-link" href="stats.html">Statistiken</a></li>
+                    <li class="nav-item user-only" style="display:none" id="admin-nav-item"><a class="nav-link" href="admin.html">Admin</a></li>
+                    <li class="nav-item user-only" style="display:none"><a class="nav-link" href="profile.html">Profil</a></li>
                 </ul>
             </div>
         </div>
@@ -72,19 +73,19 @@
                             <div class="card h-100">
                                 <div class="card-body text-center">
                                     <i class="bi bi-box-arrow-in-right text-success fs-1 mb-3"></i>
-                                    <h5 class="card-title">Anmelden</h5>
+                                    <h5 class="card-title">Login</h5>
                                     <p class="card-text">Melden Sie sich mit Ihrem bestehenden Konto an</p>
-                                    <a class="btn btn-success" href="login.html">Anmelden</a>
+                                    <a class="btn btn-success" href="login.html">Login</a>
                                 </div>
                             </div>
                         </div>
                         <div class="col-md-4">
                             <div class="card h-100">
                                 <div class="card-body text-center">
-                                    <i class="bi bi-play-circle text-info fs-1 mb-3"></i>
-                                    <h5 class="card-title">Demo-Modus</h5>
-                                    <p class="card-text">Testen Sie die App ohne Anmeldung</p>
-                                    <a class="btn btn-info" href="quiz.html">Demo starten</a>
+                                    <i class="bi bi-shield-lock text-warning fs-1 mb-3"></i>
+                                    <h5 class="card-title">Admin</h5>
+                                    <p class="card-text">Admin-Bereich für Verwaltung</p>
+                                    <a class="btn btn-warning" href="admin.html">Admin</a>
                                 </div>
                             </div>
                         </div>
@@ -95,5 +96,20 @@
         <!-- Dashboard für eingeloggte Benutzer -->
     <!-- Dashboard für eingeloggte Benutzer ist ausgelagert -->
     </div>
+    <script>
+            function updateMenuVisibility() {
+                const isLoggedIn = sessionStorage.getItem('lernapp_current_user') || sessionStorage.getItem('lernapp_admin_access');
+                document.querySelectorAll('.guest-only').forEach(el => {
+                    el.style.display = isLoggedIn ? 'none' : 'block';
+                });
+                document.querySelectorAll('.user-only').forEach(el => {
+                    el.style.display = isLoggedIn ? 'block' : 'none';
+                });
+                // Hauptmenü für Gäste sichtbar
+                document.getElementById('guest-welcome').style.display = isLoggedIn ? 'none' : 'block';
+            }
+            window.addEventListener('DOMContentLoaded', updateMenuVisibility);
+            window.addEventListener('storage', updateMenuVisibility);
+        </script>
 </body>
 </html>

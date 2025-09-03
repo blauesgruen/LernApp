@@ -1,5 +1,10 @@
 
 // Gibt einen Hinweistext zum aktuellen Cloud-Speicherstatus zurück
+// Globale Alert-Funktion für die gesamte App
+window.showAlert = function(msg, type = 'info') {
+    // Einfache Bootstrap-Alert-Integration möglich, hier als Fallback:
+    alert(msg);
+};
 function getCloudHint() {
     if (window.lernappCloudStorage && window.lernappCloudStorage.dirHandle) {
         return 'Cloud-Speicher ist aktiv: ' + window.lernappCloudStorage.dirHandle.name;
@@ -399,16 +404,31 @@ window.lernappCloudStorage = new LocalCloudStorage();
 
 // UI: Speicherort wählen
 window.chooseLernAppStorageDir = async function() {
-    if (!window.lernappCloudStorage) {
-        window.lernappCloudStorage = new LocalCloudStorage();
+    // File System Access API prüfen
+    if (!window.showDirectoryPicker) {
+        alert('Ihr Browser unterstützt keine Ordnerauswahl (File System Access API). Bitte Chrome oder Edge verwenden.');
+        return;
     }
-    if (typeof window.lernappCloudStorage.chooseDirectory === 'function') {
-        const ok = await window.lernappCloudStorage.chooseDirectory();
-        if (ok) {
-            alert('Speicherort gewählt! Ihre Daten werden ab sofort dort gespeichert.\n' + getCloudHint());
+    try {
+        const dirHandle = await window.showDirectoryPicker();
+        if (!dirHandle) {
+            alert('Kein Ordner ausgewählt.');
+            return;
         }
-    } else {
-        alert('Speicherfunktion nicht verfügbar.');
+        window.lernappCloudStorage.dirHandle = dirHandle;
+        // Im lokalen Storage speichern
+        localStorage.setItem('lernapp_dir', dirHandle.name);
+        let info = 'Speicherort gewählt: ' + dirHandle.name;
+        if (/dropbox/i.test(dirHandle.name)) {
+            info += '\nHinweis: Sie haben einen Dropbox-Ordner gewählt. Die Daten werden dort synchronisiert.';
+        }
+        alert(info);
+        // Optional: Zeige den aktuellen Ordner im UI an
+        if (document.getElementById('current-storage-dir')) {
+            document.getElementById('current-storage-dir').textContent = dirHandle.name;
+        }
+    } catch (e) {
+        alert('Fehler bei der Ordnerauswahl: ' + e.message);
     }
 };
 
