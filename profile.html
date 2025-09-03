@@ -10,6 +10,7 @@
     <script src="js/log.js"></script>
     <script src="js/utils.js"></script>
     <script src="js/ui.js"></script>
+    <script type="module" src="js/app.js"></script>
 </head>
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
@@ -25,7 +26,7 @@
             <div class="col-md-6">
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <h2><i class="bi bi-person-gear me-2"></i>Profil</h2>
-                    <a class="btn btn-secondary" href="home.html">
+                    <a class="btn btn-secondary" id="back-to-main" href="#">
                         <i class="bi bi-house-fill me-2"></i>Zurück
                     </a>
                 </div>
@@ -51,10 +52,24 @@
                             </div>
                             <button type="submit" class="btn btn-primary">Speichern</button>
                         </form>
+                        <div id="profile-cloud-btn-container" class="mb-3"></div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const btn = document.getElementById('back-to-main');
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            if (sessionStorage.getItem('lernapp_current_user')) {
+                window.location.replace('dashboard.html');
+            } else {
+                window.location.replace('home.html');
+            }
+        });
+    });
+    </script>
 </body>
 </html>

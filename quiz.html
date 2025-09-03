@@ -25,7 +25,7 @@
             <div class="col-md-8 mx-auto">
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <h2>Quiz</h2>
-                        <a class="btn btn-secondary" href="home.html">
+                        <a class="btn btn-secondary" id="back-to-main" href="#">
                             <i class="bi bi-house-fill me-2"></i>Zurück
                         </a>
                 </div>
@@ -115,5 +115,18 @@
             </div>
         </div>
     </div>
+    <script>
+document.addEventListener('DOMContentLoaded', function() {
+    const btn = document.getElementById('back-to-main');
+    btn.addEventListener('click', function(e) {
+        e.preventDefault();
+        if (sessionStorage.getItem('lernapp_current_user')) {
+            window.location.replace('dashboard.html');
+        } else {
+            window.location.replace('home.html');
+        }
+    });
+});
+</script>
 </body>
 </html>

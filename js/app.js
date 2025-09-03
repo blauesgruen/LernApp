@@ -14,12 +14,15 @@ window.showAlert = window.showAlert || function(msg, type = 'info') {
     console.log('[LernApp][DEBUG] sessionStorage:', Object.keys(sessionStorage));
 
     // Logge alle Redirects
-    const origReplace = window.location.replace;
-    window.location.replace = function(url) {
+    // window.location.replace ist read-only, daher nicht überschreiben!
+    const origReplace = window.location.replace.bind(window.location);
+    window._debugReplace = function(url) {
         console.log('[LernApp][DEBUG] window.location.replace aufgerufen mit:', url, new Error().stack);
-        origReplace.call(window.location, url);
+        origReplace(url);
     };
 })();
+
+import { cloudStorage } from './cloud-storage.js';
 
 class LernApp {
     constructor() {
@@ -52,8 +55,9 @@ class LernApp {
     // Zeigt ein modernes Modal zur Speicherort-Auswahl beim ersten Login
     async showStorageLocationModal(user) {
         return new Promise((resolve) => {
-            // Modal-HTML
-            const modalHtml = `
+            // Modal einfügen
+            if (!document.getElementById('storageLocationModal')) {
+                const modalHtml = `
                 <div class="modal fade" id="storageLocationModal" tabindex="-1">
                     <div class="modal-dialog">
                         <div class="modal-content">
@@ -62,46 +66,29 @@ class LernApp {
                                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                             </div>
                             <div class="modal-body">
-                                <p>Wo möchten Sie Ihre Daten speichern?</p>
+                                <p>Wo sollen Ihre Daten gespeichert werden?</p>
                                 <div class="d-grid gap-2">
-                                    <button id="choose-local" class="btn btn-outline-primary">Lokal (nur auf diesem Gerät)</button>
-                                    <button id="choose-cloud" class="btn btn-outline-success">Cloud (Dateisystem, portabel)</button>
+                                    <button id="choose-local" class="btn btn-outline-secondary">Nur auf diesem Gerät (lokal)</button>
+                                    <button id="choose-cloud" class="btn btn-outline-primary">Cloud/Netzwerk-Verzeichnis wählen</button>
                                 </div>
-                                <div id="storage-modal-info" class="mt-3 text-muted small"></div>
+                                <small class="text-muted d-block mt-3">Cloud: Wählen Sie z.B. ein Dropbox-, OneDrive- oder Netzlaufwerk-Verzeichnis. Ihre Daten werden als Datei gespeichert und können auf anderen Geräten genutzt werden.</small>
                             </div>
                         </div>
                     </div>
-                </div>
-            `;
-            // Modal einfügen
-            if (!document.getElementById('storageLocationModal')) {
+                </div>`;
                 document.body.insertAdjacentHTML('beforeend', modalHtml);
             }
             const modalElem = document.getElementById('storageLocationModal');
             const modal = new bootstrap.Modal(modalElem);
             modal.show();
-            // Button-Handler
             document.getElementById('choose-local').onclick = () => {
                 modal.hide();
-                setTimeout(() => {
-                    modalElem.parentNode.removeChild(modalElem);
-                    document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
-                    document.body.classList.remove('modal-open');
-                    document.body.style.overflow = '';
-                    document.body.style.paddingRight = '';
-                    resolve('local');
-                }, 350);
+                resolve('local');
             };
             document.getElementById('choose-cloud').onclick = async () => {
+                await app.enableCloudMode();
                 modal.hide();
-                setTimeout(() => {
-                    modalElem.parentNode.removeChild(modalElem);
-                    document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
-                    document.body.classList.remove('modal-open');
-                    document.body.style.overflow = '';
-                    document.body.style.paddingRight = '';
-                    resolve('cloud');
-                }, 350);
+                resolve('cloud');
             };
         });
     }
@@ -277,8 +264,8 @@ class LernApp {
             pathname: window.location.pathname,
             sessionStorage: Object.assign({}, sessionStorage)
         });
-        // Gastmodus auf home.html, index.html und login.html erlauben
-        const allowedGuestPages = ['home.html', 'index.html', 'login.html', '/'];
+        // Gastmodus auf home.html, index.html, login.html und register.html erlauben
+        const allowedGuestPages = ['home.html', 'index.html', 'login.html', 'register.html', '/'];
         const currentPath = window.location.pathname.split('/').pop() || '/';
         // --- NEU: Admin-Login-Flow auf admin.html ---
         if (currentPath === 'admin.html') {
@@ -623,7 +610,14 @@ class LernApp {
         document.getElementById('profile-confirm-password').value = '';
     }
 
-
+    // Ergänzung im Profilbereich: Button für Cloud-Verzeichnis
+    renderProfileCloudButton() {
+        // Fügt im Profilbereich einen Button zum Cloud-Verzeichnis wählen/ändern ein
+        const container = document.getElementById('profile-cloud-btn-container');
+        if (!container) return;
+        container.innerHTML = `<button class="btn btn-outline-primary" id="profile-cloud-btn"><i class="bi bi-hdd-network"></i> Cloud-Verzeichnis wählen/ändern</button>`;
+        document.getElementById('profile-cloud-btn').onclick = () => this.enableCloudMode();
+    }
 
     // ==================== DATA SHARING ====================
 
@@ -919,6 +913,7 @@ class LernApp {
     const myQuestionsCountElem = document.getElementById('my-questions-count');
     if (myQuestionsCountElem) myQuestionsCountElem.textContent = this.questions.length;
         this.updateSharedContentList();
+        this.renderProfileCloudButton();
 
         // Last login time + login count (wie im Dashboard oben)
         const lastLoginElement = document.getElementById('last-login-time');
@@ -1300,6 +1295,23 @@ class LernApp {
     }
 
     async saveToStorage(key, data) {
+        if (this.isCloudMode) {
+            // Komplette Datenbank speichern
+            const dbData = {
+                categories: this.categories,
+                questions: this.questions,
+                statistics: this.statistics,
+                users: this.users,
+                currentUser: this.currentUser
+            };
+            try {
+                await cloudStorage.saveData(dbData);
+            } catch (e) {
+                this.showAlert('Fehler beim Speichern im Cloud-Verzeichnis!', 'danger');
+                console.error(e);
+            }
+            return;
+        }
         // Zentrale Storage-Utility nutzen
         try {
             if (window.storage && window.storage.save) {
@@ -1319,1025 +1331,32 @@ class LernApp {
         }
     }
 
-    // Einfache Verschlüsselung (Base64 + XOR)
-    encryptData(data) {
-        const key = 'LernApp2025SecureKey'; // In Produktion: Zufälliger Key pro Session
-        let encrypted = '';
-        
-        for (let i = 0; i < data.length; i++) {
-            encrypted += String.fromCharCode(
-                data.charCodeAt(i) ^ key.charCodeAt(i % key.length)
-            );
-        }
-        
-        return btoa(encrypted); // Base64 kodieren
-    }
-
-    decryptData(encryptedData) {
-        try {
-            const key = 'LernApp2025SecureKey';
-            const encrypted = atob(encryptedData); // Base64 dekodieren
-            let decrypted = '';
-            
-            for (let i = 0; i < encrypted.length; i++) {
-                decrypted += String.fromCharCode(
-                    encrypted.charCodeAt(i) ^ key.charCodeAt(i % key.length)
-                );
+    // Methode zum Umschalten und Initialisieren des Cloud-Modus
+    async enableCloudMode() {
+        const dirHandle = await cloudStorage.chooseDirectory();
+        if (dirHandle) {
+            this.isCloudMode = true;
+            this.showAlert('Cloud-Verzeichnis erfolgreich gewählt!', 'success');
+            // Optional: Daten aus Cloud laden
+            const cloudData = await cloudStorage.loadData();
+            if (cloudData) {
+                // Daten übernehmen
+                this.categories = cloudData.categories || [];
+                this.questions = cloudData.questions || [];
+                this.statistics = cloudData.statistics || { totalQuestions: 0, correctAnswers: 0, categoriesPlayed: {}, lastPlayed: null };
+                this.users = cloudData.users || {};
+                this.currentUser = cloudData.currentUser || null;
+                this.renderCategories();
+                this.renderQuestionsList();
+                this.renderStatistics();
             }
-            
-            return decrypted;
-        } catch (error) {
-            console.error('Entschlüsselung fehlgeschlagen:', error);
-            return null;
         }
-    }
-
-    // Kategorien verwalten
-    addCategory() {
-        const input = document.getElementById('new-category');
-        const categoryName = input.value.trim();
-        
-        if (!categoryName) {
-            this.showAlert('Bitte geben Sie einen Kategorienamen ein!', 'danger');
-            return;
-        }
-
-        if (this.categories.includes(categoryName)) {
-            this.showAlert('Diese Kategorie existiert bereits!', 'warning');
-            return;
-        }
-
-        this.categories.push(categoryName);
-        this.saveToStorage('categories', this.categories);
-        this.updateCategorySelects();
-        this.renderCategoriesList();
-        
-        input.value = '';
-        this.showAlert('Kategorie erfolgreich hinzugefügt!', 'success');
-    }
-
-    deleteCategory(categoryName) {
-    // Keine gesperrten Kategorien mehr
-
-        if (confirm(`Möchten Sie die Kategorie "${categoryName}" wirklich löschen? Alle zugehörigen Fragen werden ebenfalls gelöscht!`)) {
-            // Kategorie entfernen
-            this.categories = this.categories.filter(cat => cat !== categoryName);
-            
-            // Zugehörige Fragen entfernen
-            this.questions = this.questions.filter(q => q.category !== categoryName);
-            
-            // Speichern
-            this.saveToStorage('categories', this.categories);
-            this.saveToStorage('questions', this.questions);
-            
-            // UI aktualisieren
-            this.updateCategorySelects();
-            this.renderCategoriesList();
-            this.renderQuestionsList();
-            
-            this.showAlert('Kategorie erfolgreich gelöscht!', 'success');
-        }
-    }
-
-    updateCategorySelects() {
-        const selects = ['quiz-category', 'question-category', 'filter-category'];
-        
-        selects.forEach(selectId => {
-            const select = document.getElementById(selectId);
-            if (select) {
-                // Aktuellen Wert merken
-                const currentValue = select.value;
-                
-                // Optionen leeren (außer der ersten)
-                while (select.children.length > 1) {
-                    select.removeChild(select.lastChild);
-                }
-                
-                // Neue Optionen hinzufügen
-                this.categories.forEach(category => {
-                    const option = document.createElement('option');
-                    option.value = category;
-                    option.textContent = category;
-                    select.appendChild(option);
-                });
-                
-                // Wert wiederherstellen
-                if (currentValue) {
-                    select.value = currentValue;
-                }
-            }
-        });
-    }
-
-    // Fragen verwalten (jetzt über questionManager)
-    addQuestion() {
-        const form = document.getElementById('question-form');
-        const mainCategory = document.getElementById('question-main-category')?.value || 'Textfragen';
-        const group = document.getElementById('question-category').value;
-        const questionText = document.getElementById('question-input').value.trim();
-        const answerType = document.querySelector('input[name="answer-type"]:checked').value;
-        const answerText = document.getElementById('answer-input').value.trim();
-        const sharedImageInput = document.getElementById('shared-image-input');
-        const answerImageInput = document.getElementById('answer-image-input') || document.getElementById('default-answer-image-input');
-        const descriptionInput = document.getElementById('ordnezu-description-input');
-
-        // Validierung
-        if (!group) {
-            this.showAlert('Bitte wählen Sie eine Gruppe/Kategorie!', 'danger');
-            return;
-        }
-        if (!questionText && !sharedImageInput.files[0]) {
-            this.showAlert('Bitte geben Sie eine Frage ein oder laden Sie ein Frage-Bild hoch!', 'danger');
-            return;
-        }
-        if (answerType === 'text' && !answerText) {
-            this.showAlert('Bitte geben Sie eine Antwort ein!', 'danger');
-            return;
-        }
-        if (answerType === 'image' && !answerImageInput.files[0]) {
-            this.showAlert('Bitte laden Sie ein Antwort-Bild hoch!', 'danger');
-            return;
-        }
-
-        // Frage-Objekt vorbereiten
-        const newQuestion = {
-            id: Date.now(),
-            mainCategory,
-            group,
-            question: questionText || null,
-            answerType,
-            answer: answerType === 'text' ? answerText : null,
-            questionImage: null,
-            answerImage: null,
-            description: descriptionInput ? descriptionInput.value.trim() : ''
-        };
-
-        // Bilder verarbeiten
-        let imagesToProcess = 0;
-        let imagesProcessed = 0;
-        const checkComplete = () => {
-            imagesProcessed++;
-            if (imagesProcessed === imagesToProcess) {
-                questionManager.addQuestion(newQuestion);
-                this.renderQuestionsList(mainCategory, group);
-                // UI-Reset
-                document.getElementById('question-form').reset();
-                document.getElementById('shared-image-preview').innerHTML = '';
-                document.getElementById('answer-image-preview').innerHTML = '';
-                document.getElementById('text-answer-section').classList.remove('d-none');
-                document.getElementById('image-answer-section').classList.add('d-none');
-                document.getElementById('text-answer').checked = true;
-                this.showAlert('Frage/Antwort erfolgreich hinzugefügt!', 'success');
-            }
-        };
-        // Frage-Bild
-        if (sharedImageInput && sharedImageInput.files[0]) {
-            imagesToProcess++;
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                newQuestion.questionImage = e.target.result;
-                checkComplete();
-            };
-            reader.readAsDataURL(sharedImageInput.files[0]);
-        }
-        // Antwort-Bild
-        if (answerType === 'image' && answerImageInput && answerImageInput.files[0]) {
-            imagesToProcess++;
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                newQuestion.answerImage = e.target.result;
-                checkComplete();
-            };
-            reader.readAsDataURL(answerImageInput.files[0]);
-        }
-        if (imagesToProcess === 0) {
-            questionManager.addQuestion(newQuestion);
-            this.renderQuestionsList(mainCategory, group);
-            document.getElementById('question-form').reset();
-            document.getElementById('shared-image-preview').innerHTML = '';
-            document.getElementById('answer-image-preview').innerHTML = '';
-            document.getElementById('text-answer-section').classList.remove('d-none');
-            document.getElementById('image-answer-section').classList.add('d-none');
-            document.getElementById('text-answer').checked = true;
-            this.showAlert('Frage/Antwort erfolgreich hinzugefügt!', 'success');
-        }
-    }
-
-    // Nicht mehr benötigt, Logik jetzt in addQuestion/questionManager
-    saveQuestion(question) {
-        // entfernt
-    }
-
-    // Fragen löschen jetzt über questionManager
-    deleteQuestion(questionId, mainCategory = null, group = null) {
-        if (confirm('Möchten Sie diese Frage wirklich löschen?')) {
-            questionManager.deleteQuestion(questionId);
-            this.renderQuestionsList(mainCategory, group);
-            this.showAlert('Frage erfolgreich gelöscht!', 'success');
-        }
-    }
-
-    // UI-Rendering
-    // Kategorien-Rendering jetzt über groupManager
-    renderCategories() {
-        const container = document.getElementById('category-buttons');
-        if (!container) return;
-        const mainCategories = ['Textfragen', 'Bilderquiz'];
-        container.innerHTML = mainCategories.map(main => {
-            const groups = groupManager.getGroups(main);
-            return `
-                <div class="mb-2"><strong>${main}</strong></div>
-                <div class="d-flex flex-wrap gap-2 mb-3">
-                    ${groups.map(group => {
-                        const count = questionManager.getQuestions(main, group).length;
-                        return `<button class="btn btn-outline-primary" onclick="window.app.startQuiz('${main}','${group}')">${group} <span class='badge bg-secondary ms-1'>${count}</span></button>`;
-                    }).join('')}
-                </div>
-            `;
-        }).join('');
-    }
-
-    // Gruppen-Rendering jetzt über groupManager
-    renderCategoriesList() {
-        const container = document.getElementById('categories-list');
-        if (!container) return;
-        const mainCategories = ['Textfragen', 'Bilderquiz'];
-        container.innerHTML = mainCategories.map(main => {
-            const groups = groupManager.getGroups(main);
-            return `
-                <div class="mb-2"><strong>${main}</strong></div>
-                <ul class="list-group mb-3">
-                    ${groups.map(group => `<li class="list-group-item d-flex justify-content-between align-items-center">${group}<span class="badge bg-secondary">${questionManager.getQuestions(main, group).length} Fragen</span></li>`).join('')}
-                </ul>
-            `;
-        }).join('');
-    }
-
-    renderQuestionsList() {
-        const container = document.getElementById('questions-list');
-        const filterCategory = document.getElementById('filter-category').value;
-        if (!container) return;
-        let filteredQuestions = this.questions;
-        if (filterCategory) {
-            filteredQuestions = this.questions.filter(q => q.category === filterCategory);
-        }
-        if (filteredQuestions.length === 0) {
-            container.innerHTML = '<p class="text-muted text-center">Keine Fragen vorhanden.</p>';
-            return;
-        }
-        container.innerHTML = filteredQuestions.map(q => {
-            const answerDisplay = q.answerType === 'text' ? 
-                `<strong>Antwort:</strong> ${q.answer}` :
-                `<strong>Antwort:</strong> <span class="badge bg-info">Bild</span>`;
-            const questionDisplay = q.question ? 
-                `<strong>Frage:</strong> ${q.question}` :
-                `<strong>Frage:</strong> <span class="badge bg-info">Bild</span>`;
-            return `
-                <div class="card mb-3">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div class="flex-grow-1">
-                                <h6 class="card-title">
-                                    <span class="badge bg-secondary me-2">${q.category}</span>
-                                    ID: ${q.id}
-                                </h6>
-                                <p class="card-text mb-1">${questionDisplay}</p>
-                                <p class="card-text mb-1">${answerDisplay}</p>
-                                <small class="text-muted">
-                                    Antwort-Typ: ${q.answerType === 'text' ? 'Text' : 'Bild'}
-                                    ${q.questionImage ? ' | Mit Frage-Bild' : ''}
-                                </small>
-                            </div>
-                            <div>
-                                <button class="btn btn-sm btn-outline-primary me-1" onclick="app.showEditQuestionModal(${q.id})"><i class='bi bi-pencil'></i> Bearbeiten</button>
-                                <button class="btn btn-sm btn-outline-danger" onclick="app.deleteQuestion(${q.id})">
-                                    <i class="bi bi-trash"></i>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }).join('');
-    }
-    // Kategorie bearbeiten
-    showEditCategoryModal(category) {
-        const modal = new bootstrap.Modal(document.getElementById('edit-category-modal'));
-        document.getElementById('edit-category-input').value = category;
-        document.getElementById('save-category-edit').onclick = () => {
-            const newName = document.getElementById('edit-category-input').value.trim();
-            if (!newName || this.categories.includes(newName)) {
-                alert('Ungültiger oder bereits vorhandener Kategoriename!');
-                return;
-            }
-            // Kategorie umbenennen
-            this.categories = this.categories.map(cat => cat === category ? newName : cat);
-            this.questions = this.questions.map(q => q.category === category ? { ...q, category: newName } : q);
-            this.saveToStorage('categories', this.categories);
-            this.saveToStorage('questions', this.questions);
-            this.renderCategoriesList();
-            this.renderQuestionsList();
-            this.updateCategorySelects();
-            modal.hide();
-        };
-        modal.show();
-    }
-
-    // Frage bearbeiten (jetzt über questionManager)
-    showEditQuestionModal(id) {
-        const q = questionManager.getQuestionById(id);
-        if (!q) return;
-        const modal = new bootstrap.Modal(document.getElementById('edit-question-modal'));
-        // Felder befüllen
-        document.getElementById('edit-question-input').value = q.question || '';
-        document.getElementById('edit-answer-image-input').value = '';
-        document.getElementById('edit-explanation-input').value = q.description || '';
-        // Kategorie-Auswahl (Gruppe)
-        const select = document.getElementById('edit-category-select');
-        // Hole Gruppen für die Hauptkategorie der Frage
-        const mainCategory = q.mainCategory || 'Textfragen';
-        const groups = groupManager.getGroups(mainCategory);
-        select.innerHTML = groups.map(g => `<option value="${g}"${g === q.group ? ' selected' : ''}>${g}</option>`).join('');
-        // Antwort-Bild
-        const answerImageInput = document.getElementById('edit-answer-image-input');
-        const answerImagePreview = document.getElementById('edit-answer-image-preview');
-        answerImageInput.value = '';
-        if (q.answerImage) {
-            answerImagePreview.innerHTML = `<img src="${q.answerImage}" alt="Antwort-Bild" style="max-width:100px;max-height:100px;">`;
-        } else {
-            answerImagePreview.innerHTML = '';
-        }
-        answerImageInput.onchange = (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = ev => {
-                    answerImagePreview.innerHTML = `<img src="${ev.target.result}" alt="Antwort-Bild" style="max-width:100px;max-height:100px;">`;
-                };
-                reader.readAsDataURL(file);
-            } else {
-                answerImagePreview.innerHTML = '';
-            }
-        };
-        // Speichern-Button
-        document.getElementById('save-question-edit').onclick = () => {
-            const newQ = document.getElementById('edit-question-input').value.trim();
-            const newGroup = select.value;
-            const newDescription = document.getElementById('edit-explanation-input').value.trim();
-            const aImgFile = answerImageInput.files[0];
-            const updateAndSave = (answerImageData = null) => {
-                q.question = newQ;
-                q.group = newGroup;
-                q.description = newDescription;
-                if (answerImageData !== null) q.answerImage = answerImageData;
-                questionManager.updateQuestion(q);
-                this.renderQuestionsList(q.mainCategory, newGroup);
-                modal.hide();
-            };
-            if (aImgFile) {
-                const reader2 = new FileReader();
-                reader2.onload = ev2 => {
-                    updateAndSave(ev2.target.result);
-                };
-                reader2.readAsDataURL(aImgFile);
-            } else {
-                updateAndSave();
-            }
-        };
-        modal.show();
-    }
-
-    // Quiz-Logik: Akzeptiert (category) oder (main, groupPath)
-    startQuiz(mainOrCategory, group) {
-        // Flexible Parameter: (main, groupPath) oder (category)
-        let mainCategory = null;
-        let groupPath = null;
-        if (group !== undefined) {
-            mainCategory = mainOrCategory;
-            groupPath = group;
-        } else {
-            mainCategory = null;
-            groupPath = mainOrCategory;
-        }
-
-        // Logging
-        console.log('[LernApp][startQuiz] mainCategory:', mainCategory, 'groupPath:', groupPath);
-
-        // Fragen holen über questionManager
-        let questions = [];
-        if (mainCategory && groupPath) {
-            // Gruppenpfad als String (z.B. "Unterkategorie 1>Quizfragengruppe 1")
-            const groupPathArr = groupPath.split('>').map(s => s.trim());
-            questions = questionManager.getQuestionsByGroupPath(mainCategory, groupPathArr);
-        } else if (groupPath) {
-            // Fallback: Nur Gruppe (wie bisher)
-            questions = questionManager.getQuestionsByGroup(groupPath);
-        } else {
-            this.showAlert('Bitte wählen Sie eine Kategorie!', 'danger');
-            return;
-        }
-
-        if (!questions || questions.length < 4) {
-            this.showAlert('Diese Kategorie hat weniger als 4 Fragen! Bitte fügen Sie mehr Fragen hinzu.', 'warning');
-            return;
-        }
-
-        // Quiz initialisieren
-        this.currentQuiz = {
-            questions: this.shuffleArray(questions).slice(0, 10), // Max 10 Fragen
-            currentIndex: 0,
-            score: 0,
-            selectedCategory: mainCategory ? `${mainCategory} - ${groupPath}` : groupPath,
-            answers: []
-        };
-
-        // Erste Frage vorbereiten
-        const firstQuestion = this.currentQuiz.questions[0];
-        const multipleChoiceQuestion = this.generateMultipleChoiceQuestion(firstQuestion, questions);
-        if (!multipleChoiceQuestion) {
-            this.showAlert('Nicht genügend Fragen für ein Quiz verfügbar!', 'danger');
-            return;
-        }
-        this.currentQuiz.questions[0] = { ...firstQuestion, ...multipleChoiceQuestion };
-
-        // Zur Quiz-Seite wechseln und Quiz-Container einblenden
-    if (window.app && typeof window.app.goToAddress === 'function') window.app.goToAddress({ level: 0 });
-        document.getElementById('category-selection').classList.add('d-none');
-        document.getElementById('quiz-container').classList.remove('d-none');
-        this.showQuestion();
-    }
-
-    // Generiert eine Multiple-Choice-Frage aus einer Frage/Antwort-Kombination
-    generateMultipleChoiceQuestion(questionData, availableQuestions) {
-        // Normale Multiple-Choice-Frage
-        const categoryQuestions = availableQuestions.filter(q => 
-            q.category === questionData.category && 
-            q.id !== questionData.id &&
-            q.answerType === questionData.answerType // Gleicher Antwort-Typ
-        );
-
-        if (categoryQuestions.length < 3) {
-            return null;
-        }
-
-        // 3 zufällige falsche Antworten auswählen
-        const wrongAnswers = this.shuffleArray(categoryQuestions)
-            .slice(0, 3)
-            .map(q => ({
-                text: questionData.answerType === 'text' ? q.answer : null,
-                image: questionData.answerType === 'image' ? q.answerImage : null,
-                isCorrect: false
-            }));
-
-        // Korrekte Antwort hinzufügen
-        const correctAnswer = {
-            text: questionData.answerType === 'text' ? questionData.answer : null,
-            image: questionData.answerType === 'image' ? questionData.answerImage : null,
-            isCorrect: true
-        };
-
-        // Alle Antworten mischen
-        const allAnswers = this.shuffleArray([...wrongAnswers, correctAnswer]);
-
-        return {
-            questionText: questionData.question || 'Was ist die richtige Antwort?',
-            questionImage: questionData.questionImage,
-            answers: allAnswers,
-            correctAnswerIndex: allAnswers.findIndex(a => a.isCorrect)
-        };
-    }
-
-    // Quiz-Anzeige
-    showQuestion() {
-        const question = this.currentQuiz.questions[this.currentQuiz.currentIndex];
-        
-        // Frage-Text
-        document.getElementById('question-text').textContent = question.questionText;
-        
-        // Frage-Bild
-        const questionImageContainer = document.getElementById('question-image');
-        if (question.questionImage) {
-                       questionImageContainer.innerHTML = `<img src="${question.questionImage}" alt="Frage Bild" class="img-fluid rounded">`;
-            questionImageContainer.classList.remove('d-none');
-        } else {
-            questionImageContainer.innerHTML = '';
-            questionImageContainer.classList.add('d-none');
-        }
-        
-        // Antwortoptionen
-        const answersContainer = document.getElementById('answers-container');
-        if (!answersContainer) {
-            console.error('answers-container nicht gefunden!');
-            return;
-        }
- 
-        
-        answersContainer.innerHTML = question.answers.map((answer, index) => {
-            if (answer.image) {
-                // Bild-Antwort
-                return `
-                    <div class="col-md-6 mb-3">
-                        <div class="answer-option image-answer h-100" data-index="${index}">
-                            <img src="${answer.image}" alt="Antwort ${index + 1}" class="img-fluid rounded">
-                        </div>
-                    </div>
-                `;
-            } else {
-                // Text-Antwort
-                return `
-                    <div class="col-md-6 mb-3">
-                        <div class="answer-option text-answer h-100 d-flex align-items-center justify-content-center" data-index="${index}">
-                                                       <span class="fs-5 fw-bold text-center">${answer.text}</span>
-                        </div>
-                    </div>
-                `;
-            }
-        }).join('');
-
-        // Event Listeners für Antworten
-        document.querySelectorAll('.answer-option').forEach((answerDiv, index) => {
-            answerDiv.addEventListener('click', () => {
-                this.selectAnswer(index);
-            });
-        });
-
-        // Fortschrittsanzeige und Kategorie
-        document.getElementById('question-progress').textContent = 
-            `Frage ${this.currentQuiz.currentIndex + 1} von ${this.currentQuiz.questions.length}`;
-            
-        // Kategorie anzeigen
-        const categoryElement = document.getElementById('current-category');
-        if (categoryElement) {
-            categoryElement.textContent = this.currentQuiz.selectedCategory;
-        }
-        
-        // Progress Bar aktualisieren
-        const progressBar = document.getElementById('progress-bar');
-        if (progressBar) {
-            const progress = ((this.currentQuiz.currentIndex + 1) / this.currentQuiz.questions.length) * 100;
-            progressBar.style.width = `${progress}%`;
-        }
-
-        // Buttons zurücksetzen
-        const submitButton = document.getElementById('submit-answer');
-        const nextButton = document.getElementById('next-question');
-        const finishButton = document.getElementById('finish-quiz');
-        
-        // Submit-Button wieder anzeigen und deaktivieren
-        if (submitButton) {
-            submitButton.disabled = true;
-            submitButton.classList.remove('d-none');
-        }
-        
-        // Andere Buttons verstecken
-        if (nextButton) {
-            nextButton.classList.add('d-none');
-        }
-        if (finishButton) {
-            finishButton.classList.add('d-none');
-        }
-        
-        // Alle Antworten deselektieren
-        document.querySelectorAll('.answer-option').forEach(option => {
-            option.classList.remove('selected', 'correct', 'incorrect');
-        });
-        
-        // Selected Answer Index zurücksetzen
-        this.currentQuiz.selectedAnswerIndex = null;
-    }
-
-    selectAnswer(answerIndex) {
-        console.log('selectAnswer aufgerufen mit Index:', answerIndex);
-        
-        // Vorherige Auswahl entfernen
-        document.querySelectorAll('.answer-option').forEach(option => {
-            option.classList.remove('selected');
-        });
-
-        // Neue Auswahl
-        const selectedOption = document.querySelector(`[data-index="${answerIndex}"]`);
-        if (selectedOption) {
-            selectedOption.classList.add('selected');
-            console.log('Antwort ausgewählt:', answerIndex);
-        } else {
-            console.error('Antwort-Option nicht gefunden für Index:', answerIndex);
-        }
-
-        // Submit Button aktivieren
-        const submitButton = document.getElementById('submit-answer');
-        if (submitButton) {
-            submitButton.disabled = false;
-            console.log('Submit-Button aktiviert');
-        }
-        
-        // Aktuellen Answer Index speichern
-        this.currentQuiz.selectedAnswerIndex = answerIndex;
-    }
-
-    submitAnswer() {
-        console.log('submitAnswer aufgerufen');
-        
-        const question = this.currentQuiz.questions[this.currentQuiz.currentIndex];
-               const selectedIndex = this.currentQuiz.selectedAnswerIndex;
-        
-        
-        console.log('Aktueller selectedIndex:', selectedIndex);
-        console.log('Korrekte Antwort:', question.correctAnswerIndex);
-        
-        // Validierung: Prüfen ob eine Antwort ausgewählt wurde
-        if (selectedIndex === undefined || selectedIndex === null) {
-            this.showAlert('Bitte wählen Sie eine Antwort aus!', 'warning');
-            return;
-        }
-        
-        const isCorrect = selectedIndex === question.correctAnswerIndex;
-
-        // Antwort speichern
-        this.currentQuiz.answers.push({
-            questionIndex: this.currentQuiz.currentIndex,
-            selectedIndex: selectedIndex,
-            correctIndex: question.correctAnswerIndex,
-            isCorrect: isCorrect
-        });
-
-        if (isCorrect) {
-            this.currentQuiz.score++;
-        }
-
-        // Antworten einfärben
-        document.querySelectorAll('.answer-option').forEach((option, index) => {
-            if (index === question.correctAnswerIndex) {
-                option.classList.add('correct');
-            } else if (index === selectedIndex && !isCorrect) {
-                option.classList.add('incorrect');
-            }
-        });
-
-        // Buttons aktualisieren
-        document.getElementById('submit-answer').classList.add('d-none');
-        
-        if (this.currentQuiz.currentIndex + 1 < this.currentQuiz.questions.length) {
-            document.getElementById('next-question').classList.remove('d-none');
-        } else {
-            document.getElementById('finish-quiz').classList.remove('d-none');
-        }
-    }
-
-    nextQuestion() {
-        this.currentQuiz.currentIndex++;
-        
-        // Nächste Frage vorbereiten
-        const nextQuestion = this.currentQuiz.questions[this.currentQuiz.currentIndex];
-        
-    // Für normale Multiple-Choice-Quizzes
-    const questionsPool = this.questions.filter(q => q.category === this.currentQuiz.selectedCategory);
-    const multipleChoiceQuestion = this.generateMultipleChoiceQuestion(nextQuestion, questionsPool);
-    this.currentQuiz.questions[this.currentQuiz.currentIndex] = { ...nextQuestion, ...multipleChoiceQuestion };
-    this.showQuestion();
-    }
-
-    finishQuiz() {
-        // Statistiken aktualisieren
-        this.updateStatistics();
-
-        // Ergebnis anzeigen
-        const percentage = Math.round((this.currentQuiz.score / this.currentQuiz.questions.length) * 100);
-        const resultContainer = document.getElementById('result-stats');
-        
-        let resultText = '';
-        let resultClass = '';
-        
-        if (percentage >= 80) {
-            resultText = 'Ausgezeichnet!';
-            resultClass = 'text-success';
-        } else if (percentage >= 60) {
-            resultText = 'Gut gemacht!';
-            resultClass = 'text-primary';
-        } else if (percentage >= 40) {
-            resultText = 'Nicht schlecht!';
-            resultClass = 'text-warning';
-        } else {
-            resultText = 'Mehr Übung nötig!';
-            resultClass = 'text-danger';
-        }
-
-        resultContainer.innerHTML = `
-            <div class="${resultClass} mb-4">
-                <h4>${resultText}</h4>
-                <p class="fs-5">${this.currentQuiz.score} von ${this.currentQuiz.questions.length} Fragen richtig</p>
-                <p class="fs-4 fw-bold">${percentage}%</p>
-                <p class="text-muted">Kategorie: ${this.currentQuiz.selectedCategory}</p>
-            </div>
-            
-            <!-- Detaillierte Antworten-Übersicht -->
-            <div class="card mt-4">
-                <div class="card-header">
-                    <h5 class="mb-0"><i class="bi bi-list-check me-2"></i>Detaillierte Auswertung</h5>
-                </div>
-                <div class="card-body">
-                    ${this.generateQuizReview()}
-                </div>
-            </div>
-            
-            <!-- Action Buttons -->
-            <div class="mt-4 d-flex justify-content-center gap-3">
-                <button class="btn btn-primary btn-lg" onclick="window.app.restartQuiz()">
-                    <i class="bi bi-arrow-repeat me-2"></i>Quiz wiederholen
-                </button>
-                <button class="btn btn-success btn-lg" onclick="showPage('home')">
-                    <i class="bi bi-house-fill me-2"></i>Zur Startseite
-                </button>
-                <button class="btn btn-info btn-lg" onclick="showPage('quiz')">
-                    <i class="bi bi-play-fill me-2"></i>Neues Quiz
-                </button>
-            </div>
-        `;
-
-        // Quiz-Container ausblenden, Ergebnis einblenden
-        document.getElementById('quiz-container').classList.add('d-none');
-        document.getElementById('quiz-result').classList.remove('d-none');
-    }
-
-    // Generiert eine detaillierte Übersicht aller Fragen und Antworten
-    // Fragen-Rendering jetzt über questionManager
-    renderQuestionsList(mainCategory = null, group = null) {
-        const container = document.getElementById('questions-list');
-        if (!container) return;
-        let questions = questionManager.questions;
-        if (mainCategory && group) {
-            questions = questionManager.getQuestions(mainCategory, group);
-        }
-        if (questions.length === 0) {
-            container.innerHTML = '<p class="text-muted text-center">Keine Fragen vorhanden.</p>';
-            return;
-        }
-        container.innerHTML = questions.map(q => {
-            const answerDisplay = q.answer ? `<strong>Antwort:</strong> ${q.answer}` : (q.answerImage ? `<strong>Antwort:</strong> <span class='badge bg-info'>Bild</span>` : '');
-            const questionDisplay = q.question ? `<strong>Frage:</strong> ${q.question}` : '';
-            return `
-                <div class="card mb-3">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div class="flex-grow-1">
-                                <h6 class="card-title">
-                                    <span class="badge bg-secondary me-2">${q.mainCategory} / ${q.group}</span>
-                                    ${questionDisplay}
-                                </h6>
-                                <p class="card-text mb-1">${answerDisplay}</p>
-                                ${q.description ? `<p class="card-text"><em>${q.description}</em></p>` : ''}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }).join('');
-    }
-
-    // Hilfsfunktion zur Formatierung von Antworten (Text oder Bild)
-    formatAnswerDisplay(answer) {
-        if (answer && answer.image) {
-            return `<img src="${answer.image}" alt="Antwort" class="img-thumbnail" style="max-height: 80px;">`;
-        } else if (answer && answer.text) {
-            return `<span class="fw-bold">${answer.text}</span>`;
-        } else if (typeof answer === 'string') {
-            return `<span class="fw-bold">${answer}</span>`;
-        } else {
-            return '';
-        }
-    }
-
-    restartQuiz() {
-        this.resetQuizContainer();
-        this.startQuiz(this.currentQuiz.selectedCategory);
-    }
-
-    resetQuizContainer() {
-        document.getElementById('quiz-container').classList.remove('d-none');
-        document.getElementById('quiz-result').classList.add('d-none');
-    }
-
-    updateStatistics() {
-        this.statistics.totalQuestions += this.currentQuiz.questions.length;
-        this.statistics.correctAnswers += this.currentQuiz.score;
-        this.statistics.lastPlayed = new Date().toISOString();
-        
-        // Kategorie-Statistiken
-        if (!this.statistics.categoriesPlayed[this.currentQuiz.selectedCategory]) {
-            this.statistics.categoriesPlayed[this.currentQuiz.selectedCategory] = {
-                totalQuestions: 0,
-                correctAnswers: 0,
-                gamesPlayed: 0
-            };
-        }
-        
-        const categoryStats = this.statistics.categoriesPlayed[this.currentQuiz.selectedCategory];
-        categoryStats.totalQuestions += this.currentQuiz.questions.length;
-        categoryStats.correctAnswers += this.currentQuiz.score;
-        categoryStats.gamesPlayed++;
-
-        this.saveToStorage('statistics', this.statistics);
-        this.renderStatistics();
-    }
-
-    renderStatistics() {
-        const container = document.getElementById('statistics-content');
-        if (!container) return;
-
-        const totalCorrectPercentage = this.statistics.totalQuestions > 0 ? 
-            Math.round((this.statistics.correctAnswers / this.statistics.totalQuestions) * 100) : 0;
-
-        let statisticsHTML = `
-            <div class="row">
-                <div class="col-md-4 mb-3">
-                    <div class="card bg-primary text-white">
-                        <div class="card-body text-center">
-                            <i class="bi bi-question-circle fs-1 mb-2"></i>
-                            <h5>Gesamt Fragen</h5>
-                            <h3>${this.statistics.totalQuestions}</h3>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-4 mb-3">
-                    <div class="card bg-success text-white">
-                        <div class="card-body text-center">
-                            <i class="bi bi-check-circle fs-1 mb-2"></i>
-                            <h5>Richtig beantwortet</h5>
-                            <h3>${this.statistics.correctAnswers}</h3>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-4 mb-3">
-                    <div class="card bg-info text-white">
-                        <div class="card-body text-center">
-                            <i class="bi bi-percent fs-1 mb-2"></i>
-                            <h5>Erfolgsquote</h5>
-                            <h3>${totalCorrectPercentage}%</h3>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-
-        if (Object.keys(this.statistics.categoriesPlayed).length > 0) {
-            statisticsHTML += `
-                <div class="card mt-4">
-                    <div class="card-header">
-                        <h5 class="mb-0">Statistiken nach Kategorien</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-striped">
-                                <thead>
-                                    <tr>
-                                        <th>Kategorie</th>
-                                        <th>Spiele</th>
-                                        <th>Fragen</th>
-                                        <th>Richtig</th>
-                                        <th>Erfolgsquote</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-            `;
-
-            Object.entries(this.statistics.categoriesPlayed).forEach(([category, stats]) => {
-                const categoryPercentage = stats.totalQuestions > 0 ? 
-                    Math.round((stats.correctAnswers / stats.totalQuestions) * 100) : 0;
-                
-                statisticsHTML += `
-                    <tr>
-                        <td><strong>${category}</strong></td>
-                        <td>${stats.gamesPlayed}</td>
-                        <td>${stats.totalQuestions}</td>
-                        <td>${stats.correctAnswers}</td>
-                        <td>
-                            <span class="badge ${categoryPercentage >= 70 ? 'bg-success' : categoryPercentage >= 50 ? 'bg-warning' : 'bg-danger'}">
-                                ${categoryPercentage}%
-                            </span>
-                        </td>
-                    </tr>
-                `;
-            });
-
-            statisticsHTML += `
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
-
-        if (this.statistics.lastPlayed) {
-            const lastPlayed = new Date(this.statistics.lastPlayed);
-            statisticsHTML += `
-                <div class="mt-3 text-muted text-center">
-                    <small>Zuletzt gespielt: ${lastPlayed.toLocaleDateString('de-DE')} um ${lastPlayed.toLocaleTimeString('de-DE')}</small>
-                </div>
-            `;
-        }
-
-        statisticsHTML += `
-            <div class="mt-4 text-center">
-                <button class="btn btn-outline-danger" onclick="app.resetStatistics()">
-                    <i class="bi bi-arrow-clockwise me-2"></i>Statistiken zurücksetzen
-                </button>
-            </div>
-        `;
-
-        container.innerHTML = statisticsHTML;
-    }
-
-    resetStatistics() {
-        if (confirm('Möchten Sie wirklich alle Statistiken zurücksetzen?')) {
-            this.statistics = {
-                totalQuestions: 0,
-                correctAnswers: 0,
-                categoriesPlayed: {},
-                lastPlayed: null
-            };
-            this.saveToStorage('statistics', this.statistics);
-            this.renderStatistics();
-            this.showAlert('Statistiken wurden zurückgesetzt!', 'success');
-        }
-    }
-
-    // Hilfsfunktionen
-    shuffleArray(array) {
-        const shuffled = [...array];
-        for (let i = shuffled.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [shuffled[i], shuffled[j]] = [shuffled[j], shuffed[i]];
-        }
-        return shuffled;
-    }
-
-
-    // Sicherheitsfunktionen
-    validateDataIntegrity() {
-        // Kategorien validieren
-        if (!Array.isArray(this.categories)) {
-            console.warn('Kategorien-Daten beschädigt, setze Standardwerte');
-            this.categories = ['textfragen', 'bilderquiz', 'demo-ketegorie'];
-            this.saveToStorage('categories', this.categories);
-        }
-
-        // Fragen validieren
-        if (!Array.isArray(this.questions)) {
-            console.warn('Fragen-Daten beschädigt, setze Standardwerte');
-            this.questions = [];
-            this.saveToStorage('questions', this.questions);
-        } else {
-            // Jede Frage validieren
-            this.questions = this.questions.filter(q => this.validateQuestion(q));
-        }
-
-        // Statistiken validieren
-        if (!this.statistics || typeof this.statistics !== 'object') {
-            console.warn('Statistik-Daten beschädigt, setze Standardwerte');
-            this.statistics = {
-                totalQuestions: 0,
-                correctAnswers: 0,
-                categoriesPlayed: {},
-                lastPlayed: null
-            };
-            this.saveToStorage('statistics', this.statistics);
-        }
-    }
-
-    validateQuestion(question) {
-        if (!question || typeof question !== 'object') return false;
-        if (typeof question.id !== 'number') return false;
-        if (typeof question.category !== 'string') return false;
-        if (!['text', 'image'].includes(question.answerType)) return false;
-        
-        // Weitere Validierungen je nach Typ
-        if (question.answerType === 'text' && !question.answer) return false;
-        if (question.answerType === 'image' && !question.answerImage) return false;
-        
-        return true;
-    }
-
-    // Checksum für wichtige Daten
-    generateChecksum(data) {
-        const str = JSON.stringify(data);
-        let hash = 0;
-        for (let i = 0; i < str.length; i++) {
-            const char = str.charCodeAt(i);
-            hash = ((hash << 5) - hash) + char;
-            hash = hash & hash; // 32-bit integer
-        }
-        return hash.toString(36);
-    }
-
-    // Überprüfe Daten-Integrität mit Checksum
-    verifyDataIntegrity(data, expectedChecksum) {
-        const currentChecksum = this.generateChecksum(data);
-        return currentChecksum === expectedChecksum;
     }
 }
 
-// ========== HILFSFUNKTIONEN ==========
-// LernApp-Instanz global verfügbar machen
-window.LernApp = new LernApp();
-window.app = window.LernApp;
-console.log('[LernApp][DEBUG] Admin-Login-Listener gesetzt');
+// === PROFIL: Cloud-Verzeichnis Button-Container (für das Profil-Formular) ===
+// Füge dieses Snippet in dein Profil-HTML ein, z.B. unterhalb des Profil-Formulars:
+// <div id="profile-cloud-btn-container" class="mb-3"></div>
+// Der Button wird automatisch von der App befüllt.
+
+window.app = new LernApp();
