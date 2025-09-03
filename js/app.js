@@ -1,3 +1,8 @@
+// Hilfsfunktion: EventListener sicher für alle passenden Elemente setzen
+function safeAddEventListener(selector, event, handler) {
+    document.querySelectorAll(selector).forEach(el => el.addEventListener(event, handler));
+}
+
 // Globale Alert-Funktion für die gesamte App
 window.showAlert = window.showAlert || function(msg, type = 'info') {
     alert(msg);
@@ -17,6 +22,23 @@ window.showAlert = window.showAlert || function(msg, type = 'info') {
 })();
 
 class LernApp {
+    constructor() {
+        // Session-User aus sessionStorage wiederherstellen
+        this.currentUser = sessionStorage.getItem('lernapp_current_user') || null;
+        this.isDemo = sessionStorage.getItem('lernapp_demo_mode') === 'true';
+        this.users = {};
+        this.categories = [];
+        this.questions = [];
+        this.statistics = {};
+        this.sharedData = {};
+        // Userdaten laden, falls User eingeloggt
+        if (this.currentUser || this.isDemo) {
+            this.loadUserData();
+        }
+        // UI anpassen
+        this.updateUIForLoginState();
+    }
+
     // Lädt die Userliste aus dem Storage (z.B. beim Seitenstart)
     async reloadUsersFromStorage() {
         let users = await this.loadFromStorage('users', true);
@@ -27,20 +49,79 @@ class LernApp {
     switchAuthMode(mode) {
         // Hier kann später die Logik für den Wechsel zwischen Login/Registrierung ergänzt werden
     }
-    // Zeigt einen einfachen Dialog zur Speicherort-Auswahl beim ersten Login
+    // Zeigt ein modernes Modal zur Speicherort-Auswahl beim ersten Login
+    async showStorageLocationModal(user) {
+        return new Promise((resolve) => {
+            // Modal-HTML
+            const modalHtml = `
+                <div class="modal fade" id="storageLocationModal" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title"><i class="bi bi-hdd-network"></i> Speicherort wählen</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <p>Wo möchten Sie Ihre Daten speichern?</p>
+                                <div class="d-grid gap-2">
+                                    <button id="choose-local" class="btn btn-outline-primary">Lokal (nur auf diesem Gerät)</button>
+                                    <button id="choose-cloud" class="btn btn-outline-success">Cloud (Dateisystem, portabel)</button>
+                                </div>
+                                <div id="storage-modal-info" class="mt-3 text-muted small"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            // Modal einfügen
+            if (!document.getElementById('storageLocationModal')) {
+                document.body.insertAdjacentHTML('beforeend', modalHtml);
+            }
+            const modalElem = document.getElementById('storageLocationModal');
+            const modal = new bootstrap.Modal(modalElem);
+            modal.show();
+            // Button-Handler
+            document.getElementById('choose-local').onclick = () => {
+                modal.hide();
+                setTimeout(() => {
+                    modalElem.parentNode.removeChild(modalElem);
+                    document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+                    document.body.classList.remove('modal-open');
+                    document.body.style.overflow = '';
+                    document.body.style.paddingRight = '';
+                    resolve('local');
+                }, 350);
+            };
+            document.getElementById('choose-cloud').onclick = async () => {
+                modal.hide();
+                setTimeout(() => {
+                    modalElem.parentNode.removeChild(modalElem);
+                    document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+                    document.body.classList.remove('modal-open');
+                    document.body.style.overflow = '';
+                    document.body.style.paddingRight = '';
+                    resolve('cloud');
+                }, 350);
+            };
+        });
+    }
+
+    // Zeigt einen Dialog zur Speicherort-Auswahl beim ersten Login (jetzt mit Modal)
     async showStorageLocationDialogIfNeeded() {
         const user = this.users[this.currentUser];
         if (user && user.storage && !user.storage.chosen) {
-            // Einfacher Dialog (window.prompt für Demo-Zweck)
-            const choice = window.prompt('Wo möchten Sie Ihre Daten speichern?\nGeben Sie "lokal" für lokalen Speicher oder "cloud" für Cloud-Speicher ein:', 'lokal');
-            if (choice && choice.toLowerCase() === 'cloud') {
-                user.storage.chosen = true;
+            // Modernes Modal statt prompt
+            const choice = await this.showStorageLocationModal(user);
+            if (choice === 'cloud') {
                 user.storage.cloud = true;
-                user.storage.folder = '';
-            } else {
                 user.storage.chosen = true;
+                // Cloud-Initialisierung (z.B. Directory Picker)
+                if (window.lernappCloudStorage && typeof window.lernappCloudStorage.pickDirectory === 'function') {
+                    await window.lernappCloudStorage.pickDirectory();
+                }
+            } else {
                 user.storage.cloud = false;
-                user.storage.folder = '';
+                user.storage.chosen = true;
             }
             this.users[this.currentUser] = user;
             localStorage.setItem(`lernapp_user_${this.currentUser}`, JSON.stringify(user));
@@ -51,14 +132,14 @@ class LernApp {
     // Admin: Benutzer löschen
     async adminDeleteUser(username) {
         if (!username || !this.users[username]) {
-            this.showAlert('Benutzer nicht gefunden!', 'danger');
+            showAlert('Benutzer nicht gefunden!', 'danger');
             return;
         }
         if (!confirm(`Benutzer "${username}" wirklich löschen?`)) return;
         delete this.users[username];
         await this.saveToStorage('users', this.users, true);
         localStorage.removeItem(`lernapp_user_${username}`);
-        this.showAlert(`Benutzer "${username}" wurde gelöscht.`, 'success');
+        showAlert(`Benutzer "${username}" wurde gelöscht.`, 'success');
         setTimeout(() => {
             this.renderAdminUsersList();
             document.getElementById('admin-user-data').innerHTML = '';
@@ -196,10 +277,27 @@ class LernApp {
             pathname: window.location.pathname,
             sessionStorage: Object.assign({}, sessionStorage)
         });
-        // Gastmodus auf home.html erlauben
+        // Gastmodus auf home.html, index.html und login.html erlauben
+        const allowedGuestPages = ['home.html', 'index.html', 'login.html', '/'];
+        const currentPath = window.location.pathname.split('/').pop() || '/';
+        // --- NEU: Admin-Login-Flow auf admin.html ---
+        if (currentPath === 'admin.html') {
+            if (!sessionStorage.getItem('lernapp_admin_access')) {
+                // Kein Admin eingeloggt: Modal anzeigen, kein Redirect
+                this.showAdminLogin();
+                // UI auf gesperrt setzen
+                this.hideAdminInterface();
+                return;
+            } else {
+                // Admin eingeloggt: Admin-UI anzeigen
+                this.showAdminInterface();
+                return;
+            }
+        }
+        // --- ENDE NEU ---
         if (!this.currentUser && !this.isDemo) {
-            if (window.location.pathname.endsWith('home.html')) {
-                console.log('[LernApp][DEBUG] Kein User -> Gastmodus auf Home-Seite erlaubt (KEIN Redirect)');
+            if (allowedGuestPages.includes(currentPath)) {
+                console.log('[LernApp][DEBUG] Kein User -> Gastmodus auf Start-/Loginseite erlaubt (KEIN Redirect)');
                 return;
             }
             console.log('[LernApp][DEBUG] Kein User -> Redirect Login ausgelöst!', new Error().stack);
@@ -219,14 +317,16 @@ class LernApp {
             guestElements.forEach(el => el.style.display = 'none');
             if (this.currentUser && !this.isDemo) {
                 const userData = this.users[this.currentUser];
-                const currentUsernameElem = document.getElementById('current-username');
-                if (currentUsernameElem) currentUsernameElem.textContent = userData.displayName || this.currentUser;
-                let loginInfo = userData.lastLogin ? new Date(userData.lastLogin).toLocaleString('de-DE') : '-';
-                loginInfo += ` (Logins: ${userData.loginCount || 0})`;
-                const lastLoginElem = document.getElementById('last-login-time');
-                if (lastLoginElem) lastLoginElem.textContent = loginInfo;
-                const dashboardUsernameElem = document.getElementById('dashboard-username');
-                if (dashboardUsernameElem) dashboardUsernameElem.textContent = userData.displayName || this.currentUser;
+                if (userData) {
+                    const currentUsernameElem = document.getElementById('current-username');
+                    if (currentUsernameElem) currentUsernameElem.textContent = userData.displayName || this.currentUser;
+                    let loginInfo = userData.lastLogin ? new Date(userData.lastLogin).toLocaleString('de-DE') : '-';
+                    loginInfo += ` (Logins: ${userData.loginCount || 0})`;
+                    const lastLoginElem = document.getElementById('last-login-time');
+                    if (lastLoginElem) lastLoginElem.textContent = loginInfo;
+                    const dashboardUsernameElem = document.getElementById('dashboard-username');
+                    if (dashboardUsernameElem) dashboardUsernameElem.textContent = userData.displayName || this.currentUser;
+                }
             } else if (this.isDemo) {
                 document.getElementById('current-username').textContent = 'Demo-Modus';
                 document.getElementById('dashboard-username').textContent = 'Demo-Benutzer';
@@ -800,14 +900,16 @@ class LernApp {
 
         // Dashboard-Statistiken aktualisieren
         const dashboardCategoriesElem = document.getElementById('dashboard-categories');
-        if (dashboardCategoriesElem) dashboardCategoriesElem.textContent = this.categories.length;
+        if (dashboardCategoriesElem) dashboardCategoriesElem.textContent = Array.isArray(this.categories) ? this.categories.length : 0;
         const dashboardQuestionsElem = document.getElementById('dashboard-questions');
-        if (dashboardQuestionsElem) dashboardQuestionsElem.textContent = this.questions.length;
-        const totalQuizzes = Object.values(this.statistics.categoriesPlayed || {})
+        if (dashboardQuestionsElem) dashboardQuestionsElem.textContent = Array.isArray(this.questions) ? this.questions.length : 0;
+        // Absicherung für Statistiken
+        const categoriesPlayedObj = (this.statistics && typeof this.statistics === 'object' && this.statistics.categoriesPlayed && typeof this.statistics.categoriesPlayed === 'object') ? this.statistics.categoriesPlayed : {};
+        const totalQuizzes = Object.values(categoriesPlayedObj)
             .reduce((sum, cat) => sum + (cat.gamesPlayed || 0), 0);
         const dashboardTotalPlayedElem = document.getElementById('dashboard-total-played');
         if (dashboardTotalPlayedElem) dashboardTotalPlayedElem.textContent = totalQuizzes;
-        const successRate = this.statistics.totalQuestions > 0 ? 
+        const successRate = this.statistics && this.statistics.totalQuestions > 0 ? 
             Math.round((this.statistics.correctAnswers / this.statistics.totalQuestions) * 100) : 0;
         const dashboardSuccessRateElem = document.getElementById('dashboard-success-rate');
         if (dashboardSuccessRateElem) dashboardSuccessRateElem.textContent = `${successRate}%`;
@@ -827,7 +929,6 @@ class LernApp {
             lastLoginElement.textContent = loginInfo;
         }
     }
-
     // ==================== EXISTING FUNCTIONALITY ====================
 
     // Admin-Zugang überprüfen
@@ -847,30 +948,21 @@ class LernApp {
         standardKategorien.forEach(kat => {
             if (!this.categories.includes(kat)) this.categories.unshift(kat);
         });
-        // Admin-Navigation anzeigen
-    const adminNavItem = document.getElementById('admin-nav-item');
-    if (adminNavItem) adminNavItem.style.display = 'block';
-    const adminLogoutItem = document.getElementById('admin-logout-item');
-    if (adminLogoutItem) adminLogoutItem.style.display = 'block';
+        // Admin-Navigationselemente anzeigen
+        const adminNavItem = document.getElementById('admin-nav-item');
+        if (adminNavItem) adminNavItem.style.display = 'block';
+        const adminLogoutItem = document.getElementById('admin-logout-item');
+        if (adminLogoutItem) adminLogoutItem.style.display = 'block';
         const adminLoginLink = document.getElementById('admin-login-link');
-        if (adminLoginLink) {
-            adminLoginLink.style.display = 'none';
-        }
-        
-        // Admin-Seite normal anzeigen (nicht gesperrt)
+        if (adminLoginLink) adminLoginLink.style.display = 'none';
+        // Admin-Seite entsperren
         const adminPage = document.getElementById('admin-page');
-        if (adminPage && adminPage.querySelector('.container.mt-5')) {
-            // Admin-Seite ist gesperrt, neu laden um entsperrt zu zeigen
-            location.reload();
-        }
-
-        // User-Liste anzeigen
+        if (adminPage) adminPage.classList.remove('locked');
+        // User-Liste und Admin-Daten anzeigen
         if (typeof this.renderAdminUsersList === 'function') {
             this.renderAdminUsersList();
-            document.getElementById('admin-user-data').innerHTML = '';
-        } else {
-            // Fallback: einfach weiterleiten
-            window.location.href = 'admin.html';
+            const userDataElem = document.getElementById('admin-user-data');
+            if (userDataElem) userDataElem.innerHTML = '';
         }
         // Kategorien und Fragen anzeigen
         this.renderCategories();
@@ -879,13 +971,19 @@ class LernApp {
     }
 
     hideAdminInterface() {
-    // Admin-Navigation verstecken (nur wenn vorhanden)
-    const adminNavItem = document.getElementById('admin-nav-item');
-    if (adminNavItem) adminNavItem.style.display = 'none';
-    const adminLogoutItem = document.getElementById('admin-logout-item');
-    if (adminLogoutItem) adminLogoutItem.style.display = 'none';
-    const adminLoginLink = document.getElementById('admin-login-link');
-    if (adminLoginLink) adminLoginLink.style.display = 'block';
+        // Admin-Navigationselemente verstecken
+        const adminNavItem = document.getElementById('admin-nav-item');
+        if (adminNavItem) adminNavItem.style.display = 'none';
+        const adminLogoutItem = document.getElementById('admin-logout-item');
+        if (adminLogoutItem) adminLogoutItem.style.display = 'none';
+        const adminLoginLink = document.getElementById('admin-login-link');
+        if (adminLoginLink) adminLoginLink.style.display = 'block';
+        // Admin-Seite sperren
+        const adminPage = document.getElementById('admin-page');
+        if (adminPage) adminPage.classList.add('locked');
+        // User-Liste und Admin-Daten ausblenden
+        const userDataElem = document.getElementById('admin-user-data');
+        if (userDataElem) userDataElem.innerHTML = '';
     }
 
     showAdminLogin() {
@@ -1114,11 +1212,12 @@ class LernApp {
             this.switchAuthMode('register');
         });
 
-        // Admin-Login Button
-        safeAddEventListener('#admin-login-link', 'click', (e) => {
-            e.preventDefault();
-            this.showAdminLogin();
-        });
+        // Admin-Login Button (NICHT mehr auf Home, nur noch Weiterleitung per href!)
+        // safeAddEventListener('#admin-login-link, .admin-login-btn', 'click', (e) => {
+        //     e.preventDefault();
+        //     console.log('[LernApp][DEBUG] Admin-Login-Button geklickt:', e.target);
+        //     this.showAdminLogin();
+        // });
 
         // User-Login Button
         safeAddEventListener('.guest-only .nav-link[href="#"]', 'click', (e) => {
@@ -1718,7 +1817,7 @@ class LernApp {
         // Frage-Bild
         const questionImageContainer = document.getElementById('question-image');
         if (question.questionImage) {
-            questionImageContainer.innerHTML = `<img src="${question.questionImage}" alt="Frage Bild" class="img-fluid rounded">`;
+                       questionImageContainer.innerHTML = `<img src="${question.questionImage}" alt="Frage Bild" class="img-fluid rounded">`;
             questionImageContainer.classList.remove('d-none');
         } else {
             questionImageContainer.innerHTML = '';
@@ -1731,6 +1830,7 @@ class LernApp {
             console.error('answers-container nicht gefunden!');
             return;
         }
+ 
         
         answersContainer.innerHTML = question.answers.map((answer, index) => {
             if (answer.image) {
@@ -1821,7 +1921,7 @@ class LernApp {
             console.log('Antwort ausgewählt:', answerIndex);
         } else {
             console.error('Antwort-Option nicht gefunden für Index:', answerIndex);
-               }
+        }
 
         // Submit Button aktivieren
         const submitButton = document.getElementById('submit-answer');
@@ -2166,7 +2266,7 @@ class LernApp {
         const shuffled = [...array];
         for (let i = shuffled.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
-            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffed[i]];
         }
         return shuffled;
     }
@@ -2240,3 +2340,4 @@ class LernApp {
 // LernApp-Instanz global verfügbar machen
 window.LernApp = new LernApp();
 window.app = window.LernApp;
+console.log('[LernApp][DEBUG] Admin-Login-Listener gesetzt');

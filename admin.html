@@ -90,22 +90,27 @@
         </div>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="js/groups.js"></script>
     <script src="js/app.js"></script>
+    <script>
+      window.app = new LernApp();
+    </script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const adminAccess = sessionStorage.getItem('lernapp_admin_access');
             const loginArea = document.getElementById('admin-login-area');
             const contentArea = document.getElementById('admin-content-area');
             if (!adminAccess) {
-                // Direkt das Admin-Login-Modal anzeigen
+                // Admin nicht eingeloggt: Admin-Elemente ausblenden, Login-Modal anzeigen
+                contentArea.style.display = 'none';
+                loginArea.innerHTML = '';
                 if (window.app && typeof window.app.showAdminLogin === 'function') {
                     window.app.showAdminLogin();
                 } else if (window.LernApp && typeof window.LernApp.showAdminLogin === 'function') {
                     window.LernApp.showAdminLogin();
                 }
-                contentArea.style.display = 'none';
-                loginArea.innerHTML = '';
             } else {
+                // Admin eingeloggt: Admin-Elemente anzeigen
                 loginArea.innerHTML = '<div class="text-end mb-3"><button class="btn btn-danger" id="admin-logout-btn"><i class="bi bi-box-arrow-right me-1"></i>Admin Logout</button></div>';
                 contentArea.style.display = 'block';
                 setTimeout(function() {
