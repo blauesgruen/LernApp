@@ -5,6 +5,19 @@ Die LernApp ist eine interaktive Plattform, die Benutzern ermöglicht, Wissen du
 
 ---
 
+## Änderungen und neue Funktionen
+
+### Navigation
+- Der Menüpunkt "Startseite" wurde entfernt.
+- Das Icon und der Text "LernApp" führen jetzt zur Startseite und sind linksbündig ausgerichtet.
+- Der Admin-Button-Text wurde schwarz gefärbt.
+
+### Willkommensbereich
+- Ein erklärender Text wurde unterhalb des Login-Buttons hinzugefügt, der die Hauptfunktionen der LernApp beschreibt.
+- Der Text ist in einer blasseren Farbe (#666) und etwas kleiner als der Willkommen-Text.
+
+---
+
 ## Anforderungen
 
 ### Kernfunktionen
