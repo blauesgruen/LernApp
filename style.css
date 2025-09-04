@@ -142,3 +142,27 @@ nav ul li a[href="#admin"] {
     margin-top: 20px; /* Abstand zum Login-Button */
     line-height: 1.5; /* Angenehme Lesbarkeit */
 }
+
+/* Stile für die LernApp-Verknüpfung */
+.app-link-container {
+    display: flex;
+    align-items: center; /* Icon und Text nebeneinander */
+}
+
+.app-link {
+    display: flex;
+    align-items: center; /* Icon und Text nebeneinander */
+    text-decoration: none; /* Entfernt Unterstreichung */
+    color: inherit; /* Erbt die Farbe */
+}
+
+.app-link i {
+    font-size: 40px;
+    color: #007BFF;
+    margin-right: 10px;
+}
+
+.app-link span {
+    font-size: 24px;
+    font-weight: bold;
+}
