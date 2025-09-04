@@ -166,3 +166,48 @@ nav ul li a[href="#admin"] {
     font-size: 24px;
     font-weight: bold;
 }
+
+/* Stile für den Login-Bereich */
+#login {
+    max-width: 400px;
+    margin: 50px auto;
+    text-align: center;
+}
+
+#login h1 {
+    font-size: 32px;
+    margin-bottom: 20px;
+}
+
+#login form {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+#login input {
+    padding: 10px;
+    font-size: 16px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+}
+
+#login .btn-primary {
+    padding: 10px 20px;
+    font-size: 18px;
+    background-color: #007BFF;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+#login .btn-primary:hover {
+    background-color: #0056b3;
+}
+
+#login p {
+    margin-top: 20px;
+    font-size: 14px;
+    color: #666;
+}
