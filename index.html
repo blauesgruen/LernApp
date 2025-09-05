@@ -8,28 +8,28 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
 </head>
 <body>
-    <header>
-        <nav>
-            <div>
-                <a href="index.html" style="text-decoration: none; color: inherit;">
-                    <i class="fas fa-graduation-cap"></i>
-                    <h1>LernApp</h1>
-                </a>
-            </div>
-            <ul>
-                <li><a href="#admin" style="color: black;">Admin</a></li>
-            </ul>
-        </nav>
-    </header>
+    <!-- Einbindung des zentralen Headers -->
+    <div id="header-container"></div>
+
     <main>
         <section id="welcome">
             <h1>Willkommen bei der LernApp</h1>
-            <a href="login.html">Login / Registrieren</a>
+            <a href="login.html" class="btn-primary">Login / Registrieren</a>
             <p>Die LernApp ermöglicht es dir, eigene Fragen mit Antworten zu erstellen und daraus ein Multiple-Choice-Quiz zu generieren. Perfekt, um Wissen zu testen und zu erweitern!</p>
         </section>
     </main>
-    <footer>
-        <p>&copy; 2025 LernApp. Alle Rechte vorbehalten.</p>
-    </footer>
+
+    <!-- Einbindung des zentralen Footers -->
+    <div id="footer-container"></div>
+
+    <script src="js/auth.js"></script>
+    <script>
+        // Header und Footer dynamisch laden
+        async function loadHeaderAndFooter() {
+            document.getElementById('header-container').innerHTML = await (await fetch('partials/header.html')).text();
+            document.getElementById('footer-container').innerHTML = await (await fetch('partials/footer.html')).text();
+        }
+        loadHeaderAndFooter();
+    </script>
 </body>
 </html>

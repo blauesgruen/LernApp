@@ -132,3 +132,22 @@ Die LernApp ist eine interaktive Plattform, die Benutzern ermöglicht, Wissen du
 - **Modularität**: Jede Funktionalität wird in separaten Dateien organisiert.
 - **Wiederverwendbarkeit**: Gemeinsame Funktionen werden zentral abgelegt.
 - **Sicherheit**: Fokus auf sichere Datenverarbeitung und -speicherung.
+
+---
+
+## Responsives Design
+- Die App wurde für mobile Geräte optimiert.
+- Media Queries wurden hinzugefügt, um sicherzustellen, dass die Navigation, der Header und der Admin-Button auf kleineren Bildschirmen korrekt angezeigt werden.
+- Der Header bleibt linksbündig, während der Admin-Button rechts positioniert bleibt.
+
+### Zentrale Header- und Footer-Komponenten
+- Der Header und Footer wurden zentralisiert und werden dynamisch in die Seiten geladen.
+- Änderungen an diesen Komponenten wirken sich automatisch auf alle Seiten aus.
+
+### Admin-Button
+- Der Admin-Button wurde speziell für schmale Bildschirme angepasst.
+- Er bleibt sichtbar und korrekt positioniert, unabhängig von der Bildschirmbreite.
+
+### Technische Herausforderungen
+- Probleme mit Flexbox und der dynamischen Einbindung von Header und Footer wurden gelöst.
+- Zusätzliche CSS-Regeln wurden hinzugefügt, um Layout-Überlappungen zu vermeiden.

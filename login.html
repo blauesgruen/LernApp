@@ -9,19 +9,9 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
 </head>
 <body>
-    <header>
-        <nav>
-            <div class="app-link-container">
-                <a href="index.html" class="app-link">
-                    <i class="fas fa-graduation-cap"></i>
-                    <span>LernApp</span>
-                </a>
-            </div>
-            <ul>
-                <li><a href="#admin" style="color: black;">Admin</a></li>
-            </ul>
-        </nav>
-    </header>
+    <!-- Einbindung des zentralen Headers -->
+    <div id="header-container"></div>
+
     <main>
         <section id="login">
             <h1>Login</h1>
@@ -36,8 +26,18 @@
             <p>Noch keinen Account? <a href="register.html">Registrieren</a></p>
         </section>
     </main>
-    <footer>
-        <p>&copy; 2025 LernApp. Alle Rechte vorbehalten.</p>
-    </footer>
+
+    <!-- Einbindung des zentralen Footers -->
+    <div id="footer-container"></div>
+
+    <script>
+        // Header und Footer dynamisch laden
+        async function loadHeaderAndFooter() {
+            document.getElementById('header-container').innerHTML = await (await fetch('partials/header.html')).text();
+            document.getElementById('footer-container').innerHTML = await (await fetch('partials/footer.html')).text();
+        }
+        loadHeaderAndFooter();
+    </script>
+    <script src="js/auth.js"></script>
 </body>
 </html>
