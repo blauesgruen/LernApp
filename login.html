@@ -15,15 +15,13 @@
     <main>
         <section id="login">
             <h1>Login</h1>
-            <form action="#" method="POST">
-
+            <form>
                 <input type="text" id="username" name="username" placeholder="Benutzername" required>
-
                 <input type="password" id="password" name="password" placeholder="Passwort" required>
-
-                <button type="submit" class="btn-primary">Einloggen</button>
+                <button type="button" class="btn-primary" onclick="handleLogin()">Einloggen</button>
             </form>
             <p>Noch keinen Account? <a href="register.html">Registrieren</a></p>
+            <div id="message-field"></div>
         </section>
     </main>
 
@@ -37,6 +35,45 @@
             document.getElementById('footer-container').innerHTML = await (await fetch('partials/footer.html')).text();
         }
         loadHeaderAndFooter();
+
+        async function handleLogin() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            // Passwort hashen
+            const hashedPassword = await hashPassword(password);
+
+            // Benutzerdaten aus localStorage abrufen
+            const users = JSON.parse(localStorage.getItem('users')) || [];
+
+            // Benutzer überprüfen
+            const user = users.find(u => u.username === username && u.password === hashedPassword);
+
+            const messageField = document.getElementById('message-field');
+
+            if (user) {
+                messageField.textContent = 'Login erfolgreich!';
+                messageField.style.color = 'green';
+                // Weiterleitung zum Dashboard
+                window.location.href = 'dashboard.html';
+            } else {
+                messageField.textContent = 'Benutzername oder Passwort falsch!';
+                messageField.style.color = 'red';
+            }
+        }
+
+        async function hashPassword(password) {
+            const encoder = new TextEncoder();
+            const data = encoder.encode(password);
+            const hash = await crypto.subtle.digest('SHA-256', data);
+            return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+
+        document.getElementById('login').addEventListener('keydown', function(event) {
+            if (event.key === 'Enter') {
+                handleLogin();
+            }
+        });
     </script>
     <script src="js/auth.js"></script>
 </body>

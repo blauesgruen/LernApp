@@ -5,6 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LernApp</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.1/css/all.min.css">
+    <style>
+        .app-logo-button {
+            cursor: pointer; /* Change cursor to pointer to indicate clickability */
+            text-decoration: none; /* Ensure no underline is shown */
+        }
+    </style>
 </head>
 <body>
     <nav>
@@ -13,25 +19,36 @@
             <span>LernApp</span>
         </div>
         <ul>
-            <li><a href="admin.html" class="admin-button">Admin</a></li>
+            <li><a href="admin.html" class="admin-button" id="admin-button">Admin</a></li>
+            <li><a href="dashboard.html" class="dashboard-button" id="dashboard-button">Dashboard</a></li>
+            <li><a href="profile.html" class="profile-button" id="profile-button">Profil</a></li>
+            <li><a href="#" class="logout-button" id="logout-button" onclick="handleLogout()">Ausloggen</a></li>
         </ul>
+        <div class="header-right"></div>
     </nav>
     <div id="notification-container" style="padding: 10px; margin: 10px 0; border-radius: 5px; font-size: 14px; background-color: #d1ecf1; display: block; position: relative;">
         <span class="close-button" style="float: right; cursor: pointer; margin-right: 10px;">×</span>
         Temporäre Meldung zur Positionierung und Gestaltung.
     </div>
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const appLogoButton = document.querySelector('.app-logo-button');
-            const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
+        // Global handleLogout-Funktion
+        window.handleLogout = function() {
+            try {
+                // Entferne alle relevanten Daten aus localStorage
+                localStorage.clear();
+                console.log('localStorage nach Logout:', localStorage);
+                // Weiterleitung zur Startseite
+                window.location.href = 'index.html';
+            } catch (error) {
+                console.error('Fehler beim Logout:', error);
+            }
+        };
 
-            appLogoButton.addEventListener('click', () => {
-                if (isLoggedIn) {
-                    window.location.href = 'dashboard.html';
-                } else {
-                    window.location.href = 'index.html';
-                }
-            });
+        document.addEventListener('DOMContentLoaded', () => {
+            const logoutButton = document.getElementById('logout-button');
+            if (logoutButton) {
+                logoutButton.onclick = window.handleLogout;
+            }
         });
     </script>
 </body>

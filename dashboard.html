@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="header-container"></div>
+
+    <main>
+        <div class="dashboard-container">
+            <div class="dashboard-box">
+                <button onclick="location.href='quiz.html'">Quiz</button>
+            </div>
+            <div class="dashboard-box">
+                <button onclick="location.href='questions.html'">Fragen/Antworten einstellen</button>
+            </div>
+            <div class="dashboard-box">
+                <button onclick="location.href='statistics.html'">Statistik</button>
+            </div>
+        </div>
+    </main>
+
+    <div id="footer-container"></div>
+
+    <script>
+        async function loadHeaderAndFooter() {
+            document.getElementById('header-container').innerHTML = await (await fetch('partials/header.html')).text();
+            document.getElementById('footer-container').innerHTML = await (await fetch('partials/footer.html')).text();
+        }
+        loadHeaderAndFooter();
+    </script>
+    <script src="js/auth.js"></script>
+</body>
+</html>

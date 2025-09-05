@@ -13,14 +13,14 @@
     <main>
         <section id="register">
             <h1>Registrieren</h1>
-            <form action="#" method="POST">
+            <form>
                 <input type="text" id="username" name="username" placeholder="Benutzername" required>
                 
                 <input type="password" id="password" name="password" placeholder="Passwort" required>
                 
                 <input type="password" id="confirm-password" name="confirm-password" placeholder="Passwort bestätigen" required>
                 
-                <button type="submit" class="btn-primary">Registrieren</button>
+                <button type="button" class="btn-primary" onclick="handleRegister()">Registrieren</button>
             </form>
             <p>Bereits einen Account? <a href="login.html">Login</a></p>
         </section>
@@ -36,6 +36,35 @@
             document.getElementById('footer-container').innerHTML = await (await fetch('partials/footer.html')).text();
         }
         loadHeaderAndFooter();
+
+        async function handleRegister() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirm-password').value;
+
+            if (password !== confirmPassword) {
+                alert('Passwörter stimmen nicht überein!');
+                return;
+            }
+
+            // Passwort mit SHA-256 hashen
+            const hashedPassword = await hashPassword(password);
+
+            // Benutzerdaten speichern
+            const users = JSON.parse(localStorage.getItem('users')) || [];
+            users.push({ username, password: hashedPassword });
+            localStorage.setItem('users', JSON.stringify(users));
+
+            alert('Registrierung erfolgreich!');
+            // Weiterleitung oder andere Aktionen hier einfügen
+        }
+
+        async function hashPassword(password) {
+            const encoder = new TextEncoder();
+            const data = encoder.encode(password);
+            const hash = await crypto.subtle.digest('SHA-256', data);
+            return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+        }
     </script>
     <script src="js/auth.js"></script>
 </body>
