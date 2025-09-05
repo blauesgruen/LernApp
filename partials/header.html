@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LernApp</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.1/css/all.min.css">
-    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <nav>
@@ -21,5 +20,19 @@
         <span class="close-button" style="float: right; cursor: pointer; margin-right: 10px;">×</span>
         Temporäre Meldung zur Positionierung und Gestaltung.
     </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const appLogoButton = document.querySelector('.app-logo-button');
+            const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
+
+            appLogoButton.addEventListener('click', () => {
+                if (isLoggedIn) {
+                    window.location.href = 'dashboard.html';
+                } else {
+                    window.location.href = 'index.html';
+                }
+            });
+        });
+    </script>
 </body>
 </html>
