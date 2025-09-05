@@ -1,5 +1,9 @@
 // auth.js - Zentrale Zugriffskontrolle
 
+// Globale Deklaration von 'users' und 'user'
+var users = JSON.parse(localStorage.getItem('users')) || [];
+var user = users.find(u => u.username === 'test');
+
 // Zentrale Funktion zur Verwaltung des Login-Status
 function setLoginStatus(isLoggedIn) {
     localStorage.setItem('loggedIn', isLoggedIn ? 'true' : 'false');
@@ -42,21 +46,21 @@ function updateButtonVisibility() {
     });
 }
 
+// Debug-Flag zur Steuerung von Logs
+const DEBUG_MODE = false;
+
 // Fügt Logs hinzu, um den Login-Status und die Benutzeranzahl zu überprüfen
 function logAuthState() {
     const isLoggedIn = getLoginStatus();
     const currentUser = localStorage.getItem('username');
     const users = JSON.parse(localStorage.getItem('users')) || [];
 
-    console.log('--- Authentifizierungsstatus ---');
-    console.log('Login-Status:', isLoggedIn ? 'Eingeloggt' : 'Nicht eingeloggt');
-    console.log('Aktueller Benutzer:', currentUser || 'Kein Benutzer eingeloggt');
-    console.log('Anzahl der Benutzer in der Datenbank:', users.length);
-    console.log('Benutzerliste:');
+    console.log('Authentifizierungsstatus: ' + (isLoggedIn ? 'Eingeloggt' : 'Nicht eingeloggt'));
+    console.log('Aktueller Benutzer: ' + (currentUser || 'Kein Benutzer eingeloggt'));
+    console.log('Anzahl der Benutzer in der Datenbank: ' + users.length);
     users.forEach(user => {
-        console.log(`- Benutzername: ${user.username}, Passwort: ${user.password}`);
+        console.log(`Benutzername: ${user.username}, Passwort: ${user.password}`);
     });
-    console.log('--------------------------------');
 }
 
 // Aktualisiert die Header-Buttons
@@ -97,10 +101,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Login-Funktion
 async function handleLogin(username, password) {
+    if (!username || !password) {
+        showNotification('Benutzername und Passwort dürfen nicht leer sein!', 'error');
+        return;
+    }
+
     const users = JSON.parse(localStorage.getItem('users')) || [];
     const hashedPassword = await hashPassword(password);
 
     const user = users.find(u => u.username === username && u.password === hashedPassword);
+
+    console.log('Benutzerliste:', users);
+    console.log('Suchergebnis:', user);
 
     if (user) {
         setLoginStatus(true);
@@ -136,46 +148,38 @@ async function hashPassword(password) {
         .join('');
 }
 
-// Verbesserte Benutzerregistrierung
+// Verbesserte Benutzerregistrierung mit Validierung
 async function handleRegister(username, password, confirmPassword) {
+    if (!username || !password) {
+        showNotification('Benutzername und Passwort dürfen nicht leer sein!', 'error');
+        return;
+    }
+
     if (password !== confirmPassword) {
         showNotification('Passwörter stimmen nicht überein!', 'error');
         return;
     }
 
-    try {
-        const users = JSON.parse(localStorage.getItem('users')) || [];
+    const users = JSON.parse(localStorage.getItem('users')) || [];
 
-        if (users.some(user => user.username === username)) {
-            showNotification('Benutzername ist bereits vergeben!', 'warning');
-            return;
-        }
-
-        const hashedPassword = await hashPassword(password);
-
-        // Debugging der Eingaben
-        console.log('Eingaben vor Hinzufügen:', { username, password });
-
-        users.push({ username, password: hashedPassword });
-        localStorage.setItem('users', JSON.stringify(users));
-
-        // Bereinigung der Benutzerliste
-        const uniqueUsers = users.filter((user, index, self) =>
-            index === self.findIndex(u => u.username === user.username)
-        );
-        localStorage.setItem('users', JSON.stringify(uniqueUsers));
-        console.log('Bereinigte Benutzerliste:', uniqueUsers);
-
-        console.log('Aktuelle Benutzer in localStorage:', users);
-
-        showNotification('Registrierung erfolgreich! Sie können sich jetzt einloggen.', 'success');
-        setTimeout(() => {
-            window.location.href = 'login.html';
-        }, 2000);
-    } catch (error) {
-        console.error('Fehler bei der Registrierung:', error);
-        showNotification('Ein Fehler ist aufgetreten: ' + error.message, 'error');
+    // Überprüfen, ob der Benutzername bereits existiert
+    if (users.some(user => user.username === username)) {
+        showNotification('Benutzername ist bereits vergeben!', 'warning');
+        return;
     }
+
+    // Validierung: Benutzername und Passwort dürfen nicht undefined oder leer sein
+    if (typeof username !== 'string' || username.trim() === '' || typeof password !== 'string' || password.trim() === '') {
+        showNotification('Ungültige Eingaben! Benutzername und Passwort dürfen nicht leer sein.', 'error');
+        return;
+    }
+
+    const hashedPassword = await hashPassword(password);
+
+    users.push({ username, password: hashedPassword });
+    localStorage.setItem('users', JSON.stringify(users));
+
+    showNotification('Registrierung erfolgreich!', 'success');
 }
 
 // Registrierungshandling
@@ -215,11 +219,14 @@ if (loginForm) {
             return;
         }
 
+        console.log('Eingegebener Benutzername:', username);
+        console.log('Eingegebenes Passwort:', password);
+
         // Bereinigung der Benutzerliste von ungültigen Einträgen
         const users = JSON.parse(localStorage.getItem('users')) || [];
         const validUsers = users.filter(user => typeof user.username === 'string' && user.username.trim() !== '' && typeof user.password === 'string' && user.password.trim() !== '');
         localStorage.setItem('users', JSON.stringify(validUsers));
-        console.log('Bereinigte Benutzerliste nach Validierung:', validUsers);
+        showNotification('Bereinigte Benutzerliste nach Validierung: ' + JSON.stringify(validUsers), 'info');
 
         try {
             const hashedPassword = await hashPassword(password);
@@ -268,6 +275,22 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
+// Funktion zum Speichern von Logs in localStorage
+function saveLog(message) {
+    const existingLogs = JSON.parse(localStorage.getItem('persistentLogs')) || [];
+    existingLogs.push({ timestamp: new Date().toISOString(), message });
+    localStorage.setItem('persistentLogs', JSON.stringify(existingLogs));
+}
+
+// Funktion zum Abrufen der Logs
+function getLogs() {
+    return JSON.parse(localStorage.getItem('persistentLogs')) || [];
+}
+
+// Beispiel: Logs speichern
+saveLog('Benutzerliste: ' + JSON.stringify(users));
+saveLog('Suchergebnis: ' + JSON.stringify(user));
+
 // Funktion zur Bereinigung doppelter Benutzer
 function removeDuplicateUsers() {
     const users = JSON.parse(localStorage.getItem('users')) || [];
@@ -277,59 +300,35 @@ function removeDuplicateUsers() {
     localStorage.setItem('users', JSON.stringify(uniqueUsers));
 }
 
-// Entfernt ungültige Benutzer aus localStorage
-function removeInvalidUsers() {
+// Entfernt ungültige Benutzer aus localStorage nur bei Bedarf und loggt relevante Informationen
+function removeInvalidUsersIfNeeded() {
     const users = JSON.parse(localStorage.getItem('users')) || [];
     const validUsers = users.filter(user => user.username && user.password);
-    localStorage.setItem('users', JSON.stringify(validUsers));
-    console.log('Ungültige Benutzer entfernt. Aktuelle Benutzer:', validUsers);
+
+    // Überprüfen, ob ungültige Benutzer existieren
+    if (users.length !== validUsers.length) {
+        localStorage.setItem('users', JSON.stringify(validUsers));
+        console.log(`Ungültige Benutzer entfernt: ${users.length - validUsers.length}`);
+        saveLog(`Ungültige Benutzer entfernt: ${users.length - validUsers.length}`);
+    } else {
+        console.log('Keine ungültigen Benutzer gefunden.');
+    }
 }
 
-// Validierung bei der Registrierung
-async function handleRegister(username, password) {
+// Initialisierung der Benutzerbereinigung nur bei bestimmten Bedingungen
+function initializeUserCleanup() {
     const users = JSON.parse(localStorage.getItem('users')) || [];
-    const userExists = users.some(user => user.username === username);
+    const hasInvalidUsers = users.some(user => !user.username || !user.password);
 
-    if (userExists) {
-        showNotification('Benutzername existiert bereits. Bitte wählen Sie einen anderen.', 'error');
-        return;
+    if (hasInvalidUsers) {
+        removeInvalidUsersIfNeeded();
+    } else {
+        console.log('Benutzerbereinigung nicht erforderlich.');
     }
-
-    const hashedPassword = await hashPassword(password);
-    users.push({ username, password: hashedPassword });
-    localStorage.setItem('users', JSON.stringify(users));
-    showNotification('Registrierung erfolgreich!', 'success');
 }
 
-// Initialisierung
-document.addEventListener('DOMContentLoaded', () => {
-    updateButtonVisibility();
-    updateHeaderButtons();
-
-    const loginButton = document.getElementById('login-button');
-    const logoutButton = document.getElementById('logout-button');
-
-    if (loginButton) {
-        loginButton.addEventListener('click', () => {
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
-            handleLogin(username, password);
-        });
-    }
-
-    if (logoutButton) {
-        logoutButton.addEventListener('click', handleLogout);
-    }
-
-    // Bereinigung doppelter Benutzer beim Laden der Seite
-    removeDuplicateUsers();
-
-    // Bereinigung ungültiger Benutzer beim Laden der Seite
-    removeInvalidUsers();
-
-    // Zusätzliche Initialisierungen, falls erforderlich
-    refreshUIAfterAuthChange();
-});
+// Aufruf der Bereinigung nur bei bestimmten Ereignissen (z. B. Registrierung oder Login)
+// initializeUserCleanup(); // Entfernt aus dem globalen Seitenaufruf
 
 // Sicherstellen, dass `refreshUIAfterAuthChange` verfügbar ist
 document.addEventListener('DOMContentLoaded', () => {
@@ -386,3 +385,63 @@ function showNotification(message, type = 'info') {
 
 // Stellt sicher, dass handleLogout global verfügbar ist
 window.handleLogout = handleLogout;
+
+// Funktion zum Schreiben von Debug-Logs in eine lokale Datei
+function writeToLogFile(message) {
+    const existingLogs = localStorage.getItem('debugLogs') || '';
+    const updatedLogs = existingLogs + `\n${new Date().toISOString()} - ${message}`;
+    localStorage.setItem('debugLogs', updatedLogs);
+}
+
+// Beispiel für die Verwendung:
+writeToLogFile('Benutzerliste: ' + JSON.stringify(users));
+writeToLogFile('Suchergebnis: ' + JSON.stringify(user));
+
+// Funktion zum Exportieren der Logs in die debug.log-Datei
+function exportLogsToFile() {
+    const logs = localStorage.getItem('debugLogs') || '';
+    const blob = new Blob([logs], { type: 'text/plain' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'debug.log';
+    link.click();
+}
+
+// Beispiel: Exportieren der Logs
+// exportLogsToFile();
+
+// Überschreibt console.log, um Logs direkt in die debug.log-Datei zu schreiben
+(function() {
+    const originalConsoleLog = console.log;
+    console.log = function(...args) {
+        originalConsoleLog.apply(console, args);
+    };
+})();
+
+// Funktion zur Anzeige von Logs
+function showLogs() {
+    const logs = JSON.parse(localStorage.getItem('persistentLogs')) || [];
+    const logContainer = document.createElement('div');
+    logContainer.style.padding = '10px';
+    logContainer.style.margin = '10px';
+    logContainer.style.border = '1px solid #ccc';
+    logContainer.style.backgroundColor = '#f9f9f9';
+    logContainer.style.maxHeight = '300px';
+    logContainer.style.overflowY = 'scroll';
+
+    logs.forEach(log => {
+        const logEntry = document.createElement('p');
+        logEntry.textContent = `${log.timestamp}: ${log.message}`;
+        logContainer.appendChild(logEntry);
+    });
+
+    const headerRight = document.querySelector('.header-right');
+    if (headerRight) {
+        headerRight.appendChild(logContainer);
+    } else {
+        console.error('Header-Container nicht gefunden. Logs können nicht angezeigt werden.');
+    }
+}
+
+// Stellt sicher, dass die Funktion global verfügbar ist
+window.showLogs = showLogs;

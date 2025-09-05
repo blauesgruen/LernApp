@@ -10,6 +10,17 @@
             cursor: pointer; /* Change cursor to pointer to indicate clickability */
             text-decoration: none; /* Ensure no underline is shown */
         }
+        .btn {
+            padding: 10px 20px;
+            margin: 10px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .btn-secondary {
+            background-color: #6c757d;
+            color: white;
+        }
     </style>
 </head>
 <body>
@@ -24,12 +35,9 @@
             <li><a href="profile.html" class="profile-button" id="profile-button">Profil</a></li>
             <li><a href="#" class="logout-button" id="logout-button" onclick="handleLogout()">Ausloggen</a></li>
         </ul>
+        <button id="log-button" class="btn btn-secondary" onclick="showLogs()">Logs anzeigen</button>
         <div class="header-right"></div>
     </nav>
-    <div id="notification-container" style="padding: 10px; margin: 10px 0; border-radius: 5px; font-size: 14px; background-color: #d1ecf1; display: block; position: relative;">
-        <span class="close-button" style="float: right; cursor: pointer; margin-right: 10px;">×</span>
-        Temporäre Meldung zur Positionierung und Gestaltung.
-    </div>
     <script>
         // Global handleLogout-Funktion
         window.handleLogout = function() {
@@ -50,6 +58,27 @@
                 logoutButton.onclick = window.handleLogout;
             }
         });
+
+        // Stellt sicher, dass showLogs global verfügbar ist
+        window.showLogs = function() {
+            const logs = JSON.parse(localStorage.getItem('persistentLogs')) || [];
+            const logContainer = document.createElement('div');
+            logContainer.style.padding = '10px';
+            logContainer.style.margin = '10px';
+            logContainer.style.border = '1px solid #ccc';
+            logContainer.style.backgroundColor = '#f9f9f9';
+            logContainer.style.maxHeight = '300px';
+            logContainer.style.overflowY = 'scroll';
+
+            logs.forEach(log => {
+                const logEntry = document.createElement('p');
+                logEntry.textContent = `${log.timestamp}: ${log.message}`;
+                logContainer.appendChild(logEntry);
+            });
+
+            const headerRight = document.querySelector('.header-right');
+            headerRight.appendChild(logContainer);
+        };
     </script>
 </body>
 </html>

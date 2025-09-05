@@ -13,14 +13,14 @@
     <main>
         <section id="register">
             <h1>Registrieren</h1>
-            <form>
+            <form id="register-form">
                 <input type="text" id="username" name="username" placeholder="Benutzername" required>
                 
                 <input type="password" id="password" name="password" placeholder="Passwort" required>
                 
                 <input type="password" id="confirm-password" name="confirm-password" placeholder="Passwort bestätigen" required>
                 
-                <button type="button" class="btn-primary" onclick="handleRegister()">Registrieren</button>
+                <button type="submit" class="btn-primary">Registrieren</button>
             </form>
             <p>Bereits einen Account? <a href="login.html">Login</a></p>
         </section>
@@ -37,13 +37,16 @@
         }
         loadHeaderAndFooter();
 
-        async function handleRegister() {
+        document.getElementById('register-form').addEventListener('submit', async function(event) {
+            event.preventDefault(); // Verhindert das automatische Neuladen der Seite
+
             const username = document.getElementById('username').value;
             const password = document.getElementById('password').value;
             const confirmPassword = document.getElementById('confirm-password').value;
 
             if (password !== confirmPassword) {
-                alert('Passwörter stimmen nicht überein!');
+                showNotification('Passwörter stimmen nicht überein!', 'error');
+                console.log('Passwörter stimmen nicht überein!');
                 return;
             }
 
@@ -55,9 +58,10 @@
             users.push({ username, password: hashedPassword });
             localStorage.setItem('users', JSON.stringify(users));
 
-            alert('Registrierung erfolgreich!');
+            showNotification('Registrierung erfolgreich!', 'success');
+            console.log('Registrierung erfolgreich!');
             // Weiterleitung oder andere Aktionen hier einfügen
-        }
+        });
 
         async function hashPassword(password) {
             const encoder = new TextEncoder();
