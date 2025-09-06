@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard</title>
     <link rel="stylesheet" href="style.css">
+    <!-- Font Awesome für die Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.1/css/all.min.css">
 </head>
 <body>
     <div id="header-container"></div>
@@ -12,13 +14,13 @@
     <main>
         <div class="dashboard-container">
             <div class="dashboard-box">
-                <button onclick="location.href='quiz.html'">Quiz</button>
+                <button onclick="location.href='quiz.html'">Quiz starten</button>
             </div>
             <div class="dashboard-box">
-                <button onclick="location.href='questions.html'">Fragen/Antworten einstellen</button>
+                <button onclick="location.href='questions.html'">Fragen verwalten</button>
             </div>
             <div class="dashboard-box">
-                <button onclick="location.href='statistics.html'">Statistik</button>
+                <button onclick="location.href='statistics.html'">Statistiken</button>
             </div>
         </div>
     </main>
@@ -33,5 +35,6 @@
         loadHeaderAndFooter();
     </script>
     <script src="js/auth.js"></script>
+    <script src="js/notification.js"></script>
 </body>
 </html>
