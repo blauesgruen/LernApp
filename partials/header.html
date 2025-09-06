@@ -27,6 +27,16 @@
         .app-logo-button span {
             color: black; /* Text immer schwarz */
         }
+        /* Gemeinsame Stile für alle Menübuttons */
+        #user-buttons a, .admin-button {
+            margin-right: 15px; /* Abstand zwischen den Buttons */
+            color: black; /* Textfarbe immer schwarz */
+            text-decoration: none; /* Keine Unterstreichung */
+            transition: color 0.3s ease; /* Weicher Übergang für Hover-Effekt */
+        }
+        #user-buttons a:hover, .admin-button:hover {
+            color: #007bff; /* Dezente Farbänderung beim Hover */
+        }
     </style>
 </head>
 <body>
