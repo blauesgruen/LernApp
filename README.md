@@ -151,3 +151,25 @@ Die LernApp ist eine interaktive Plattform, die Benutzern ermöglicht, Wissen du
 ### Technische Herausforderungen
 - Probleme mit Flexbox und der dynamischen Einbindung von Header und Footer wurden gelöst.
 - Zusätzliche CSS-Regeln wurden hinzugefügt, um Layout-Überlappungen zu vermeiden.
+
+### App-Logo-Button
+- Der App-Logo-Button wurde so konfiguriert, dass er dynamisch auf die Login-Status des Benutzers reagiert.
+  - Wenn der Benutzer eingeloggt ist, führt der Button zur `dashboard.html`.
+  - Wenn der Benutzer nicht eingeloggt ist, führt der Button zur `index.html`.
+- Styling:
+  - Das Icon des Buttons ist immer blau.
+  - Der Text des Buttons ist immer schwarz.
+- Diese Änderungen wurden implementiert, um eine konsistente Benutzererfahrung zu gewährleisten.
+
+### Sichtbarkeit der Menü-Punkte
+- Die Sichtbarkeit der Menü-Punkte wird dynamisch basierend auf dem Login-Status des Benutzers gesteuert.
+  - **Admin-Button**: Wird nur angezeigt, wenn der Benutzer nicht eingeloggt ist.
+  - **User-Buttons**: Werden nur angezeigt, wenn der Benutzer eingeloggt ist.
+- Diese Logik wird durch JavaScript implementiert und überprüft den `loggedIn`-Status im `localStorage`.
+
+### Login und Login-Status
+- Der Login-Status des Benutzers wird im `localStorage` unter dem Schlüssel `loggedIn` gespeichert.
+  - **Wert `true`**: Benutzer ist eingeloggt.
+  - **Wert `false`**: Benutzer ist nicht eingeloggt.
+- Beim Logout werden alle Daten im `localStorage` gelöscht, mit Ausnahme der persistenten Logs (`persistentLogs`).
+- Nach dem Logout wird der Benutzer automatisch zur Startseite (`index.html`) weitergeleitet.

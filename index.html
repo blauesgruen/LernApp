@@ -26,8 +26,19 @@
     <script>
         // Header und Footer dynamisch laden
         async function loadHeaderAndFooter() {
-            document.getElementById('header-container').innerHTML = await (await fetch('partials/header.html')).text();
-            document.getElementById('footer-container').innerHTML = await (await fetch('partials/footer.html')).text();
+            const headerHTML = await (await fetch('partials/header.html')).text();
+            document.getElementById('header-container').innerHTML = headerHTML;
+
+            // Stelle sicher, dass die Logik für den app-logo-button nach dem Laden des Headers ausgeführt wird
+            const appLogoButton = document.getElementById('app-logo-button');
+            const isLoggedIn = localStorage.getItem('loggedIn') === 'true';
+            if (appLogoButton) {
+                appLogoButton.href = isLoggedIn ? 'dashboard.html' : 'index.html';
+                console.log('DEBUG: App-Logo-Button Link nach dynamischem Laden gesetzt:', appLogoButton.href);
+            }
+
+            const footerHTML = await (await fetch('partials/footer.html')).text();
+            document.getElementById('footer-container').innerHTML = footerHTML;
         }
         loadHeaderAndFooter();
     </script>

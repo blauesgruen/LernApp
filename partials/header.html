@@ -21,14 +21,20 @@
             background-color: #6c757d;
             color: white;
         }
+        .app-logo-button i {
+            color: blue; /* Icon immer blau */
+        }
+        .app-logo-button span {
+            color: black; /* Text immer schwarz */
+        }
     </style>
 </head>
 <body>
     <nav>
-        <div class="app-logo-button">
+        <a href="index.html" class="app-logo-button" id="app-logo-button">
             <i class="fas fa-graduation-cap"></i>
             <span>LernApp</span>
-        </div>
+        </a>
         <ul>
             <li><a href="admin.html" class="admin-button" id="admin-button">Admin</a></li>
             <li id="user-buttons" style="display: none;">
@@ -66,7 +72,7 @@
 
             const adminButton = document.getElementById('admin-button');
             const userButtons = document.getElementById('user-buttons');
-            const appLogoButton = document.querySelector('.app-logo-button');
+            const appLogoButton = document.getElementById('app-logo-button');
             const isLoggedIn = localStorage.getItem('loggedIn') === 'true';
 
             console.log('DEBUG: Überprüfe, ob adminButton existiert:', !!adminButton);
@@ -91,7 +97,16 @@
 
             if (appLogoButton) {
                 console.log('DEBUG: App-Logo-Button gefunden. Setze Link.');
-                appLogoButton.href = isLoggedIn ? 'dashboard.html' : 'index.html';
+
+                // Setze den Link basierend auf dem Login-Status
+                if (isLoggedIn) {
+                    appLogoButton.href = 'dashboard.html';
+                    console.log('DEBUG: Benutzer ist eingeloggt. Link auf Dashboard gesetzt.');
+                } else {
+                    appLogoButton.href = 'index.html';
+                    console.log('DEBUG: Benutzer ist nicht eingeloggt. Link auf Index gesetzt.');
+                }
+
                 console.log('DEBUG: App-Logo-Button Link nach Änderung:', appLogoButton.href);
             } else {
                 console.error('DEBUG: App-Logo-Button nicht gefunden.');
