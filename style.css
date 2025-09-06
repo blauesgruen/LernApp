@@ -127,24 +127,27 @@ nav ul li a[href="#admin"] {
 
 #welcome h1 {
     font-size: 32px;
+    margin-bottom: 30px;
+}
+
+#welcome p {
+    color: #666; /* Blassere Farbe als Schwarz */
+    font-size: 16px; /* Kleinere Schriftgröße */
+    margin-bottom: 30px; /* Gleicher Abstand zum Button wie vom Titel zum Text */
+    line-height: 1.5; /* Angenehme Lesbarkeit */
+    max-width: 600px; /* Begrenzte Breite für bessere Lesbarkeit */
+    margin-left: auto; /* Zentrieren */
+    margin-right: auto; /* Zentrieren */
 }
 
 #welcome a {
     display: inline-block;
-    margin-top: 30px;
     padding: 20px 40px;
     font-size: 20px;
     background-color: #007BFF;
     color: white;
     text-decoration: none;
     border-radius: 8px;
-}
-
-#welcome p {
-    color: #666; /* Blassere Farbe als Schwarz */
-    font-size: 20px; /* Etwas kleiner als der Willkommen-Text */
-    margin-top: 20px; /* Abstand zum Login-Button */
-    line-height: 1.5; /* Angenehme Lesbarkeit */
 }
 
 /* Stile für die LernApp-Verknüpfung */
