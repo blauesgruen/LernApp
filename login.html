@@ -28,6 +28,8 @@
     <!-- Einbindung des zentralen Footers -->
     <div id="footer-container"></div>
 
+    <script src="js/auth.js"></script>
+    <script src="js/notification.js"></script>
     <script>
         // Header und Footer dynamisch laden
         async function loadHeaderAndFooter() {
@@ -36,45 +38,48 @@
         }
         loadHeaderAndFooter();
 
-        async function handleLogin() {
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
-
-            // Passwort hashen
-            const hashedPassword = await hashPassword(password);
-
-            // Benutzerdaten aus localStorage abrufen
-            const users = JSON.parse(localStorage.getItem('users')) || [];
-
-            // Benutzer überprüfen
-            const user = users.find(u => u.username === username && u.password === hashedPassword);
-
-            const messageField = document.getElementById('message-field');
-
-            if (user) {
-                messageField.textContent = 'Login erfolgreich!';
-                messageField.style.color = 'green';
-                // Weiterleitung zum Dashboard
-                window.location.href = 'dashboard.html';
-            } else {
-                messageField.textContent = 'Benutzername oder Passwort falsch!';
-                messageField.style.color = 'red';
-            }
-        }
-
+        // Hashfunktion für lokale Nutzung (könnte in auth.js zentralisiert werden)
         async function hashPassword(password) {
             const encoder = new TextEncoder();
             const data = encoder.encode(password);
             const hash = await crypto.subtle.digest('SHA-256', data);
             return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
         }
+        
+        // Globale hashPassword-Funktion für die zentrale handleLogin-Funktion in auth.js
+        window.hashPassword = hashPassword;
 
-        document.getElementById('login').addEventListener('keydown', function(event) {
-            if (event.key === 'Enter') {
-                handleLogin();
+        // Form-Submission-Handler
+        document.addEventListener('DOMContentLoaded', function() {
+            const loginForm = document.querySelector('#login form');
+            
+            if (loginForm) {
+                loginForm.addEventListener('submit', async function(event) {
+                    event.preventDefault(); // Verhindert Standard-Formular-Absenden
+                    
+                    const username = document.getElementById('username').value;
+                    const password = document.getElementById('password').value;
+                    
+                    // Zentrale Login-Funktion aus auth.js aufrufen
+                    if (window.handleLogin) {
+                        await window.handleLogin(username, password);
+                    } else {
+                        // Fallback, falls die zentrale Funktion nicht verfügbar ist
+                        showError('Fehler: Login-Funktion nicht verfügbar.');
+                    }
+                });
             }
+            
+            // Zusätzlicher Enter-Key-Handler
+            document.getElementById('login').addEventListener('keydown', function(event) {
+                if (event.key === 'Enter') {
+                    const loginButton = document.querySelector('#login form button[type="submit"]');
+                    if (loginButton) {
+                        loginButton.click(); // Simuliert Klick auf Submit-Button
+                    }
+                }
+            });
         });
     </script>
-    <script src="js/auth.js"></script>
 </body>
 </html>

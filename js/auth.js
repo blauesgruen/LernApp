@@ -191,14 +191,21 @@ document.addEventListener('DOMContentLoaded', () => {
 async function handleLogin(username, password) {
     logMessage('handleLogin wurde aufgerufen mit Benutzername: ' + username + ' und Passwort: ' + password);
 
+    // Prüfen, ob hashPassword-Funktion verfügbar ist
+    if (!window.hashPassword) {
+        logMessage('Fehler: hashPassword-Funktion nicht verfügbar', 'error');
+        showError('Ein interner Fehler ist aufgetreten.');
+        return;
+    }
+
     if (!username || !password) {
         logMessage('Fehler: Benutzername oder Passwort ist leer', 'error');
-        showNotification('Benutzername und Passwort dürfen nicht leer sein!', 'error');
+        showError('Benutzername und Passwort dürfen nicht leer sein!');
         return;
     }
 
     const users = JSON.parse(localStorage.getItem('users')) || [];
-    const hashedPassword = await hashPassword(password);
+    const hashedPassword = await window.hashPassword(password);
 
     const user = users.find(u => u.username === username && u.password === hashedPassword);
 
@@ -234,17 +241,29 @@ async function handleLogin(username, password) {
         logMessage('Passwortvergleichsergebnis: ' + (user.password === hashedPassword));
     } else {
         logMessage('Kein passender Benutzer gefunden oder Passwort stimmt nicht überein.', 'error');
+        // Zentrale Benachrichtigung für Fehlerfall
+        showError('Benutzername oder Passwort falsch!');
+        setLoginStatus(false);
+        return; // Frühzeitig beenden, um Weiterleitung zu verhindern
     }
 
     if (user) {
         localStorage.setItem('username', user.username); // Benutzername speichern
         setLoginStatus(true);
         logMessage('Login-Status wurde auf "eingeloggt" gesetzt.');
-
-        // Weiterleitung zum Dashboard
-        window.location.href = 'dashboard.html';
+        
+        // Erfolgsmeldung über das zentrale Benachrichtigungssystem
+        showSuccess('Login erfolgreich! Sie werden weitergeleitet...');
+        
+        // Kurze Verzögerung für die Anzeige der Erfolgsmeldung
+        setTimeout(() => {
+            // Weiterleitung zum Dashboard
+            window.location.href = 'dashboard.html';
+        }, 1000);
     } else {
         logMessage('Kein Benutzer gefunden oder Passwortvergleich fehlgeschlagen.', 'error');
+        // Dies sollte nie erreicht werden, da wir bereits oben bei user==null abbrechen
+        showError('Ein unerwarteter Fehler ist aufgetreten.');
         setLoginStatus(false);
     }
 }
