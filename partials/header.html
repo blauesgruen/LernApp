@@ -76,11 +76,12 @@
             }
         };
 
-        document.addEventListener('DOMContentLoaded', () => {
+        // Funktion zur Aktualisierung der Navigation basierend auf Login-Status
+        window.updateNavigation = function() {
             // Zentrale Logging-Funktion verwenden, falls verfügbar
             const log = window.logMessage || console.log;
             
-            log('DOMContentLoaded Event ausgelöst.');
+            log('Navigation wird aktualisiert.');
 
             const adminButton = document.getElementById('admin-button');
             const userButtons = document.getElementById('user-buttons');
@@ -124,8 +125,14 @@
                 log('App-Logo-Button nicht gefunden.', 'error');
             }
 
-            log('DOM-Manipulation abgeschlossen.');
-        });
+            log('Navigation aktualisiert.');
+        }
+
+        // Führe updateNavigation sofort aus, wenn das Skript geladen wird
+        window.updateNavigation();
+
+        // Zusätzlich beim DOMContentLoaded-Event ausführen
+        document.addEventListener('DOMContentLoaded', window.updateNavigation);
 
         // Stellt sicher, dass showLogs global verfügbar ist
         window.showLogs = function() {

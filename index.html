@@ -27,25 +27,32 @@
     <script>
         // Header und Footer dynamisch laden
         async function loadHeaderAndFooter() {
-            const headerHTML = await (await fetch('partials/header.html')).text();
-            document.getElementById('header-container').innerHTML = headerHTML;
-
-            // Stelle sicher, dass die Logik für den app-logo-button nach dem Laden des Headers ausgeführt wird
-            const appLogoButton = document.getElementById('app-logo-button');
-            const isLoggedIn = localStorage.getItem('loggedIn') === 'true';
-            if (appLogoButton) {
-                appLogoButton.href = isLoggedIn ? 'dashboard.html' : 'index.html';
-                // Zentrale Logging-Funktion verwenden
-                if (window.logMessage) {
-                    window.logMessage('App-Logo-Button Link nach dynamischem Laden gesetzt: ' + appLogoButton.href);
-                } else {
-                    console.log('App-Logo-Button Link nach dynamischem Laden gesetzt: ' + appLogoButton.href);
+            try {
+                // Header und Footer laden
+                document.getElementById('header-container').innerHTML = await (await fetch('partials/header.html')).text();
+                document.getElementById('footer-container').innerHTML = await (await fetch('partials/footer.html')).text();
+                
+                // Skripte aus dem Header auswerten
+                const headerScripts = document.getElementById('header-container').querySelectorAll('script');
+                for (const script of headerScripts) {
+                    if (script.innerText) {
+                        eval(script.innerText);
+                    }
                 }
+                
+                // Explizit die Navigation aktualisieren
+                if (window.updateNavigation) {
+                    console.log('Navigation wird nach dem Laden des Headers aktualisiert.');
+                    window.updateNavigation();
+                } else {
+                    console.log('updateNavigation-Funktion nicht gefunden.');
+                }
+            } catch (error) {
+                console.error('Fehler beim Laden des Headers oder Footers:', error);
             }
-
-            const footerHTML = await (await fetch('partials/footer.html')).text();
-            document.getElementById('footer-container').innerHTML = footerHTML;
         }
+        
+        // Header und Footer laden
         loadHeaderAndFooter();
     </script>
 </body>

@@ -9,7 +9,8 @@ Die LernApp ist eine interaktive Plattform, die Benutzern ermöglicht, Wissen du
 
 ### Navigation
 - Der Menüpunkt "Startseite" wurde entfernt.
-- Das Icon und der Text "LernApp" führen jetzt zur Startseite und sind linksbündig ausgerichtet.
+- Der Menüpunkt "Dashboard" wurde aus dem Header entfernt, da die Navigation zum Dashboard über den App-Logo-Button erfolgt.
+- Das Icon und der Text "LernApp" führen jetzt zur Startseite oder zum Dashboard (abhängig vom Login-Status) und sind linksbündig ausgerichtet.
 - Der Admin-Button-Text wurde schwarz gefärbt.
 
 ### Willkommensbereich
@@ -142,24 +143,63 @@ Die LernApp ist eine interaktive Plattform, die Benutzern ermöglicht, Wissen du
 
 ### Zentrale Header- und Footer-Komponenten
 - Der Header und Footer wurden zentralisiert und werden dynamisch in die Seiten geladen.
+- Die Ladestrategie wurde verbessert, um sicherzustellen, dass JavaScript im Header korrekt ausgeführt wird:
+  ```javascript
+  async function loadHeaderAndFooter() {
+      try {
+          // Header und Footer laden
+          document.getElementById('header-container').innerHTML = await (await fetch('partials/header.html')).text();
+          document.getElementById('footer-container').innerHTML = await (await fetch('partials/footer.html')).text();
+          
+          // Skripte aus dem Header auswerten
+          const headerScripts = document.getElementById('header-container').querySelectorAll('script');
+          for (const script of headerScripts) {
+              if (script.innerText) {
+                  eval(script.innerText);
+              }
+          }
+          
+          // Explizit die Navigation aktualisieren
+          if (window.updateNavigation) {
+              window.updateNavigation();
+          }
+      } catch (error) {
+          console.error('Fehler beim Laden des Headers oder Footers:', error);
+      }
+  }
+  ```
 - Änderungen an diesen Komponenten wirken sich automatisch auf alle Seiten aus.
 
-### Admin-Button
-- Der Admin-Button wurde speziell für schmale Bildschirme angepasst.
-- Er bleibt sichtbar und korrekt positioniert, unabhängig von der Bildschirmbreite.
+### Profilseite
+- Die Profilseite wurde mit einem kompakteren, zweispaltigen Layout neu gestaltet.
+- Die linke Spalte enthält Funktionen zur Bearbeitung des Benutzerprofils und zum Ändern des Passworts.
+- Die rechte Spalte enthält die "Gefahrenzone" mit Optionen zum Löschen von Daten und des Kontos.
+- Das Design ist responsiv und wechselt auf kleineren Bildschirmen zu einem einspaltigen Layout.
+- Eingabefelder wurden optimiert, um die korrekte Box-Sizing-Strategie zu verwenden (`box-sizing: border-box`).
+
+### Sicherheitsabfragen
+- Für kritische Aktionen wie das Löschen von Daten oder des Kontos wurden modale Dialoge mit Sicherheitsabfragen implementiert.
+- Die modalen Dialoge sind zentriert und responsiv gestaltet.
+- Klare Warnmeldungen informieren den Benutzer über die Konsequenzen der Aktionen.
 
 ### Technische Herausforderungen
 - Probleme mit Flexbox und der dynamischen Einbindung von Header und Footer wurden gelöst.
+- Das korrekte Ausführen von JavaScript in dynamisch geladenen Header-Elementen wurde implementiert.
+- Die Konsistenz des App-Logo-Buttons über alle Seiten hinweg wurde sichergestellt.
 - Zusätzliche CSS-Regeln wurden hinzugefügt, um Layout-Überlappungen zu vermeiden.
+- Ein robustes Fehlerbehandlungssystem mit try-catch-Blöcken und detailliertem Logging wurde implementiert.
 
 ### App-Logo-Button
-- Der App-Logo-Button wurde so konfiguriert, dass er dynamisch auf die Login-Status des Benutzers reagiert.
+- Der App-Logo-Button wurde so konfiguriert, dass er dynamisch auf den Login-Status des Benutzers reagiert.
   - Wenn der Benutzer eingeloggt ist, führt der Button zur `dashboard.html`.
   - Wenn der Benutzer nicht eingeloggt ist, führt der Button zur `index.html`.
+- Die Konfiguration erfolgt durch die globale `window.updateNavigation`-Funktion im Header.
+- Diese Funktion wird automatisch nach dem Laden des Headers auf allen Seiten ausgeführt.
+- Für dynamisch geladene Header wurde ein spezieller Mechanismus implementiert, der sicherstellt, dass die Verlinkung konsistent funktioniert.
 - Styling:
   - Das Icon des Buttons ist immer blau.
   - Der Text des Buttons ist immer schwarz.
-- Diese Änderungen wurden implementiert, um eine konsistente Benutzererfahrung zu gewährleisten.
+- Diese Änderungen wurden implementiert, um eine konsistente Benutzererfahrung auf allen Seiten zu gewährleisten.
 
 ### Sichtbarkeit der Menü-Punkte
 - Die Sichtbarkeit der Menü-Punkte wird dynamisch basierend auf dem Login-Status des Benutzers gesteuert.

@@ -33,9 +33,32 @@
     <script>
         // Header und Footer dynamisch laden
         async function loadHeaderAndFooter() {
-            document.getElementById('header-container').innerHTML = await (await fetch('partials/header.html')).text();
-            document.getElementById('footer-container').innerHTML = await (await fetch('partials/footer.html')).text();
+            try {
+                // Header und Footer laden
+                document.getElementById('header-container').innerHTML = await (await fetch('partials/header.html')).text();
+                document.getElementById('footer-container').innerHTML = await (await fetch('partials/footer.html')).text();
+                
+                // Skripte aus dem Header auswerten
+                const headerScripts = document.getElementById('header-container').querySelectorAll('script');
+                for (const script of headerScripts) {
+                    if (script.innerText) {
+                        eval(script.innerText);
+                    }
+                }
+                
+                // Explizit die Navigation aktualisieren
+                if (window.updateNavigation) {
+                    console.log('Navigation wird nach dem Laden des Headers aktualisiert.');
+                    window.updateNavigation();
+                } else {
+                    console.log('updateNavigation-Funktion nicht gefunden.');
+                }
+            } catch (error) {
+                console.error('Fehler beim Laden des Headers oder Footers:', error);
+            }
         }
+        
+        // Header und Footer laden
         loadHeaderAndFooter();
 
         // Hashfunktion für lokale Nutzung (könnte in auth.js zentralisiert werden)
