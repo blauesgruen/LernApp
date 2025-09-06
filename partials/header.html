@@ -31,19 +31,28 @@
         </div>
         <ul>
             <li><a href="admin.html" class="admin-button" id="admin-button">Admin</a></li>
-            <li><a href="dashboard.html" class="dashboard-button" id="dashboard-button">Dashboard</a></li>
-            <li><a href="profile.html" class="profile-button" id="profile-button">Profil</a></li>
-            <li><a href="#" class="logout-button" id="logout-button" onclick="handleLogout()">Ausloggen</a></li>
+            <li id="user-buttons" style="display: none;">
+                <a href="dashboard.html" class="dashboard-button" id="dashboard-button">Dashboard</a>
+                <a href="profile.html" class="profile-button" id="profile-button">Profil</a>
+                <a href="#" class="logout-button" id="logout-button" onclick="handleLogout()">Ausloggen</a>
+            </li>
         </ul>
-        <button id="log-button" class="btn btn-secondary" onclick="showLogs()">Logs anzeigen</button>
         <div class="header-right"></div>
-    </nav>
+    </nav>    
+    <div id="notification-container" style="padding: 10px; margin: 10px 0; border-radius: 5px; font-size: 14px; background-color: #d1ecf1; display: block; position: relative;">
+        <span class="close-button" style="float: right; cursor: pointer; margin-right: 10px;">×</span>
+        Temporäre Meldung zur Positionierung und Gestaltung.
+    </div>
     <script>
-        // Global handleLogout-Funktion
+        // Logs persistent machen, auch nach Logout
         window.handleLogout = function() {
             try {
-                // Entferne alle relevanten Daten aus localStorage
+                // Nur relevante Daten aus localStorage entfernen, Logs bleiben erhalten
+                const logs = localStorage.getItem('persistentLogs');
                 localStorage.clear();
+                if (logs) {
+                    localStorage.setItem('persistentLogs', logs);
+                }
                 console.log('localStorage nach Logout:', localStorage);
                 // Weiterleitung zur Startseite
                 window.location.href = 'index.html';
@@ -53,10 +62,42 @@
         };
 
         document.addEventListener('DOMContentLoaded', () => {
-            const logoutButton = document.getElementById('logout-button');
-            if (logoutButton) {
-                logoutButton.onclick = window.handleLogout;
+            console.log('DEBUG: DOMContentLoaded Event ausgelöst.');
+
+            const adminButton = document.getElementById('admin-button');
+            const userButtons = document.getElementById('user-buttons');
+            const appLogoButton = document.querySelector('.app-logo-button');
+            const isLoggedIn = localStorage.getItem('loggedIn') === 'true';
+
+            console.log('DEBUG: Überprüfe, ob adminButton existiert:', !!adminButton);
+            console.log('DEBUG: Überprüfe, ob userButtons existiert:', !!userButtons);
+            console.log('DEBUG: Login-Status:', isLoggedIn);
+
+            if (adminButton) {
+                console.log('DEBUG: Admin-Button gefunden. Setze Sichtbarkeit.');
+                adminButton.style.display = isLoggedIn ? 'none' : 'block';
+                console.log('DEBUG: Admin-Button Sichtbarkeit nach Änderung:', adminButton.style.display);
+            } else {
+                console.error('DEBUG: Admin-Button nicht gefunden.');
             }
+
+            if (userButtons) {
+                console.log('DEBUG: User-Buttons gefunden. Setze Sichtbarkeit.');
+                userButtons.style.display = isLoggedIn ? 'block' : 'none';
+                console.log('DEBUG: User-Buttons Sichtbarkeit nach Änderung:', userButtons.style.display);
+            } else {
+                console.error('DEBUG: User-Buttons Gruppe nicht gefunden.');
+            }
+
+            if (appLogoButton) {
+                console.log('DEBUG: App-Logo-Button gefunden. Setze Link.');
+                appLogoButton.href = isLoggedIn ? 'dashboard.html' : 'index.html';
+                console.log('DEBUG: App-Logo-Button Link nach Änderung:', appLogoButton.href);
+            } else {
+                console.error('DEBUG: App-Logo-Button nicht gefunden.');
+            }
+
+            console.log('DEBUG: DOM-Manipulation abgeschlossen.');
         });
 
         // Stellt sicher, dass showLogs global verfügbar ist
