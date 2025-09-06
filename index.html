@@ -23,6 +23,7 @@
     <div id="footer-container"></div>
 
     <script src="js/auth.js"></script>
+    <script src="js/notification.js"></script>
     <script>
         // Header und Footer dynamisch laden
         async function loadHeaderAndFooter() {
@@ -34,7 +35,12 @@
             const isLoggedIn = localStorage.getItem('loggedIn') === 'true';
             if (appLogoButton) {
                 appLogoButton.href = isLoggedIn ? 'dashboard.html' : 'index.html';
-                console.log('DEBUG: App-Logo-Button Link nach dynamischem Laden gesetzt:', appLogoButton.href);
+                // Zentrale Logging-Funktion verwenden
+                if (window.logMessage) {
+                    window.logMessage('App-Logo-Button Link nach dynamischem Laden gesetzt: ' + appLogoButton.href);
+                } else {
+                    console.log('App-Logo-Button Link nach dynamischem Laden gesetzt: ' + appLogoButton.href);
+                }
             }
 
             const footerHTML = await (await fetch('partials/footer.html')).text();
