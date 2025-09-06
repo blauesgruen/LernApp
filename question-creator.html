@@ -14,89 +14,156 @@
         <section id="question-creator-section">
             <h1>Fragen erstellen</h1>
             
-            <div class="question-creator-card">
-                <form id="question-form">
-                    <div class="form-grid">
-                        <div class="form-column">
+            <div class="page-layout">
+                <div class="category-management-column">
+                    <div class="question-creator-card">
+                        <h3>Kategorien verwalten</h3>
+                        <form id="category-form">
                             <div class="form-group">
-                                <label for="question-category">Kategorie:</label>
-                                <select id="question-category" required>
+                                <label for="category-name">Kategorienname:</label>
+                                <input type="text" id="category-name" required placeholder="Name der Kategorie...">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="category-description">Beschreibung (optional):</label>
+                                <textarea id="category-description" rows="2" placeholder="Beschreibung der Kategorie..."></textarea>
+                            </div>
+                            
+                            <div class="form-info">
+                                <p><i class="fas fa-info-circle"></i> Fragen mit Bildern werden automatisch als Bilderquiz kategorisiert. Fragen mit Text und Bild stehen in beiden Kategorien zur Verfügung.</p>
+                            </div>
+                            
+                            <div class="form-actions">
+                                <button type="submit" class="btn-primary">
+                                    <i class="fas fa-plus-circle"></i> Kategorie erstellen
+                                </button>
+                            </div>
+                        </form>
+                        
+                        <div class="items-list" id="categories-list">
+                            <p class="loading-info">Kategorien werden geladen...</p>
+                        </div>
+                    </div>
+                    
+                    <div class="question-creator-card">
+                        <h3>Gruppen verwalten</h3>
+                        <form id="group-form">
+                            <div class="form-group">
+                                <label for="group-category">Kategorie:</label>
+                                <select id="group-category" required>
                                     <option value="">-- Kategorie wählen --</option>
                                 </select>
                             </div>
                             
                             <div class="form-group">
-                                <label for="question-group">Gruppe:</label>
-                                <select id="question-group" required>
-                                    <option value="">-- Gruppe wählen --</option>
-                                    <option value="" disabled>Wähle zuerst eine Kategorie</option>
-                                </select>
+                                <label for="group-name">Gruppenname:</label>
+                                <input type="text" id="group-name" required placeholder="Name der Gruppe...">
                             </div>
                             
                             <div class="form-group">
-                                <label for="question-text">Fragetext:</label>
-                                <textarea id="question-text" rows="4" required placeholder="Gib hier deine Frage ein..."></textarea>
+                                <label for="group-description">Beschreibung (optional):</label>
+                                <textarea id="group-description" rows="2" placeholder="Beschreibung der Gruppe..."></textarea>
                             </div>
                             
-                            <div class="form-group">
-                                <label for="question-image">Bild hinzufügen (optional):</label>
-                                <div class="image-upload-container">
-                                    <input type="file" id="question-image" accept="image/*">
-                                    <label for="question-image" class="image-upload-label">
-                                        <i class="fas fa-upload"></i> Bild auswählen
-                                    </label>
-                                    <div id="image-preview" class="image-preview"></div>
-                                </div>
+                            <div class="form-actions">
+                                <button type="submit" class="btn-primary">
+                                    <i class="fas fa-plus-circle"></i> Gruppe erstellen
+                                </button>
                             </div>
-                            
-                            <div class="form-group">
-                                <label for="question-explanation">Erklärung (optional):</label>
-                                <textarea id="question-explanation" rows="3" placeholder="Erkläre die richtige Antwort..."></textarea>
-                            </div>
-                            
-                            <div class="form-group">
-                                <label for="question-difficulty">Schwierigkeitsgrad:</label>
-                                <div class="difficulty-selector">
-                                    <input type="range" id="question-difficulty" min="1" max="5" value="3">
-                                    <div class="difficulty-labels">
-                                        <span>Leicht</span>
-                                        <span>Mittel</span>
-                                        <span>Schwer</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                        </form>
                         
-                        <div class="form-column">
-                            <h3>Antwort</h3>
-                            <p class="help-text">Gib die richtige Antwort ein. Falsche Antwortoptionen werden automatisch aus anderen Fragen generiert.</p>
-                            
-                            <div id="answers-container">
-                                <div class="answer-option">
-                                    <div class="answer-header">
-                                        <label for="answer-0">Richtige Antwort:</label>
+                        <div class="items-list" id="groups-list">
+                            <p class="loading-info">Gruppen werden geladen...</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="question-creation-column">
+                    <div class="question-creator-card">
+                        <h3>Neue Frage erstellen</h3>
+                        <form id="question-form">
+                            <div class="form-column">
+                                <div class="form-group">
+                                    <label for="question-category">Kategorie:</label>
+                                    <select id="question-category" required>
+                                        <option value="">-- Kategorie wählen --</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="question-group">Gruppe:</label>
+                                    <select id="question-group" required>
+                                        <option value="">-- Gruppe wählen --</option>
+                                        <option value="" disabled>Wähle zuerst eine Kategorie</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="question-text">Fragetext:</label>
+                                    <textarea id="question-text" rows="4" required placeholder="Gib hier deine Frage ein..."></textarea>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="question-image">Bild hinzufügen (optional):</label>
+                                    <div class="image-upload-container">
+                                        <input type="file" id="question-image" accept="image/*">
+                                        <label for="question-image" class="image-upload-label">
+                                            <i class="fas fa-upload"></i> Bild auswählen
+                                        </label>
+                                        <div id="image-preview" class="image-preview"></div>
                                     </div>
-                                    <textarea id="answer-0" class="answer-text" rows="2" required placeholder="Die richtige Antwort..."></textarea>
+                                    <div class="form-info">
+                                        <p><i class="fas fa-info-circle"></i> Wenn du ein Bild hinzufügst, wird die Frage automatisch im Bilderquiz angezeigt. Fragen mit Text und Bild stehen in beiden Kategorien zur Verfügung.</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="question-explanation">Erklärung (optional):</label>
+                                    <textarea id="question-explanation" rows="3" placeholder="Erkläre die richtige Antwort..."></textarea>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="question-difficulty">Schwierigkeitsgrad:</label>
+                                    <div class="difficulty-selector">
+                                        <input type="range" id="question-difficulty" min="1" max="5" value="3">
+                                        <div class="difficulty-labels">
+                                            <span>Leicht</span>
+                                            <span>Mittel</span>
+                                            <span>Schwer</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            
+                                <h3>Antwort</h3>
+                                <p class="help-text">Gib die richtige Antwort ein. Falsche Antwortoptionen werden automatisch aus anderen Fragen generiert.</p>
+                                
+                                <div id="answers-container">
+                                    <div class="answer-option">
+                                        <div class="answer-header">
+                                            <label for="answer-0">Richtige Antwort:</label>
+                                        </div>
+                                        <textarea id="answer-0" class="answer-text" rows="2" required placeholder="Die richtige Antwort..."></textarea>
+                                    </div>
+                                </div>
+                            
+                                <div class="form-actions">
+                                    <button type="button" id="shuffle-answers-btn" class="btn-secondary">
+                                        <i class="fas fa-random"></i> Antworten mischen
+                                    </button>
+                                    <button type="submit" class="btn-primary">
+                                        <i class="fas fa-save"></i> Frage speichern
+                                    </button>
                                 </div>
                             </div>
-                        </div>
+                        </form>
                     </div>
                     
-                    <div class="form-actions">
-                        <button type="button" id="shuffle-answers-btn" class="btn-secondary">
-                            <i class="fas fa-random"></i> Antworten mischen
-                        </button>
-                        <button type="submit" class="btn-primary">
-                            <i class="fas fa-save"></i> Frage speichern
-                        </button>
+                    <div class="recent-questions-section">
+                        <h2>Zuletzt erstellte Fragen</h2>
+                        <div id="recent-questions-list" class="items-list">
+                            <p class="loading-info">Fragen werden geladen...</p>
+                        </div>
                     </div>
-                </form>
-            </div>
-            
-            <div class="recent-questions-section">
-                <h2>Zuletzt erstellte Fragen</h2>
-                <div id="recent-questions-list" class="items-list">
-                    <p class="loading-info">Fragen werden geladen...</p>
                 </div>
             </div>
         </section>

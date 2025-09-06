@@ -418,32 +418,12 @@ async function initializeDefaultCategories() {
     const categories = await loadCategories();
     
     if (categories.length === 0) {
-        const defaultCategories = [
-            {
-                id: generateUniqueId(),
-                name: 'Allgemeinwissen',
-                description: 'Fragen zu allgemeinem Wissen aus verschiedenen Bereichen',
-                createdBy: 'System',
-                createdAt: Date.now()
-            },
-            {
-                id: generateUniqueId(),
-                name: 'Mathematik',
-                description: 'Fragen zu mathematischen Konzepten und Berechnungen',
-                createdBy: 'System',
-                createdAt: Date.now()
-            },
-            {
-                id: generateUniqueId(),
-                name: 'Naturwissenschaften',
-                description: 'Fragen zu Physik, Chemie, Biologie und anderen Naturwissenschaften',
-                createdBy: 'System',
-                createdAt: Date.now()
-            }
-        ];
+        const defaultCategories = [];
         
-        await saveCategories(defaultCategories);
-        console.log('Standardkategorien wurden initialisiert.');
+        if (defaultCategories.length > 0) {
+            await saveCategories(defaultCategories);
+            console.log('Standardkategorien wurden initialisiert.');
+        }
     }
 }
 

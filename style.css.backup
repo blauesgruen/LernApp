@@ -15,6 +15,13 @@ body {
     flex-direction: column;
 }
 
+main {
+    flex: 1;
+    padding: 2rem;
+    text-align: center;
+    margin-bottom: var(--bar-height); /* Abstand für den Footer */
+}
+
 /* Allgemeine Utility-Klassen */
 .hidden {
     display: none !important;
@@ -895,118 +902,6 @@ img.icon {
     color: #6c757d;
 }
 
-/* Stile für den Fragenersteller */
-.question-creator-card {
-    max-width: 900px;
-    margin: 0 auto var(--bar-height) auto;
-    padding: 20px;
-    background-color: #fff;
-    border-radius: 10px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    margin-bottom: 20px;
-}
-
-.form-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 20px;
-}
-
-/* Zweispaltiges Layout für die Fragenerstellung */
-.page-layout {
-    display: grid;
-    grid-template-columns: 1fr 2fr;
-    gap: 20px;
-    max-width: 1200px;
-    margin: 0 auto;
-}
-
-.category-management-column,
-.question-creation-column {
-    display: flex;
-    flex-direction: column;
-}
-
-/* Listen für Kategorien und Gruppen */
-.items-list {
-    margin-top: 20px;
-    border-top: 1px solid #eee;
-    padding-top: 15px;
-}
-
-.category-item, 
-.group-item {
-    background-color: #f8f9fa;
-    border-radius: 8px;
-    padding: 10px 15px;
-    margin-bottom: 10px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.category-item .category-info,
-.group-item .group-info {
-    flex: 1;
-}
-
-.category-item h4,
-.group-item h4 {
-    margin: 0 0 5px 0;
-    font-size: 16px;
-}
-
-.category-item p,
-.group-item p {
-    margin: 0;
-    font-size: 14px;
-    color: #666;
-}
-
-.category-item .category-type,
-.group-item .group-category {
-    font-size: 12px;
-    padding: 2px 8px;
-    border-radius: 10px;
-    color: white;
-    background-color: #007BFF;
-    display: inline-block;
-    margin-bottom: 5px;
-}
-
-.category-item .category-actions,
-.group-item .group-actions {
-    display: flex;
-    gap: 5px;
-}
-
-.action-btn {
-    background: none;
-    border: none;
-    font-size: 16px;
-    cursor: pointer;
-    color: #6c757d;
-    padding: 4px;
-}
-
-.action-btn:hover {
-    color: #343a40;
-}
-
-.action-btn.edit {
-    color: #28a745;
-}
-
-.action-btn.delete {
-    color: #dc3545;
-}
-
-/* Stil für die Fragenliste */
-.recent-questions-section {
-    max-width: 900px;
-    margin: 30px auto var(--bar-height) auto;
-}
-
 @media (max-width: 576px) {
     .input-with-button {
         flex-direction: column;
@@ -1018,15 +913,21 @@ img.icon {
     }
 }
 
-/* Responsive design für kleinere Bildschirme */
-@media (max-width: 768px) {
-    .profile-content {
-        padding: 15px;
-    }
-    
-    .profile-grid {
-        grid-template-columns: 1fr;
-    }
+/* Stile für den Fragenersteller */
+.form-container {
+    max-width: 900px;
+    margin: 0 auto var(--bar-height) auto;
+    padding: 20px;
+    background-color: #fff;
+    border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
 
     .modal-content {
         width: 90%;
@@ -1066,8 +967,20 @@ img.icon {
         text-align: center;
         white-space: nowrap;
     }
-    
-    .form-grid {
-        grid-template-columns: 1fr;
-    }
+}
+
+/* Stile für den Fragenersteller */
+.form-container {
+    max-width: 900px;
+    margin: 0 auto var(--bar-height) auto;
+    padding: 20px;
+    background-color: #fff;
+    border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
 }

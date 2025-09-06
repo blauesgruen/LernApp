@@ -47,7 +47,27 @@ document.addEventListener('DOMContentLoaded', function() {
     function updateStoragePathDisplay() {
         if (window.isStoragePathConfigured && window.getStoragePath) {
             if (window.isStoragePathConfigured()) {
-                currentStoragePathSpan.textContent = window.getStoragePath();
+                const path = window.getStoragePath();
+                currentStoragePathSpan.textContent = path;
+                
+                // Prüfen, ob wir einen Hinweis anzeigen sollen, dass der Ordner neu ausgewählt werden muss
+                if (localStorage.getItem('hasDirectoryHandle') === 'true' && 
+                    localStorage.getItem('needsHandleRenewal') === 'true') {
+                    // Wir benötigen den Handle, aber er ist nicht verfügbar - Hinweis hinzufügen
+                    const hintSpan = document.createElement('span');
+                    hintSpan.textContent = ' (Bitte neu auswählen für vollen Dateizugriff)';
+                    hintSpan.style.color = '#ff9800';
+                    hintSpan.style.fontStyle = 'italic';
+                    hintSpan.style.fontSize = '0.8em';
+                    
+                    // Alten Hinweis entfernen, falls vorhanden
+                    const oldHint = currentStoragePathSpan.querySelector('span');
+                    if (oldHint) {
+                        oldHint.remove();
+                    }
+                    
+                    currentStoragePathSpan.appendChild(hintSpan);
+                }
             } else {
                 currentStoragePathSpan.textContent = 'Standard';
             }
@@ -63,7 +83,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Benutzernamen aktualisieren
     if (updateUsernameBtn) {
-        updateUsernameBtn.addEventListener('click', function() {
+        updateUsernameBtn.addEventListener('click', async function() {
             const newUsername = newUsernameInput.value.trim();
             
             if (!newUsername) {
@@ -72,19 +92,128 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             // Überprüfen, ob der Benutzername bereits existiert
-            if (users.some(user => user.username === newUsername && user.username !== currentUsername)) {
+            if (users.some(user => user.username.toLowerCase() === newUsername.toLowerCase() && user.username !== currentUsername)) {
                 showError('Dieser Benutzername ist bereits vergeben.');
                 return;
             }
 
             // Benutzernamen aktualisieren
             if (currentUser) {
-                currentUser.username = newUsername;
-                localStorage.setItem('users', JSON.stringify(users));
-                localStorage.setItem('username', newUsername);
-                usernameDisplay.textContent = newUsername;
-                showSuccess('Dein Benutzername wurde erfolgreich aktualisiert!');
-                newUsernameInput.value = '';
+                try {
+                    // Speichern des alten Usernamens zum Aktualisieren aller relevanten Daten
+                    const oldUsername = currentUser.username;
+                    
+                    // Benutzernamen im Benutzerobjekt und localStorage aktualisieren
+                    currentUser.username = newUsername;
+                    localStorage.setItem('users', JSON.stringify(users));
+                    localStorage.setItem('username', newUsername);
+                    usernameDisplay.textContent = newUsername;
+                    
+                    // Alle anderen Datenstrukturen aktualisieren, die den Benutzernamen verwenden
+                    // Synchronisiere auch die users.json mit dem neuen Benutzernamen
+                    try {
+                        const storedUsers = await window.loadData('users.json', users);
+                        const userIndex = storedUsers.findIndex(u => u.username === oldUsername);
+                        if (userIndex !== -1) {
+                            storedUsers[userIndex].username = newUsername;
+                            await window.saveData('users.json', storedUsers);
+                        }
+                    } catch (error) {
+                        console.error('Fehler beim Aktualisieren der Benutzer in users.json:', error);
+                    }
+                    
+                    // Überprüfen, ob die Storage-API verfügbar ist
+                    if (window.loadData && window.saveData) {
+                        // Quizstatistiken aktualisieren (aus dem konfigurierten Speicherort)
+                        const stats = await window.loadData('statistics.json', {});
+                        if (stats[oldUsername]) {
+                            stats[newUsername] = stats[oldUsername];
+                            delete stats[oldUsername];
+                            await window.saveData('statistics.json', stats);
+                        }
+                        
+                        // Fragen aktualisieren, die vom Benutzer erstellt wurden (aus dem konfigurierten Speicherort)
+                        const questions = await window.loadData('questions.json', []);
+                        let questionsUpdated = false;
+                        for (const question of questions) {
+                            if (question.createdBy === oldUsername) {
+                                question.createdBy = newUsername;
+                                questionsUpdated = true;
+                            }
+                        }
+                        if (questionsUpdated) {
+                            await window.saveData('questions.json', questions);
+                        }
+                        
+                        // Kategorien aktualisieren, die vom Benutzer erstellt wurden (aus dem konfigurierten Speicherort)
+                        const categories = await window.loadData('categories.json', []);
+                        let categoriesUpdated = false;
+                        for (const category of categories) {
+                            if (category.createdBy === oldUsername) {
+                                category.createdBy = newUsername;
+                                categoriesUpdated = true;
+                            }
+                        }
+                        if (categoriesUpdated) {
+                            await window.saveData('categories.json', categories);
+                        }
+                        
+                        // Gruppen aktualisieren, die vom Benutzer erstellt wurden
+                        const groups = await window.loadData('groups.json', []);
+                        let groupsUpdated = false;
+                        for (const group of groups) {
+                            if (group.createdBy === oldUsername) {
+                                group.createdBy = newUsername;
+                                groupsUpdated = true;
+                            }
+                        }
+                        if (groupsUpdated) {
+                            await window.saveData('groups.json', groups);
+                        }
+                    } else {
+                        // Fallback auf localStorage, wenn Storage-API nicht verfügbar ist
+                        // Quizstatistiken aktualisieren
+                        const stats = JSON.parse(localStorage.getItem('statistics')) || {};
+                        if (stats[oldUsername]) {
+                            stats[newUsername] = stats[oldUsername];
+                            delete stats[oldUsername];
+                            localStorage.setItem('statistics', JSON.stringify(stats));
+                        }
+                        
+                        // Fragen aktualisieren, die vom Benutzer erstellt wurden
+                        const questions = JSON.parse(localStorage.getItem('questions')) || [];
+                        for (const question of questions) {
+                            if (question.createdBy === oldUsername) {
+                                question.createdBy = newUsername;
+                            }
+                        }
+                        localStorage.setItem('questions', JSON.stringify(questions));
+                        
+                        // Kategorien aktualisieren, die vom Benutzer erstellt wurden
+                        const categories = JSON.parse(localStorage.getItem('categories')) || [];
+                        for (const category of categories) {
+                            if (category.createdBy === oldUsername) {
+                                category.createdBy = newUsername;
+                            }
+                        }
+                        localStorage.setItem('categories', JSON.stringify(categories));
+                        
+                        // Gruppen aktualisieren, die vom Benutzer erstellt wurden
+                        const groups = JSON.parse(localStorage.getItem('groups')) || [];
+                        for (const group of groups) {
+                            if (group.createdBy === oldUsername) {
+                                group.createdBy = newUsername;
+                            }
+                        }
+                        localStorage.setItem('groups', JSON.stringify(groups));
+                    }
+                    
+                    showSuccess('Dein Benutzername wurde erfolgreich aktualisiert!');
+                    newUsernameInput.value = '';
+                } catch (error) {
+                    console.error('Fehler beim Aktualisieren der Benutzerdaten:', error);
+                    showWarning('Dein Benutzername wurde aktualisiert, aber einige Daten konnten nicht vollständig aktualisiert werden.');
+                }
             } else {
                 showError('Benutzer nicht gefunden.');
             }
@@ -106,27 +235,42 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Ordner-Auswahl-Dialog öffnen
                 const directoryHandle = await window.openDirectoryPicker();
                 
-                if (directoryHandle) {
-                    // Pfad speichern
-                    const path = directoryHandle.name;
+                if (!directoryHandle) {
+                    showError('Kein Ordner ausgewählt.');
+                    return;
+                }
+                
+                // Pfad und Handle für den Speicherort vorbereiten
+                const storagePathData = {
+                    path: directoryHandle.name || 'LernAppDatenbank',
+                    handle: directoryHandle
+                };
+                
+                console.log('Ausgewählter Speicherort:', storagePathData.path);
+                
+                // Speicherpfad aktualisieren
+                const success = await window.setStoragePath(storagePathData);
+                
+                if (success) {
+                    // Handle wurde erfolgreich aktualisiert, alle Flags zurücksetzen
+                    localStorage.removeItem('needsHandleRenewal');
                     
-                    // Speicherpfad aktualisieren
-                    const success = await window.setStoragePath(path, directoryHandle);
+                    // UI aktualisieren
+                    updateStoragePathDisplay();
                     
-                    if (success) {
-                        updateStoragePathDisplay();
-                        showSuccess(`Speicherort wurde auf "${path}" gesetzt.`);
-                    } else {
-                        showError('Fehler beim Setzen des Speicherorts.');
-                    }
+                    // Zusätzliche Erfolgsmeldung
+                    showSuccess(`Speicherort "${storagePathData.path}" wurde erfolgreich konfiguriert und der Dateizugriff ist jetzt vollständig hergestellt.`);
+                } else {
+                    showError('Fehler beim Setzen des Speicherorts. Bitte versuchen Sie es erneut.');
                 }
             } catch (error) {
                 // Benutzer hat den Dialog abgebrochen oder es ist ein Fehler aufgetreten
-                if (error.name !== 'AbortError') {
-                    showError(`Fehler beim Öffnen des Ordner-Auswahl-Dialogs: ${error.message}`);
-                    console.error('Fehler beim Öffnen des Ordner-Auswahl-Dialogs:', error);
-                } else {
+                if (error.name === 'AbortError') {
                     console.log('Benutzer hat den Ordner-Auswahl-Dialog abgebrochen.');
+                    showInfo('Ordnerauswahl wurde abgebrochen.');
+                } else {
+                    console.error('Fehler beim Öffnen des Ordner-Auswahl-Dialogs:', error);
+                    showError(`Fehler beim Öffnen des Ordner-Auswahl-Dialogs: ${error.message}`);
                 }
             }
         });
@@ -226,38 +370,69 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Fragen löschen bestätigen
     if (confirmDeleteQuestions) {
-        confirmDeleteQuestions.addEventListener('click', function() {
-            // Alle Fragen des Benutzers löschen
-            const questions = JSON.parse(localStorage.getItem('questions')) || [];
-            const updatedQuestions = questions.filter(q => q.createdBy !== currentUsername);
-            localStorage.setItem('questions', JSON.stringify(updatedQuestions));
-            
-            deleteQuestionsModal.style.display = 'none';
-            showSuccess('Alle deine Fragen wurden erfolgreich gelöscht!');
+        confirmDeleteQuestions.addEventListener('click', async function() {
+            try {
+                // Alle Fragen über die Storage-API laden, um den konfigurierten Speicherort zu berücksichtigen
+                const questions = await window.loadData('questions.json', []);
+                
+                // Nur die Fragen behalten, die nicht von diesem Benutzer erstellt wurden
+                const updatedQuestions = questions.filter(q => q.createdBy !== currentUsername);
+                
+                // Aktualisierte Fragenliste über die Storage-API speichern
+                const success = await window.saveData('questions.json', updatedQuestions);
+                
+                deleteQuestionsModal.style.display = 'none';
+                
+                if (success) {
+                    showSuccess('Alle deine Fragen wurden erfolgreich gelöscht!');
+                } else {
+                    showError('Beim Löschen der Fragen ist ein Fehler aufgetreten.');
+                }
+            } catch (error) {
+                console.error('Fehler beim Löschen der Fragen:', error);
+                showError(`Fehler beim Löschen der Fragen: ${error.message}`);
+                deleteQuestionsModal.style.display = 'none';
+            }
         });
     }
 
     // Konto löschen bestätigen
     if (confirmDeleteAccount) {
-        confirmDeleteAccount.addEventListener('click', function() {
-            // Benutzer aus der Liste entfernen
-            const updatedUsers = users.filter(user => user.username !== currentUsername);
-            localStorage.setItem('users', JSON.stringify(updatedUsers));
-            
-            // Fragen des Benutzers löschen
-            const questions = JSON.parse(localStorage.getItem('questions')) || [];
-            const updatedQuestions = questions.filter(q => q.createdBy !== currentUsername);
-            localStorage.setItem('questions', JSON.stringify(updatedQuestions));
-            
-            // Abmelden
-            localStorage.removeItem('username');
-            localStorage.setItem('loggedIn', 'false');
-            
-            // Zurück zur Startseite
-            showInfo('Dein Konto wurde erfolgreich gelöscht.');
-            setTimeout(() => {
-                window.location.href = 'index.html';
-            }, 2000);
+        confirmDeleteAccount.addEventListener('click', async function() {
+            try {
+                // Benutzer aus der Liste entfernen
+                const updatedUsers = users.filter(user => user.username !== currentUsername);
+                
+                // Sowohl in localStorage als auch im Storage-System speichern
+                localStorage.setItem('users', JSON.stringify(updatedUsers));
+                await window.saveData('users.json', updatedUsers);
+                
+                // Fragen des Benutzers löschen
+                const questions = await window.loadData('questions.json', []);
+                const updatedQuestions = questions.filter(q => q.createdBy !== currentUsername);
+                await window.saveData('questions.json', updatedQuestions);
+                
+                // Statistiken des Benutzers löschen
+                const stats = await window.loadData('statistics.json', {});
+                if (stats[currentUsername]) {
+                    delete stats[currentUsername];
+                    await window.saveData('statistics.json', stats);
+                }
+                
+                // Abmelden
+                localStorage.removeItem('username');
+                localStorage.setItem('loggedIn', 'false');
+                
+                // Zurück zur Startseite
+                showSuccess('Dein Konto wurde erfolgreich gelöscht.');
+                setTimeout(() => {
+                    window.location.href = 'index.html';
+                }, 2000);
+            } catch (error) {
+                console.error('Fehler beim Löschen des Kontos:', error);
+                showError(`Fehler beim Löschen des Kontos: ${error.message}`);
+                deleteAccountModal.style.display = 'none';
+            }
         });
     }
 

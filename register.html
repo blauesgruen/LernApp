@@ -90,8 +90,34 @@
 
             // Benutzerdaten speichern
             const users = JSON.parse(localStorage.getItem('users')) || [];
-            users.push({ username, password: hashedPassword });
+            
+            // Überprüfen, ob der Benutzername bereits existiert (case-insensitive)
+            if (users.some(user => user.username.toLowerCase() === username.toLowerCase())) {
+                showError('Dieser Benutzername ist bereits vergeben!');
+                return;
+            }
+            
+            // Neuen Benutzer hinzufügen
+            const newUser = { username, password: hashedPassword };
+            users.push(newUser);
             localStorage.setItem('users', JSON.stringify(users));
+            
+            // Auch in der Storage-API speichern, falls verfügbar
+            if (window.saveData) {
+                try {
+                    // Vorhandene Benutzer laden
+                    const storedUsers = await window.loadData('users.json', []);
+                    
+                    // Prüfen, ob der Benutzer bereits existiert
+                    if (!storedUsers.some(user => user.username.toLowerCase() === username.toLowerCase())) {
+                        storedUsers.push(newUser);
+                        await window.saveData('users.json', storedUsers);
+                    }
+                } catch (error) {
+                    console.error('Fehler beim Speichern des Benutzers in der Storage-API:', error);
+                    // Auch bei Storage-API-Fehler fortfahren, da der Benutzer bereits in localStorage ist
+                }
+            }
 
             showSuccess('Registrierung erfolgreich!');
             

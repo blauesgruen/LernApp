@@ -211,13 +211,13 @@ async function saveQuestions(questions) {
  * @returns {Promise<object|null>} Die erstellte Frage oder null bei Fehler
  */
 async function createQuestion(questionData) {
-    if (!questionData || !questionData.text || !questionData.categoryId || !questionData.groupId || !questionData.options || questionData.options.length < 4) {
+    if (!questionData || !questionData.text || !questionData.categoryId || !questionData.groupId) {
         console.error("Unvollständige Fragendaten.");
         return null;
     }
     
     // Prüfen, ob mindestens eine Option richtig ist
-    if (!questionData.options.some(option => option.isCorrect)) {
+    if (!questionData.options || !questionData.options.some(option => option.isCorrect)) {
         console.error("Mindestens eine Antwortoption muss richtig sein.");
         return null;
     }
@@ -279,13 +279,26 @@ async function getQuizQuestions(categoryId, groupId = null, count = 10) {
             filteredQuestions = filteredQuestions.filter(q => q.groupId === groupId);
         }
         
-        // Je nach Hauptkategorie (Quiz-Typ) nur Text- oder nur Bildfragen auswählen
-        if (category.mainCategory === MAIN_CATEGORY.TEXT) {
-            // Für Textfragen: Nur Fragen ohne Bilder auswählen
-            filteredQuestions = filteredQuestions.filter(q => !q.imageUrl || q.imageUrl.trim() === '');
-        } else if (category.mainCategory === MAIN_CATEGORY.IMAGE) {
-            // Für Bilderquiz: Nur Fragen mit Bildern auswählen
-            filteredQuestions = filteredQuestions.filter(q => q.imageUrl && q.imageUrl.trim() !== '');
+        // Fragen nach dem Vorhandensein eines Bildes filtern, falls in der Frage ein Typ angegeben ist
+        const requestedType = category.mainCategory;
+        
+        // Fragen, die sowohl Text als auch Bild haben, bleiben immer erhalten
+        // Für TEXT-Kategorien: Fragen ohne Bild oder mit Text UND Bild
+        // Für IMAGE-Kategorien: Fragen mit Bild oder mit Text UND Bild
+        if (requestedType === MAIN_CATEGORY.TEXT) {
+            // Fragen ohne Bild bleiben im TEXT-Typ
+            // Fragen mit Text UND Bild bleiben ebenfalls
+            filteredQuestions = filteredQuestions.filter(q => 
+                !q.imageUrl || q.imageUrl.trim() === '' || 
+                (q.questionType === MAIN_CATEGORY.TEXT) ||
+                (q.text && q.text.trim() !== '') // Fragen mit Text bleiben auch, selbst wenn sie ein Bild haben
+            );
+        } else if (requestedType === MAIN_CATEGORY.IMAGE) {
+            // Fragen mit Bild bleiben im IMAGE-Typ
+            filteredQuestions = filteredQuestions.filter(q => 
+                (q.imageUrl && q.imageUrl.trim() !== '') || 
+                (q.questionType === MAIN_CATEGORY.IMAGE)
+            );
         }
         
         // Wenn nicht genug Fragen vorhanden sind, Warnung ausgeben

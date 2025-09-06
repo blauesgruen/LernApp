@@ -83,6 +83,11 @@ async function setStoragePath(path) {
     try {
         let pathString, handle;
         
+        // Sicherheitscheck: Ist path undefined oder null?
+        if (path === undefined || path === null) {
+            throw new Error('Kein Speicherort angegeben');
+        }
+        
         // Prüfen, ob es sich um ein Objekt mit Handle handelt
         if (typeof path === 'object' && path !== null) {
             pathString = path.path;
@@ -98,7 +103,7 @@ async function setStoragePath(path) {
             localStorage.removeItem('hasDirectoryHandle');
         }
 
-        if (!pathString) {
+        if (!pathString || pathString.trim() === '') {
             throw new Error('Kein gültiger Pfad angegeben');
         }
         
@@ -210,9 +215,20 @@ async function saveData(resourceName, data) {
                 // Stream schließen
                 await writable.close();
                 
+                // Handle-Erneuerung ist nicht mehr nötig, da wir erfolgreich waren
+                localStorage.removeItem('needsHandleRenewal');
+                
                 return true;
             } catch (error) {
                 console.error(`Fehler beim Speichern von ${resourceName} im Dateisystem:`, error);
+                
+                // Prüfen, ob wir eine Aufforderung zur Handle-Erneuerung anzeigen sollen
+                if (localStorage.getItem('needsHandleRenewal') === 'true' && window.showInfo) {
+                    // Handle-Erneuerung erforderlich - nur einmal anzeigen
+                    window.showInfo('Für den Dateizugriff ist es erforderlich, den Speicherordner neu auszuwählen. Bitte öffnen Sie die Profileinstellungen.', 8000);
+                    localStorage.setItem('needsHandleRenewal', 'shown');
+                }
+                
                 // Fallback auf localStorage
                 localStorage.setItem(getResourcePath(resourceName), jsonData);
                 return true;
@@ -223,7 +239,9 @@ async function saveData(resourceName, data) {
             return true;
         }
     } catch (error) {
-        showError(`Fehler beim Speichern der Daten: ${error.message}`);
+        if (window.showError) {
+            window.showError(`Fehler beim Speichern der Daten: ${error.message}`);
+        }
         console.error(`Fehler beim Speichern von ${resourceName}:`, error);
         return false;
     }
@@ -256,6 +274,9 @@ async function loadData(resourceName, defaultValue = null) {
                     const file = await fileHandle.getFile();
                     const text = await file.text();
                     
+                    // Handle-Erneuerung ist nicht mehr nötig, da wir erfolgreich waren
+                    localStorage.removeItem('needsHandleRenewal');
+                    
                     return JSON.parse(text);
                 } catch (fileError) {
                     if (fileError.name === 'NotFoundError') {
@@ -266,6 +287,14 @@ async function loadData(resourceName, defaultValue = null) {
                 }
             } catch (error) {
                 console.error(`Fehler beim Laden von ${resourceName} aus dem Dateisystem:`, error);
+                
+                // Prüfen, ob wir eine Aufforderung zur Handle-Erneuerung anzeigen sollen
+                if (localStorage.getItem('needsHandleRenewal') === 'true' && window.showInfo) {
+                    // Handle-Erneuerung erforderlich - nur einmal anzeigen
+                    window.showInfo('Für den Dateizugriff ist es erforderlich, den Speicherordner neu auszuwählen. Bitte öffnen Sie die Profileinstellungen.', 8000);
+                    localStorage.setItem('needsHandleRenewal', 'shown');
+                }
+                
                 // Fallback auf localStorage
             }
         }
@@ -279,7 +308,6 @@ async function loadData(resourceName, defaultValue = null) {
         
         return JSON.parse(jsonData);
     } catch (error) {
-        showError(`Fehler beim Laden der Daten: ${error.message}`);
         console.error(`Fehler beim Laden von ${resourceName}:`, error);
         return defaultValue;
     }
@@ -381,6 +409,28 @@ async function listResources() {
     }
 }
 
+/**
+ * Prüft, ob der Dateizugriff nach dem Login konfiguriert werden muss.
+ * Diese Funktion kann nach dem Login aufgerufen werden, um festzustellen,
+ * ob der Benutzer den Speicherordner auswählen muss.
+ * @returns {boolean} True, wenn der Benutzer den Speicherordner auswählen sollte, sonst False.
+ */
+function needsStorageConfiguration() {
+    // Wenn kein Speicherort konfiguriert ist, ist keine Auswahl nötig (wird automatisch Standard verwendet)
+    if (!isStoragePathConfigured()) {
+        return false;
+    }
+    
+    // Wenn wir keinen Handle hatten, brauchen wir auch keinen neuen zu wählen
+    if (localStorage.getItem('hasDirectoryHandle') !== 'true') {
+        return false;
+    }
+    
+    // Wenn der Handle erneuert werden muss und wichtige Aktionen geplant sind,
+    // sollte der Benutzer den Ordner neu auswählen
+    return localStorage.getItem('needsHandleRenewal') === 'true';
+}
+
 // Globale Funktionen exportieren
 window.isFileSystemAccessSupported = isFileSystemAccessSupported;
 window.isStoragePathConfigured = isStoragePathConfigured;
@@ -393,11 +443,15 @@ window.saveData = saveData;
 window.loadData = loadData;
 window.deleteData = deleteData;
 window.listResources = listResources;
+window.needsStorageConfiguration = needsStorageConfiguration;
 
 // Bei DOMContentLoaded prüfen, ob ein Speicherort konfiguriert ist
 document.addEventListener('DOMContentLoaded', async () => {
     if (!isStoragePathConfigured()) {
         console.log('Kein Speicherort konfiguriert. Standard wird verwendet:', DEFAULT_STORAGE_PATH);
+        
+        // Standard-Speicherort festlegen, wenn noch keiner gesetzt ist
+        await setStoragePath(DEFAULT_STORAGE_PATH);
     } else {
         const path = getStoragePath();
         console.log('Konfigurierter Speicherort:', path);
@@ -405,13 +459,27 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Prüfen, ob wir einen gespeicherten Handle wiederherstellen können
         if (localStorage.getItem('hasDirectoryHandle') === 'true') {
             console.log('Ein Verzeichnis-Handle wurde zuvor verwendet, aber kann nicht direkt wiederhergestellt werden.');
-            console.log('Der Benutzer muss den Ordner erneut auswählen, um den Handle zu erneuern.');
+            
+            // Nur auf Seiten, die aktiv Dateizugriff benötigen, eine Meldung anzeigen
+            // und auch nur, wenn der Benutzer explizit eine Aktion ausführt, die den Handle benötigt
+            
+            // In localStorage merken, dass wir wissen, dass der Handle erneuert werden muss
+            localStorage.setItem('needsHandleRenewal', 'true');
+            
+            // Den Hinweis speichern, aber nicht direkt anzeigen - nur wenn nötig
+            console.log('Handle-Erneuerung wird bei Bedarf angefordert.');
         }
         
         // Speicherort überprüfen
         const isValid = await verifyStoragePath();
         if (!isValid) {
             console.warn('Der konfigurierte Speicherort ist möglicherweise nicht zugänglich.');
+            
+            // Wenn der Speicherort ungültig ist, setzen wir auf den Standard zurück
+            if (window.showWarning) {
+                window.showWarning('Der konfigurierte Speicherort ist nicht zugänglich. Standardspeicherort wird verwendet.', 8000);
+            }
+            await resetStoragePath();
         }
     }
 });

@@ -204,51 +204,48 @@ async function handleLogin(username, password) {
         return;
     }
 
-    const users = JSON.parse(localStorage.getItem('users')) || [];
+    // Versuche, Benutzer aus beiden Quellen zu laden
+    let users = JSON.parse(localStorage.getItem('users')) || [];
+    let storedUsers = [];
+    
+    try {
+        if (window.loadData) {
+            storedUsers = await window.loadData('users.json', []);
+            
+            // Zusammenführen von Benutzern aus beiden Quellen
+            const mergedUsers = [...users];
+            
+            // Benutzer aus storage.js hinzufügen, falls noch nicht vorhanden
+            for (const storedUser of storedUsers) {
+                if (!mergedUsers.some(u => u.username === storedUser.username)) {
+                    mergedUsers.push(storedUser);
+                }
+            }
+            
+            // Zurück in localStorage speichern, um Konsistenz zu gewährleisten
+            localStorage.setItem('users', JSON.stringify(mergedUsers));
+            users = mergedUsers;
+        }
+    } catch (error) {
+        logMessage('Fehler beim Laden der Benutzer aus der Storage-API: ' + error.message, 'error');
+    }
+
     const hashedPassword = await window.hashPassword(password);
 
-    const user = users.find(u => u.username === username && u.password === hashedPassword);
+    // Suche nach dem Benutzer, Case-Insensitive für den Benutzernamen
+    const user = users.find(u => 
+        u.username.toLowerCase() === username.toLowerCase() && 
+        u.password === hashedPassword
+    );
 
-    console.log('Benutzerliste:', users);
-    console.log('Suchergebnis:', user);
-
-    // Debugging-Logs hinzugefügt
-    console.log('Login-Status:', getLoginStatus());
-    console.log('Aktueller Benutzer in localStorage:', localStorage.getItem('username'));
-    console.log('Benutzerliste in localStorage:', JSON.parse(localStorage.getItem('users')) || []);
-
-    console.log('Eingegebener Benutzername:', username);
-    console.log('Eingegebenes Passwort:', password);
-    console.log('Gehashtes Passwort:', hashedPassword);
-    console.log('Benutzerliste aus localStorage:', users);
-    console.log('Gefundener Benutzer:', user);
-    console.log('Vergleich eingegebener Passwort:', hashedPassword, 'mit gespeichertem Passwort:', user ? user.password : 'Kein Benutzer gefunden');
-
+    // Debugging-Logs
     logMessage('Benutzerliste aus localStorage: ' + JSON.stringify(users));
     logMessage('Eingegebenes Passwort vor Hashing: ' + password);
     logMessage('Gehashtes Passwort: ' + hashedPassword);
 
-    // Debugging-Logs zur Validierung der Passwortspeicherung und Sicherstellung einer konsistenten Hashing während des Logins
-    logMessage('Validating password storage and hashing consistency.');
-
-    // Überprüfen, ob Passwörter während der Registrierung korrekt gehasht werden
-    if (!users.every(u => u.password && u.password.length === 64)) {
-        logMessage('Warning: Some stored passwords are not hashed correctly.', 'warning');
-    }
-
-    // Debugging-Logs für den Passwortvergleich
     if (user) {
-        logMessage('Passwortvergleichsergebnis: ' + (user.password === hashedPassword));
-    } else {
-        logMessage('Kein passender Benutzer gefunden oder Passwort stimmt nicht überein.', 'error');
-        // Zentrale Benachrichtigung für Fehlerfall
-        showError('Benutzername oder Passwort falsch!');
-        setLoginStatus(false);
-        return; // Frühzeitig beenden, um Weiterleitung zu verhindern
-    }
-
-    if (user) {
-        localStorage.setItem('username', user.username); // Benutzername speichern
+        // Speichere den korrekten Benutzernamen (mit der richtigen Groß-/Kleinschreibung)
+        localStorage.setItem('username', user.username);
         setLoginStatus(true);
         logMessage('Login-Status wurde auf "eingeloggt" gesetzt.');
         
@@ -256,21 +253,44 @@ async function handleLogin(username, password) {
         const isFirstLogin = !localStorage.getItem('firstLoginComplete');
         if (isFirstLogin) {
             logMessage('Erster Login des Benutzers erkannt.');
-            // Erstlogin-Status wird im Dashboard überprüft
         }
         
-        // Erfolgsmeldung über das zentrale Benachrichtigungssystem
+        // Prüfen, ob der Speicherort konfiguriert werden muss
+        let storagePath = '';
+        let needsConfiguration = false;
+        
+        if (window.needsStorageConfiguration && window.getStoragePath) {
+            needsConfiguration = window.needsStorageConfiguration();
+            storagePath = window.getStoragePath();
+            
+            if (needsConfiguration) {
+                logMessage('Benutzer muss den Speicherordner neu auswählen.');
+            }
+        }
+        
         showSuccess('Login erfolgreich! Sie werden weitergeleitet...');
         
-        // Kurze Verzögerung für die Anzeige der Erfolgsmeldung
         setTimeout(() => {
-            // Weiterleitung zum Dashboard
+            if (needsConfiguration) {
+                // Nach erfolgreichem Login eine Meldung anzeigen, dass der Speicherordner ausgewählt werden sollte
+                const confirmConfig = confirm(
+                    `Willkommen zurück! Der Speicherordner "${storagePath}" sollte neu ausgewählt werden, ` +
+                    `um vollen Zugriff auf Ihre Daten zu ermöglichen. Möchten Sie jetzt zu den Profileinstellungen wechseln?`
+                );
+                
+                if (confirmConfig) {
+                    // Zu den Profileinstellungen wechseln
+                    window.location.href = 'profile.html';
+                    return;
+                }
+            }
+            
+            // Normale Weiterleitung zum Dashboard
             window.location.href = 'dashboard.html';
         }, 1000);
     } else {
-        logMessage('Kein Benutzer gefunden oder Passwortvergleich fehlgeschlagen.', 'error');
-        // Dies sollte nie erreicht werden, da wir bereits oben bei user==null abbrechen
-        showError('Ein unerwarteter Fehler ist aufgetreten.');
+        logMessage('Kein passender Benutzer gefunden oder Passwort stimmt nicht überein.', 'error');
+        showError('Benutzername oder Passwort falsch!');
         setLoginStatus(false);
     }
 }

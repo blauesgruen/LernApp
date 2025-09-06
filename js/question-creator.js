@@ -22,6 +22,19 @@ document.addEventListener('DOMContentLoaded', function() {
     const difficultyInput = document.getElementById('question-difficulty');
     const recentQuestionsList = document.getElementById('recent-questions-list');
 
+    // Elemente für Kategorie-Verwaltung
+    const categoryForm = document.getElementById('category-form');
+    const categoryNameInput = document.getElementById('category-name');
+    const categoryDescriptionInput = document.getElementById('category-description');
+    const categoriesList = document.getElementById('categories-list');
+
+    // Elemente für Gruppen-Verwaltung
+    const groupForm = document.getElementById('group-form');
+    const groupCategorySelect = document.getElementById('group-category');
+    const groupNameInput = document.getElementById('group-name');
+    const groupDescriptionInput = document.getElementById('group-description');
+    const groupsList = document.getElementById('groups-list');
+
     // Base64-kodiertes Bild
     let imageBase64 = null;
 
@@ -38,6 +51,89 @@ document.addEventListener('DOMContentLoaded', function() {
     // Event Listener für Bild-Upload
     if (questionImageInput) {
         questionImageInput.addEventListener('change', handleImageUpload);
+    }
+
+    // Event Listener für Kategorie-Formular
+    if (categoryForm) {
+        categoryForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const name = categoryNameInput.value.trim();
+            const description = categoryDescriptionInput.value.trim();
+            // Verwende standardmäßig TEXT als Hauptkategorie
+            const mainCategory = window.quizDB.MAIN_CATEGORY.TEXT;
+            
+            if (!name) {
+                showError('Bitte gib einen Kategorienamen ein.');
+                return;
+            }
+            
+            try {
+                const newCategory = await window.quizDB.createCategory(
+                    name,
+                    description,
+                    mainCategory,
+                    username
+                );
+                
+                if (newCategory) {
+                    showSuccess('Kategorie wurde erfolgreich erstellt!');
+                    
+                    // Formular zurücksetzen
+                    categoryForm.reset();
+                    
+                    // Listen aktualisieren
+                    await updateCategoriesDisplay();
+                    await updateCategorySelect();
+                    await updateGroupCategorySelect();
+                } else {
+                    showError('Fehler beim Erstellen der Kategorie.');
+                }
+            } catch (error) {
+                console.error('Fehler beim Erstellen der Kategorie:', error);
+                showError(`Fehler: ${error.message}`);
+            }
+        });
+    }
+    
+    // Event Listener für Gruppen-Formular
+    if (groupForm) {
+        groupForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const categoryId = groupCategorySelect.value;
+            const name = groupNameInput.value.trim();
+            const description = groupDescriptionInput.value.trim();
+            
+            if (!categoryId || !name) {
+                showError('Bitte fülle alle erforderlichen Felder aus.');
+                return;
+            }
+            
+            try {
+                const newGroup = await window.quizDB.createGroup(
+                    name,
+                    categoryId,
+                    description,
+                    username
+                );
+                
+                if (newGroup) {
+                    showSuccess('Gruppe wurde erfolgreich erstellt!');
+                    
+                    // Formular zurücksetzen
+                    groupForm.reset();
+                    
+                    // Listen aktualisieren
+                    await updateGroupsDisplay();
+                } else {
+                    showError('Fehler beim Erstellen der Gruppe.');
+                }
+            } catch (error) {
+                console.error('Fehler beim Erstellen der Gruppe:', error);
+                showError(`Fehler: ${error.message}`);
+            }
+        });
     }
 
     // Event Listener für das Fragen-Formular
@@ -75,7 +171,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 categoryId: categorySelect.value,
                 groupId: groupSelect.value,
                 difficulty: parseInt(difficultyInput.value),
-                createdBy: username
+                createdBy: username,
+                // Typ automatisch basierend auf dem Vorhandensein eines Bildes setzen
+                questionType: imageBase64 ? window.quizDB.MAIN_CATEGORY.IMAGE : window.quizDB.MAIN_CATEGORY.TEXT
             };
             
             try {
@@ -107,9 +205,14 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             // Kategorien laden und Auswahlfelder aktualisieren
             await updateCategorySelect();
+            await updateCategoriesDisplay();
+            
+            // Gruppen-Kategorie-Auswahlfeld aktualisieren
+            await updateGroupCategorySelect();
             
             // Gruppen aktualisieren (leer, da noch keine Kategorie gewählt)
             await updateGroupSelect();
+            await updateGroupsDisplay();
             
             // Zuletzt erstellte Fragen laden
             await loadRecentQuestions();
@@ -139,18 +242,163 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Kategorien hinzufügen
             categories.forEach(category => {
-                const mainCategoryName = category.mainCategory === window.quizDB.MAIN_CATEGORY.TEXT ? 'Textfragen' : 'Bilderquiz';
-                const optionText = `${category.name} (${mainCategoryName})`;
-                
                 const option = document.createElement('option');
                 option.value = category.id;
-                option.textContent = optionText;
-                option.dataset.mainCategory = category.mainCategory;
+                option.textContent = category.name;
                 categorySelect.appendChild(option);
             });
         } catch (error) {
             console.error('Fehler beim Aktualisieren des Kategorie-Auswahlfelds:', error);
             showError('Fehler beim Laden der Kategorien.');
+        }
+    }
+
+    /**
+     * Aktualisiert die Anzeige der Kategorien
+     */
+    async function updateCategoriesDisplay() {
+        try {
+            categoriesList.innerHTML = '<p class="loading-info">Kategorien werden geladen...</p>';
+            
+            const categories = await window.quizDB.loadCategories();
+            
+            if (categories.length === 0) {
+                categoriesList.innerHTML = '<p class="info-text">Keine Kategorien vorhanden. Erstelle deine erste Kategorie.</p>';
+                return;
+            }
+            
+            let html = '';
+            
+            // Eigene Kategorien anzeigen (nicht vom System erstellt)
+            const userCategories = categories.filter(category => category.createdBy !== 'system');
+            
+            if (userCategories.length === 0) {
+                html = '<p class="info-text">Du hast noch keine eigenen Kategorien erstellt.</p>';
+            } else {
+                userCategories.forEach(category => {
+                    html += `
+                        <div class="category-item" data-id="${category.id}">
+                            <div class="category-info">
+                                <h4>${category.name}</h4>
+                                ${category.description ? `<p>${category.description}</p>` : ''}
+                            </div>
+                            <div class="category-actions">
+                                <button type="button" class="action-btn delete" title="Kategorie löschen" data-id="${category.id}">
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+            
+            categoriesList.innerHTML = html;
+            
+            // Event-Listener für Lösch-Buttons
+            document.querySelectorAll('.category-item .delete').forEach(button => {
+                button.addEventListener('click', async function() {
+                    const categoryId = this.getAttribute('data-id');
+                    if (confirm('Möchtest du diese Kategorie wirklich löschen? Alle zugehörigen Gruppen werden ebenfalls gelöscht.')) {
+                        // Hier Code zum Löschen der Kategorie einfügen (zukünftige Erweiterung)
+                        alert('Löschen von Kategorien ist noch nicht implementiert.');
+                    }
+                });
+            });
+        } catch (error) {
+            console.error('Fehler beim Aktualisieren der Kategorien-Anzeige:', error);
+            categoriesList.innerHTML = '<p class="error-text">Fehler beim Laden der Kategorien.</p>';
+        }
+    }
+    
+    /**
+     * Aktualisiert die Anzeige der Gruppen
+     */
+    async function updateGroupsDisplay() {
+        try {
+            groupsList.innerHTML = '<p class="loading-info">Gruppen werden geladen...</p>';
+            
+            const [groups, categories] = await Promise.all([
+                window.quizDB.loadGroups(),
+                window.quizDB.loadCategories()
+            ]);
+            
+            // Kategorien für schnellen Zugriff mappen
+            const categoryMap = {};
+            categories.forEach(category => {
+                categoryMap[category.id] = category;
+            });
+            
+            if (groups.length === 0) {
+                groupsList.innerHTML = '<p class="info-text">Keine Gruppen vorhanden. Erstelle deine erste Gruppe.</p>';
+                return;
+            }
+            
+            let html = '';
+            
+            // Eigene Gruppen anzeigen (nicht vom System erstellt)
+            const userGroups = groups.filter(group => group.createdBy !== 'system');
+            
+            if (userGroups.length === 0) {
+                html = '<p class="info-text">Du hast noch keine eigenen Gruppen erstellt.</p>';
+            } else {
+                userGroups.forEach(group => {
+                    const category = categoryMap[group.categoryId] || { name: 'Unbekannte Kategorie' };
+                    
+                    html += `
+                        <div class="group-item" data-id="${group.id}">
+                            <div class="group-info">
+                                <span class="group-category">${category.name}</span>
+                                <h4>${group.name}</h4>
+                                ${group.description ? `<p>${group.description}</p>` : ''}
+                            </div>
+                            <div class="group-actions">
+                                <button type="button" class="action-btn delete" title="Gruppe löschen" data-id="${group.id}">
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+            
+            groupsList.innerHTML = html;
+            
+            // Event-Listener für Lösch-Buttons
+            document.querySelectorAll('.group-item .delete').forEach(button => {
+                button.addEventListener('click', async function() {
+                    const groupId = this.getAttribute('data-id');
+                    if (confirm('Möchtest du diese Gruppe wirklich löschen?')) {
+                        // Hier Code zum Löschen der Gruppe einfügen (zukünftige Erweiterung)
+                        alert('Löschen von Gruppen ist noch nicht implementiert.');
+                    }
+                });
+            });
+        } catch (error) {
+            console.error('Fehler beim Aktualisieren der Gruppen-Anzeige:', error);
+            groupsList.innerHTML = '<p class="error-text">Fehler beim Laden der Gruppen.</p>';
+        }
+    }
+    
+    /**
+     * Aktualisiert das Kategorie-Auswahlfeld im Gruppen-Formular
+     */
+    async function updateGroupCategorySelect() {
+        try {
+            const categories = await window.quizDB.loadCategories();
+            
+            // Auswahlfeld leeren
+            groupCategorySelect.innerHTML = '<option value="">-- Kategorie wählen --</option>';
+            
+            // Kategorien hinzufügen
+            categories.forEach(category => {
+                const option = document.createElement('option');
+                option.value = category.id;
+                option.textContent = category.name;
+                groupCategorySelect.appendChild(option);
+            });
+        } catch (error) {
+            console.error('Fehler beim Aktualisieren des Gruppen-Kategorie-Auswahlfelds:', error);
+            showError('Fehler beim Laden der Kategorien für Gruppen.');
         }
     }
 
@@ -341,14 +589,6 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!questionTextInput.value.trim()) {
             showError('Bitte gib einen Fragetext ein.');
             questionTextInput.focus();
-            return false;
-        }
-        
-        // Bildprüfung für Bilderquiz
-        const selectedOption = categorySelect.options[categorySelect.selectedIndex];
-        if (selectedOption && selectedOption.dataset.mainCategory === window.quizDB.MAIN_CATEGORY.IMAGE && !imageBase64) {
-            showError('Für ein Bilderquiz muss ein Bild hinzugefügt werden.');
-            questionImageInput.focus();
             return false;
         }
         
