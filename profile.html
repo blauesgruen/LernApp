@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mein Profil - LernApp</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.1/css/all.min.css">
+</head>
+<body>
+    <div id="header-container"></div>
+
+    <main>
+        <section id="profile-section">
+            <h1>Mein Profil</h1>
+            
+            <div class="profile-card">
+                <div class="profile-header">
+                    <i class="fas fa-user-circle profile-icon"></i>
+                    <div id="username-display">Benutzername</div>
+                </div>
+                
+                <div class="profile-content">
+                    <div class="profile-grid">
+                        <!-- Linke Spalte -->
+                        <div class="profile-column">
+                            <div class="profile-group">
+                                <h2>Profil bearbeiten</h2>
+                                <form id="profile-form">
+                                    <div class="form-group">
+                                        <label for="new-username">Neuer Benutzername:</label>
+                                        <input type="text" id="new-username" name="new-username" placeholder="Neuen Benutzernamen eingeben">
+                                    </div>
+                                    <button type="button" id="update-username-btn" class="btn-primary">Aktualisieren</button>
+                                </form>
+                            </div>
+
+                            <div class="profile-group">
+                                <h2>Passwort ändern</h2>
+                                <form id="password-form">
+                                    <div class="form-group">
+                                        <label for="current-password">Aktuelles Passwort:</label>
+                                        <input type="password" id="current-password" name="current-password" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="new-password">Neues Passwort:</label>
+                                        <input type="password" id="new-password" name="new-password" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="confirm-password">Passwort bestätigen:</label>
+                                        <input type="password" id="confirm-password" name="confirm-password" required>
+                                    </div>
+                                    <button type="button" id="change-password-btn" class="btn-primary">Ändern</button>
+                                </form>
+                            </div>
+                        </div>
+                        
+                        <!-- Rechte Spalte -->
+                        <div class="profile-column">
+                            <div class="profile-group danger-zone">
+                                <h2>Gefahrenzone</h2>
+                                
+                                <div class="danger-action">
+                                    <button type="button" id="delete-questions-btn" class="btn-warning">
+                                        <i class="fas fa-trash-alt"></i> Alle meine Fragen löschen
+                                    </button>
+                                    <p class="danger-description">Löscht alle deine erstellten Fragen und Antworten. Diese Aktion kann nicht rückgängig gemacht werden!</p>
+                                </div>
+                                
+                                <div class="danger-action">
+                                    <button type="button" id="delete-account-btn" class="btn-danger">
+                                        <i class="fas fa-user-slash"></i> Mein Konto löschen
+                                    </button>
+                                    <p class="danger-description">Löscht dein Konto und alle damit verbundenen Daten. Diese Aktion kann nicht rückgängig gemacht werden!</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <div id="footer-container"></div>
+
+    <!-- Modals für Sicherheitsabfragen -->
+    <div id="delete-questions-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h2>Fragen löschen</h2>
+            <p>Bist du sicher, dass du alle deine Fragen und Antworten löschen möchtest? Diese Aktion kann nicht rückgängig gemacht werden!</p>
+            <div class="modal-buttons">
+                <button id="cancel-delete-questions" class="btn-secondary">Abbrechen</button>
+                <button id="confirm-delete-questions" class="btn-danger">Ja, alle Fragen löschen</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="delete-account-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h2>Konto löschen</h2>
+            <p>Bist du sicher, dass du dein Konto löschen möchtest? Alle deine Daten werden dauerhaft gelöscht. Diese Aktion kann nicht rückgängig gemacht werden!</p>
+            <div class="modal-buttons">
+                <button id="cancel-delete-account" class="btn-secondary">Abbrechen</button>
+                <button id="confirm-delete-account" class="btn-danger">Ja, mein Konto löschen</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Header und Footer dynamisch laden
+        async function loadHeaderAndFooter() {
+            document.getElementById('header-container').innerHTML = await (await fetch('partials/header.html')).text();
+            document.getElementById('footer-container').innerHTML = await (await fetch('partials/footer.html')).text();
+        }
+        loadHeaderAndFooter();
+    </script>
+    <script src="js/auth.js"></script>
+    <script src="js/notification.js"></script>
+    <script src="js/profile.js"></script>
+</body>
+</html>
