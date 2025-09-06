@@ -213,3 +213,96 @@ Die LernApp ist eine interaktive Plattform, die Benutzern ermöglicht, Wissen du
   - **Wert `false`**: Benutzer ist nicht eingeloggt.
 - Beim Logout werden alle Daten im `localStorage` gelöscht, mit Ausnahme der persistenten Logs (`persistentLogs`).
 - Nach dem Logout wird der Benutzer automatisch zur Startseite (`index.html`) weitergeleitet.
+
+---
+
+## Datenbank und Speicherort
+
+Die LernApp bietet eine flexible Speicherkonfiguration für die Fragendatenbank und Benutzerstatistiken:
+
+#### Speicherort-Konfiguration
+- Benutzer können einen benutzerdefinierten Pfad für die Speicherung der Fragenbank festlegen.
+- Die App unterstützt die Auswahl eines Ordners über den nativen Dateibrowser des Betriebssystems.
+- Ein gemeinsamer Pfad auf verschiedenen Geräten (z.B. in Dropbox) ermöglicht es, die gleichen Fragen auf all Ihren Geräten zu verwenden.
+- Bei der ersten Anmeldung wird ein Dialog angezeigt, der die Konfiguration des Speicherorts ermöglicht.
+- Der Speicherort kann jederzeit über das Benutzerprofil geändert werden.
+
+#### Funktionen für den Speicherort
+- **isFileSystemAccessSupported()**: Überprüft, ob der Browser die File System Access API unterstützt.
+- **openDirectoryPicker()**: Öffnet den nativen Dateibrowser-Dialog zur Auswahl eines Ordners.
+- **isStoragePathConfigured()**: Überprüft, ob ein Speicherort bereits konfiguriert wurde.
+- **getStoragePath()**: Gibt den aktuell konfigurierten Speicherort zurück.
+- **setStoragePath(path)**: Setzt einen neuen Speicherort.
+- **resetStoragePath()**: Setzt den Speicherort auf den Standardpfad zurück.
+- **verifyStoragePath()**: Prüft, ob der konfigurierte Speicherort existiert und zugänglich ist.
+
+#### Fragendatenbank
+- Die Fragenbank unterstützt Multiple-Choice-Fragen mit mehreren Antwortoptionen.
+- Jede Frage kann mit einem Bild oder einer Erklärung versehen werden.
+- Fragen sind in Kategorien organisiert, die vom Benutzer erstellt und verwaltet werden können.
+- Standardkategorien werden beim ersten Start automatisch erstellt.
+
+#### Datenstruktur
+
+1. **Fragen**:
+   ```javascript
+   {
+     id: string,            // Eindeutige ID der Frage
+     text: string,          // Fragetext
+     imageUrl: string,      // Optional: URL zu einem Bild (kann auch Data-URL sein)
+     options: [             // Array mit Antwortoptionen
+       {
+         id: string,        // Eindeutige ID der Antwortoption
+         text: string,      // Text der Antwortoption
+         isCorrect: boolean // Ob die Antwort richtig ist
+       }
+     ],
+     explanation: string,   // Optional: Erklärung der richtigen Antwort
+     categoryId: string,    // Kategorie-ID
+     difficulty: number,    // Schwierigkeitsgrad (1-5)
+     createdBy: string,     // Benutzername des Erstellers
+     createdAt: number      // Zeitstempel der Erstellung
+   }
+   ```
+
+2. **Kategorien**:
+   ```javascript
+   {
+     id: string,            // Eindeutige ID der Kategorie
+     name: string,          // Name der Kategorie
+     description: string,   // Beschreibung der Kategorie
+     createdBy: string,     // Benutzername des Erstellers
+     createdAt: number      // Zeitstempel der Erstellung
+   }
+   ```
+
+3. **Statistiken**:
+   ```javascript
+   {
+     userId: string,        // Benutzername
+     questionStats: {       // Statistiken pro Frage
+       [questionId]: {
+         correct: number,   // Anzahl der richtigen Antworten
+         incorrect: number, // Anzahl der falschen Antworten
+         lastAnswered: number // Zeitstempel der letzten Beantwortung
+       }
+     },
+     quizStats: [           // Statistiken pro Quiz-Durchlauf
+       {
+         date: number,      // Zeitstempel des Quiz-Durchlaufs
+         categoryId: string, // Kategorie des Quiz
+         totalQuestions: number, // Gesamtzahl der Fragen
+         correctAnswers: number, // Anzahl der richtigen Antworten
+         timeSpent: number  // Benötigte Zeit in Sekunden
+       }
+     ]
+   }
+   ```
+
+#### Implementierung
+- Das System bietet zwei Speichermethoden:
+  1. **File System Access API**: In unterstützten Browsern (Chrome, Edge, etc.) können Benutzer direkt auf ihr Dateisystem zugreifen und einen Ordner auswählen.
+  2. **LocalStorage**: Als Fallback wird `localStorage` verwendet, um die Daten persistent im Browser zu speichern.
+- Die Datenpfade werden so konstruiert, dass sie mit echten Dateisystempfaden kompatibel sind.
+- Alle Speicherfunktionen sind asynchron gestaltet, um die verschiedenen Backends einheitlich zu unterstützen.
+- Die Implementierung prüft die Verfügbarkeit der APIs und bietet sinnvolle Fallbacks und Fehlermeldungen.

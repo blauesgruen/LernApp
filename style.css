@@ -562,6 +562,110 @@ img.icon {
     gap: 15px;
 }
 
+/* Neue Stile für das Speicherort-Formular */
+.form-info {
+    margin: 10px 0 15px 0;
+    padding: 10px;
+    background-color: #f0f7ff;
+    border-radius: 6px;
+    border-left: 3px solid #007BFF;
+}
+
+.form-info p {
+    margin: 0;
+    color: #555;
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+/* Stil für Speicherort-Formular */
+#storage-path-form {
+    margin-bottom: 10px;
+}
+
+#storage-path-form .btn-secondary {
+    margin-left: 10px;
+    background-color: #6c757d;
+}
+
+#storage-path-form .btn-secondary:hover {
+    background-color: #5a6268;
+}
+
+/* First-Login-Dialog */
+#first-login-dialog .modal-content {
+    text-align: left;
+}
+
+#first-login-dialog h2 {
+    color: #007BFF;
+    margin-top: 0;
+}
+
+#first-login-dialog .form-info {
+    margin: 15px 0;
+}
+
+#first-login-dialog .form-group {
+    margin-bottom: 20px;
+}
+
+#first-login-dialog input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 16px;
+    box-sizing: border-box;
+}
+
+/* Stile für das Input-Feld mit dem Browse-Button */
+.input-with-button {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+}
+
+.input-with-button input {
+    flex: 1;
+}
+
+.btn-browse {
+    background-color: #e9ecef;
+    color: #495057;
+    border: 1px solid #ced4da;
+    padding: 7px 12px;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    transition: all 0.2s ease;
+}
+
+.btn-browse:hover {
+    background-color: #dde1e5;
+}
+
+.btn-browse i {
+    font-size: 16px;
+    color: #6c757d;
+}
+
+@media (max-width: 576px) {
+    .input-with-button {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .btn-browse {
+        margin-top: 5px;
+    }
+}
+
 /* Responsive design für kleinere Bildschirme */
 @media (max-width: 768px) {
     .profile-content {

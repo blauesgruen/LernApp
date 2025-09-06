@@ -57,6 +57,23 @@
                         
                         <!-- Rechte Spalte -->
                         <div class="profile-column">
+                            <div class="profile-group">
+                                <h2>Datenbank-Speicherort</h2>
+                                <form id="storage-path-form">
+                                    <div class="form-group">
+                                        <label>Aktueller Speicherort: <span id="current-storage-path">Standard</span></label>
+                                        <button type="button" id="browse-storage-path-btn" class="btn-primary" style="margin-top: 10px; width: 100%;">
+                                            <i class="fas fa-folder-open"></i> Ordner auswählen
+                                        </button>
+                                    </div>
+                                    <div class="form-info">
+                                        <p>Ein gemeinsamer Pfad auf verschiedenen Geräten (z.B. in Dropbox) ermöglicht dir, 
+                                        die gleichen Fragen auf all deinen Geräten zu verwenden.</p>
+                                    </div>
+                                    <button type="button" id="reset-storage-path-btn" class="btn-secondary" style="margin-top: 10px;">Auf Standard zurücksetzen</button>
+                                </form>
+                            </div>
+
                             <div class="profile-group danger-zone">
                                 <h2>Gefahrenzone</h2>
                                 
@@ -110,6 +127,7 @@
 
     <script src="js/auth.js"></script>
     <script src="js/notification.js"></script>
+    <script src="js/storage.js"></script>
     <script>
         // Header und Footer dynamisch laden
         async function loadHeaderAndFooter() {

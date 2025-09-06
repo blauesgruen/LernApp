@@ -12,6 +12,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const confirmPasswordInput = document.getElementById('confirm-password');
     const changePasswordBtn = document.getElementById('change-password-btn');
 
+    // Elemente für Speicherort
+    const currentStoragePathSpan = document.getElementById('current-storage-path');
+    const browseStoragePathBtn = document.getElementById('browse-storage-path-btn');
+    const resetStoragePathBtn = document.getElementById('reset-storage-path-btn');
+
     // Elemente für Löschaktionen
     const deleteQuestionsBtn = document.getElementById('delete-questions-btn');
     const deleteAccountBtn = document.getElementById('delete-account-btn');
@@ -37,6 +42,24 @@ document.addEventListener('DOMContentLoaded', function() {
         // Nicht eingeloggt - zurück zur Login-Seite
         window.location.href = 'login.html';
     }
+
+    // Aktuellen Speicherpfad anzeigen, falls vorhanden
+    function updateStoragePathDisplay() {
+        if (window.isStoragePathConfigured && window.getStoragePath) {
+            if (window.isStoragePathConfigured()) {
+                currentStoragePathSpan.textContent = window.getStoragePath();
+            } else {
+                currentStoragePathSpan.textContent = 'Standard';
+            }
+        } else {
+            console.error("Speicherpfad-Funktionen nicht verfügbar");
+            showError("Speicherpfad-Funktionen nicht verfügbar. Bitte aktualisiere die Seite.");
+            currentStoragePathSpan.textContent = 'Nicht verfügbar';
+        }
+    }
+    
+    // Initialen Speicherpfad anzeigen
+    updateStoragePathDisplay();
 
     // Benutzernamen aktualisieren
     if (updateUsernameBtn) {
@@ -64,6 +87,61 @@ document.addEventListener('DOMContentLoaded', function() {
                 newUsernameInput.value = '';
             } else {
                 showError('Benutzer nicht gefunden.');
+            }
+        });
+    }
+
+    // Der "Speicherort setzen"-Button wurde entfernt, da wir jetzt nur den Browse-Button verwenden
+
+    // Ordner-Auswahl-Dialog öffnen
+    if (browseStoragePathBtn) {
+        browseStoragePathBtn.addEventListener('click', async function() {
+            // Prüfen, ob die File System Access API unterstützt wird
+            if (!window.isFileSystemAccessSupported || !window.isFileSystemAccessSupported()) {
+                showError('Dein Browser unterstützt leider nicht die Auswahl von Ordnern. Diese Funktion ist nicht verfügbar.');
+                return;
+            }
+
+            try {
+                // Ordner-Auswahl-Dialog öffnen
+                const directoryHandle = await window.openDirectoryPicker();
+                
+                if (directoryHandle) {
+                    // Pfad speichern
+                    const path = directoryHandle.name;
+                    
+                    // Speicherpfad aktualisieren
+                    const success = await window.setStoragePath(path, directoryHandle);
+                    
+                    if (success) {
+                        updateStoragePathDisplay();
+                        showSuccess(`Speicherort wurde auf "${path}" gesetzt.`);
+                    } else {
+                        showError('Fehler beim Setzen des Speicherorts.');
+                    }
+                }
+            } catch (error) {
+                // Benutzer hat den Dialog abgebrochen oder es ist ein Fehler aufgetreten
+                if (error.name !== 'AbortError') {
+                    showError(`Fehler beim Öffnen des Ordner-Auswahl-Dialogs: ${error.message}`);
+                    console.error('Fehler beim Öffnen des Ordner-Auswahl-Dialogs:', error);
+                } else {
+                    console.log('Benutzer hat den Ordner-Auswahl-Dialog abgebrochen.');
+                }
+            }
+        });
+    }
+
+    // Speicherpfad zurücksetzen
+    if (resetStoragePathBtn && window.resetStoragePath) {
+        resetStoragePathBtn.addEventListener('click', async function() {
+            const success = await window.resetStoragePath();
+            
+            if (success) {
+                updateStoragePathDisplay();
+                showSuccess('Speicherpfad wurde auf den Standardwert zurückgesetzt.');
+            } else {
+                showError('Fehler beim Zurücksetzen des Speicherpfads.');
             }
         });
     }

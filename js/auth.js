@@ -252,6 +252,13 @@ async function handleLogin(username, password) {
         setLoginStatus(true);
         logMessage('Login-Status wurde auf "eingeloggt" gesetzt.');
         
+        // Überprüfen, ob es der erste Login dieses Benutzers ist
+        const isFirstLogin = !localStorage.getItem('firstLoginComplete');
+        if (isFirstLogin) {
+            logMessage('Erster Login des Benutzers erkannt.');
+            // Erstlogin-Status wird im Dashboard überprüft
+        }
+        
         // Erfolgsmeldung über das zentrale Benachrichtigungssystem
         showSuccess('Login erfolgreich! Sie werden weitergeleitet...');
         
