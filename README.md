@@ -236,6 +236,73 @@ Die LernApp bietet eine flexible Speicherkonfiguration für die Fragendatenbank 
 - **resetStoragePath()**: Setzt den Speicherort auf den Standardpfad zurück.
 - **verifyStoragePath()**: Prüft, ob der konfigurierte Speicherort existiert und zugänglich ist.
 
+### Breadcrumb-Navigation
+
+Die LernApp verfügt über eine intuitive Breadcrumb-Navigation, die es den Benutzern ermöglicht, ihren aktuellen Standort in der Anwendung zu erkennen und einfach zu vorherigen Ebenen zurückzukehren:
+
+#### Funktionen und Eigenschaften
+- Hierarchische Navigation: Zeigt den vollständigen Pfad von der Startseite bis zur aktuellen Ansicht an.
+- Responsive Design: Passt sich automatisch an verschiedene Bildschirmgrößen an.
+- Klickbare Pfadeinträge: Ermöglicht die direkte Navigation zu übergeordneten Ebenen.
+- Persistente Zustandsspeicherung: Behält den Navigationspfad auch bei Seitenneuladen bei.
+
+#### Implementierung
+- Die Breadcrumb-Navigation ist in der Datei `header.html` definiert und über das globale Objekt `window.breadcrumbs` zugänglich.
+- Die Navigation wird auf verschiedenen Seiten dynamisch aktualisiert:
+  - **Quiz-Spieler**: Zeigt den Pfad "Quiz → Kategorie → Gruppe → Frage X/Y → Ergebnis" an.
+  - **Kategorie-Verwaltung**: Zeigt den Pfad "Verwaltung → Kategorien & Gruppen" an.
+  - **Fragen-Erstellung**: Zeigt den Pfad "Verwaltung → Fragen erstellen" an.
+  - **Dashboard**: Zeigt keine Breadcrumbs an, da es die Startseite ist.
+
+#### API-Methoden
+- **breadcrumbs.set(path)**: Setzt einen neuen Navigationspad.
+- **breadcrumbs.add(label, url)**: Fügt einen neuen Eintrag zum bestehenden Pfad hinzu.
+- **breadcrumbs.navigateTo(index)**: Navigiert zu einem bestimmten Eintrag im Pfad.
+- **breadcrumbs.clear()**: Entfernt alle Breadcrumbs.
+- **breadcrumbs.updateVisibility()**: Aktualisiert die Sichtbarkeit der Breadcrumb-Navigation.
+
+### Automatisches Quiz-System
+
+Die LernApp generiert automatisch Quizze aus den eingepflegten Fragen:
+
+- **Dynamische Fragenerstellung**: Benutzer müssen nur die richtige Antwort eingeben, falsche Antworten werden automatisch aus anderen Fragen übernommen
+- **Zufällige Auswahl**: Das System wählt Fragen zufällig aus der Datenbank basierend auf Kategorie und Gruppe
+- **Keine Wiederholungen**: Innerhalb eines Quiz werden Fragen nicht wiederholt
+- **Gemischte Antworten**: Die Reihenfolge der Antwortoptionen wird für jede Frage neu gemischt
+
+#### Fragen erstellen
+
+1. Wähle eine Kategorie und Gruppe
+2. Gib den Fragetext ein
+3. Füge ggf. ein Bild hinzu (erforderlich für Bilderquiz)
+4. Gib die richtige Antwort ein
+5. Füge eine optionale Erklärung hinzu
+
+Das System ergänzt automatisch die falschen Antwortoptionen aus dem Pool aller anderen richtigen Antworten.
+
+### Automatisches Quiz-System
+
+Die LernApp verfügt über ein intelligentes System zur automatischen Erstellung von Quizzes:
+
+#### Funktionsweise
+- **Dynamische Fragenerstellung**: Quizzes werden dynamisch aus einer Datenbank von Fragen generiert.
+- **Zufällige Auswahl**: Fragen werden zufällig ausgewählt, ohne Wiederholungen innerhalb eines Quiz-Durchlaufs.
+- **Gemischte Antwortoptionen**: Die Reihenfolge der Antwortoptionen wird bei jedem Quiz neu gemischt.
+- **Kategorie- und Gruppenfilterung**: Quizzes können auf bestimmte Kategorien und Gruppen eingeschränkt werden.
+
+#### Erstellen von Fragen
+Die App ermöglicht die Erstellung von Fragen mit:
+- Fragetexten
+- Optionalen Bildern
+- Vier Antwortoptionen (eine davon als richtig markiert)
+- Optionalen Erklärungstexten, die nach der Beantwortung angezeigt werden
+- Schwierigkeitsgraden zur späteren Filterung
+
+#### Quiz-Anpassungen
+- Anzahl der Fragen kann vom Benutzer bestimmt werden
+- Quiz-Typ (Text oder Bild) wird automatisch anhand der Kategorie erkannt
+- Fragen und Antworten werden für jeden Quiz-Durchlauf neu gemischt
+
 #### Fragendatenbank
 - Die Fragenbank unterstützt Multiple-Choice-Fragen mit mehreren Antwortoptionen.
 - Jede Frage kann mit einem Bild oder einer Erklärung versehen werden.

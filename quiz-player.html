@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz spielen - LernApp</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.1/css/all.min.css">
+</head>
+<body>
+    <div id="header-container"></div>
+
+    <main>
+        <section id="quiz-section" class="hidden">
+            <div class="quiz-header">
+                <h1 id="quiz-title">Quiz</h1>
+                <div class="quiz-info">
+                    <span id="quiz-progress">Frage 1/10</span>
+                    <span id="quiz-timer">00:00</span>
+                </div>
+            </div>
+            
+            <div class="quiz-container">
+                <div class="quiz-question-container">
+                    <div class="quiz-question">
+                        <h2 id="question-text">Fragetext wird geladen...</h2>
+                    </div>
+                    
+                    <div id="question-image-container" class="quiz-image-container hidden">
+                        <img id="question-image" src="" alt="Fragebild">
+                    </div>
+                    
+                    <div id="answers-container" class="quiz-answers">
+                        <!-- Antworten werden dynamisch eingefügt -->
+                    </div>
+                    
+                    <div id="explanation-container" class="quiz-explanation hidden">
+                        <h3>Erklärung</h3>
+                        <p id="explanation-text"></p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="quiz-footer">
+                <button id="next-question-btn" class="btn-primary hidden">
+                    Nächste Frage <i class="fas fa-chevron-right"></i>
+                </button>
+                <button id="finish-quiz-btn" class="btn-primary hidden">
+                    Quiz beenden <i class="fas fa-check"></i>
+                </button>
+            </div>
+        </section>
+        
+        <section id="quiz-setup-section">
+            <h1>Quiz starten</h1>
+            
+            <div class="quiz-setup-card">
+                <form id="quiz-setup-form">
+                    <div class="form-group">
+                        <label for="quiz-type">Quiz-Typ:</label>
+                        <select id="quiz-type" required>
+                            <option value="">-- Quiz-Typ wählen --</option>
+                            <option value="text">Textfragen</option>
+                            <option value="image">Bilderquiz</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="quiz-category">Kategorie:</label>
+                        <select id="quiz-category" required>
+                            <option value="">-- Kategorie wählen --</option>
+                            <option value="" disabled>Wähle zuerst einen Quiz-Typ</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="quiz-group">Gruppe (optional):</label>
+                        <select id="quiz-group">
+                            <option value="">Alle Gruppen</option>
+                            <option value="" disabled>Wähle zuerst eine Kategorie</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="quiz-question-count">Anzahl der Fragen:</label>
+                        <input type="number" id="quiz-question-count" min="5" max="20" value="10" required>
+                    </div>
+                    
+                    <button type="submit" class="btn-primary">
+                        <i class="fas fa-play"></i> Quiz starten
+                    </button>
+                </form>
+            </div>
+            
+            <div id="no-questions-warning" class="warning-box hidden">
+                <i class="fas fa-exclamation-triangle"></i>
+                <p>Es sind keine Fragen für die gewählte Kategorie/Gruppe verfügbar.</p>
+                <p>Bitte erstelle zuerst Fragen oder wähle eine andere Kategorie.</p>
+                <a href="question-creator.html" class="btn-primary">Fragen erstellen</a>
+            </div>
+        </section>
+        
+        <section id="quiz-results-section" class="hidden">
+            <h1>Quiz-Ergebnis</h1>
+            
+            <div class="quiz-results-card">
+                <div class="quiz-results-header">
+                    <div class="quiz-results-score">
+                        <div class="score-circle">
+                            <span id="result-percentage">0%</span>
+                        </div>
+                        <div class="score-details">
+                            <h2>Dein Ergebnis</h2>
+                            <p id="result-correct">0 von 10 Fragen richtig</p>
+                        </div>
+                    </div>
+                    <div class="quiz-results-time">
+                        <i class="fas fa-clock"></i>
+                        <span id="result-time">00:00</span>
+                    </div>
+                </div>
+                
+                <div id="result-feedback" class="quiz-results-feedback">
+                    <!-- Feedback wird dynamisch eingefügt -->
+                </div>
+                
+                <div class="quiz-results-actions">
+                    <button id="play-again-btn" class="btn-primary">
+                        <i class="fas fa-redo"></i> Nochmal spielen
+                    </button>
+                    <button id="new-quiz-btn" class="btn-secondary">
+                        <i class="fas fa-plus"></i> Neues Quiz
+                    </button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <div id="footer-container"></div>
+
+    <script src="js/auth.js"></script>
+    <script src="js/notification.js"></script>
+    <script src="js/storage.js"></script>
+    <script src="js/quiz-db.js"></script>
+    <script>
+        // Header und Footer dynamisch laden
+        async function loadHeaderAndFooter() {
+            try {
+                // Header und Footer laden
+                document.getElementById('header-container').innerHTML = await (await fetch('partials/header.html')).text();
+                document.getElementById('footer-container').innerHTML = await (await fetch('partials/footer.html')).text();
+                
+                // Skripte aus dem Header auswerten
+                const headerScripts = document.getElementById('header-container').querySelectorAll('script');
+                for (const script of headerScripts) {
+                    if (script.innerText) {
+                        eval(script.innerText);
+                    }
+                }
+                
+                // Explizit die Navigation aktualisieren
+                if (window.updateNavigation) {
+                    window.updateNavigation();
+                }
+            } catch (error) {
+                console.error('Fehler beim Laden des Headers oder Footers:', error);
+            }
+        }
+        
+        // Header und Footer laden
+        loadHeaderAndFooter();
+    </script>
+    <script src="js/quiz-player.js"></script>
+</body>
+</html>

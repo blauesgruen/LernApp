@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kategorien & Gruppen verwalten - LernApp</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.1/css/all.min.css">
+</head>
+<body>
+    <div id="header-container"></div>
+
+    <main>
+        <section id="category-management-section">
+            <h1>Kategorien & Gruppen verwalten</h1>
+            
+            <div class="management-grid">
+                <!-- Linke Spalte: Kategorien erstellen -->
+                <div class="management-column">
+                    <div class="management-card">
+                        <h2>Kategorie erstellen</h2>
+                        <form id="category-form">
+                            <div class="form-group">
+                                <label for="category-name">Name:</label>
+                                <input type="text" id="category-name" required placeholder="z.B. Geschichte">
+                            </div>
+                            <div class="form-group">
+                                <label for="category-description">Beschreibung:</label>
+                                <textarea id="category-description" placeholder="Kurze Beschreibung der Kategorie"></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label>Hauptkategorie:</label>
+                                <div class="radio-group">
+                                    <label class="radio-option">
+                                        <input type="radio" name="main-category" value="text" checked> 
+                                        Textfragen
+                                    </label>
+                                    <label class="radio-option">
+                                        <input type="radio" name="main-category" value="image"> 
+                                        Bilderquiz
+                                    </label>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn-primary">Kategorie erstellen</button>
+                        </form>
+                    </div>
+
+                    <div class="management-card">
+                        <h2>Vorhandene Kategorien</h2>
+                        <div id="categories-list" class="items-list">
+                            <p class="loading-info">Kategorien werden geladen...</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Rechte Spalte: Gruppen erstellen -->
+                <div class="management-column">
+                    <div class="management-card">
+                        <h2>Gruppe erstellen</h2>
+                        <form id="group-form">
+                            <div class="form-group">
+                                <label for="group-category">Kategorie:</label>
+                                <select id="group-category" required>
+                                    <option value="">-- Kategorie wählen --</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="group-name">Name:</label>
+                                <input type="text" id="group-name" required placeholder="z.B. Mittelalter">
+                            </div>
+                            <div class="form-group">
+                                <label for="group-description">Beschreibung:</label>
+                                <textarea id="group-description" placeholder="Kurze Beschreibung der Gruppe"></textarea>
+                            </div>
+                            <button type="submit" class="btn-primary">Gruppe erstellen</button>
+                        </form>
+                    </div>
+
+                    <div class="management-card">
+                        <h2>Vorhandene Gruppen</h2>
+                        <div class="form-group">
+                            <label for="filter-category">Nach Kategorie filtern:</label>
+                            <select id="filter-category">
+                                <option value="">Alle Kategorien</option>
+                            </select>
+                        </div>
+                        <div id="groups-list" class="items-list">
+                            <p class="loading-info">Gruppen werden geladen...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <div id="footer-container"></div>
+
+    <script src="js/auth.js"></script>
+    <script src="js/notification.js"></script>
+    <script src="js/storage.js"></script>
+    <script src="js/quiz-db.js"></script>
+    <script>
+        // Header und Footer dynamisch laden
+        async function loadHeaderAndFooter() {
+            try {
+                // Header und Footer laden
+                document.getElementById('header-container').innerHTML = await (await fetch('partials/header.html')).text();
+                document.getElementById('footer-container').innerHTML = await (await fetch('partials/footer.html')).text();
+                
+                // Skripte aus dem Header auswerten
+                const headerScripts = document.getElementById('header-container').querySelectorAll('script');
+                for (const script of headerScripts) {
+                    if (script.innerText) {
+                        eval(script.innerText);
+                    }
+                }
+                
+                // Explizit die Navigation aktualisieren
+                if (window.updateNavigation) {
+                    window.updateNavigation();
+                }
+            } catch (error) {
+                console.error('Fehler beim Laden des Headers oder Footers:', error);
+            }
+        }
+        
+        // Header und Footer laden
+        loadHeaderAndFooter();
+    </script>
+    <script src="js/category-management.js"></script>
+</body>
+</html>

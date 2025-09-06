@@ -14,13 +14,13 @@
     <main>
         <div class="dashboard-container">
             <div class="dashboard-box">
-                <button onclick="location.href='quiz.html'">Quiz starten</button>
+                <button onclick="location.href='quiz-player.html'">Quiz starten</button>
             </div>
             <div class="dashboard-box">
-                <button onclick="location.href='questions.html'">Fragen verwalten</button>
+                <button onclick="location.href='question-creator.html'">Fragen erstellen</button>
             </div>
             <div class="dashboard-box">
-                <button onclick="location.href='statistics.html'">Statistiken</button>
+                <button onclick="location.href='category-management.html'">Kategorien verwalten</button>
             </div>
         </div>
     </main>
@@ -53,6 +53,11 @@
                     window.updateNavigation();
                 } else {
                     console.log('updateNavigation-Funktion nicht gefunden.');
+                }
+                
+                // Breadcrumbs initialisieren (leerer Pfad für Dashboard als Startseite)
+                if (window.breadcrumbs) {
+                    window.breadcrumbs.clear();
                 }
             } catch (error) {
                 console.error('Fehler beim Laden des Headers oder Footers:', error);

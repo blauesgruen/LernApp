@@ -37,6 +37,73 @@
         #user-buttons a:hover, .admin-button:hover {
             color: #007bff; /* Dezente Farbänderung beim Hover */
         }
+
+        /* Breadcrumb Navigation Stile */
+        .breadcrumb-container {
+            padding: 10px 20px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            margin: 10px 0;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .breadcrumb-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .breadcrumb-item {
+            display: inline-flex;
+            align-items: center;
+        }
+
+        .breadcrumb-item:not(:last-child)::after {
+            content: "›";
+            margin: 0 8px;
+            color: #6c757d;
+            font-weight: bold;
+        }
+
+        .breadcrumb-link {
+            color: #007bff;
+            text-decoration: none;
+            transition: color 0.2s;
+            font-size: 0.95rem;
+        }
+
+        .breadcrumb-link:hover {
+            color: #0056b3;
+            text-decoration: underline;
+        }
+
+        .breadcrumb-current {
+            color: #6c757d;
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+
+        /* Für mobile Ansicht */
+        @media (max-width: 576px) {
+            .breadcrumb-container {
+                padding: 8px 12px;
+                margin: 5px 0;
+            }
+            
+            .breadcrumb-item:not(:last-child)::after {
+                margin: 0 5px;
+            }
+            
+            .breadcrumb-link, .breadcrumb-current {
+                font-size: 0.85rem;
+            }
+        }
     </style>
 </head>
 <body>
@@ -53,7 +120,16 @@
             </li>
         </ul>
         <div class="header-right"></div>
-    </nav>    
+    </nav>
+
+    <!-- Breadcrumb Navigation -->
+    <div class="breadcrumb-container" id="breadcrumb-container" style="display: none;">
+        <nav aria-label="Breadcrumb Navigation">
+            <ol class="breadcrumb-list" id="breadcrumb-list">
+                <!-- Breadcrumbs werden dynamisch eingefügt -->
+            </ol>
+        </nav>
+    </div>    
     <script src="js/notification.js"></script>
     <script>
         // Logs persistent machen, auch nach Logout
@@ -133,6 +209,176 @@
 
         // Zusätzlich beim DOMContentLoaded-Event ausführen
         document.addEventListener('DOMContentLoaded', window.updateNavigation);
+
+        // Breadcrumb-Funktionen
+        window.breadcrumbs = {
+            // Aktuelle Breadcrumb-Pfad (wird von Seiten gespeichert)
+            path: [],
+            
+            // Container- und Listen-Referenzen
+            container: null,
+            list: null,
+            
+            // Initialisiert die Breadcrumb-Navigation
+            init: function() {
+                this.container = document.getElementById('breadcrumb-container');
+                this.list = document.getElementById('breadcrumb-list');
+                
+                // Versuche gespeicherten Pfad zu laden
+                this.loadState();
+                
+                // Prüfe, ob wir auf einer Seite sind, die Breadcrumbs anzeigen sollte
+                this.updateVisibility();
+            },
+            
+            // Setzt einen neuen Breadcrumb-Pfad
+            set: function(newPath) {
+                if (!Array.isArray(newPath)) {
+                    console.error('Breadcrumb-Pfad muss ein Array sein');
+                    return;
+                }
+                
+                this.path = newPath;
+                this.saveState();
+                this.render();
+                this.updateVisibility();
+            },
+            
+            // Fügt einen Breadcrumb zum Pfad hinzu
+            add: function(label, url = null) {
+                // Prüfen, ob dieser Breadcrumb bereits existiert
+                const existingIndex = this.path.findIndex(item => item.label === label);
+                
+                if (existingIndex >= 0) {
+                    // Wenn gefunden, schneide den Pfad ab diesem Punkt ab
+                    this.path = this.path.slice(0, existingIndex + 1);
+                } else {
+                    // Sonst füge neuen Breadcrumb hinzu
+                    this.path.push({ label, url });
+                }
+                
+                this.saveState();
+                this.render();
+                this.updateVisibility();
+            },
+            
+            // Entfernt alle Breadcrumbs bis zu einem bestimmten Index
+            navigateTo: function(index) {
+                if (index >= 0 && index < this.path.length) {
+                    this.path = this.path.slice(0, index + 1);
+                    this.saveState();
+                    this.render();
+                    
+                    // Wenn eine URL vorhanden ist, navigiere dorthin
+                    const item = this.path[index];
+                    if (item && item.url) {
+                        window.location.href = item.url;
+                    }
+                }
+            },
+            
+            // Löscht alle Breadcrumbs
+            clear: function() {
+                this.path = [];
+                this.saveState();
+                this.render();
+                this.updateVisibility();
+            },
+            
+            // Aktualisiert die Sichtbarkeit des Breadcrumb-Containers
+            updateVisibility: function() {
+                if (!this.container) return;
+                
+                // Zeige Breadcrumbs nur an, wenn Pfad vorhanden ist und wir nicht auf der Startseite sind
+                const isHomePage = window.location.pathname.endsWith('index.html') || 
+                                   window.location.pathname.endsWith('/');
+                const shouldShow = this.path.length > 0 && !isHomePage;
+                
+                this.container.style.display = shouldShow ? 'block' : 'none';
+            },
+            
+            // Rendert die aktuellen Breadcrumbs
+            render: function() {
+                if (!this.list) return;
+                
+                // Liste leeren
+                this.list.innerHTML = '';
+                
+                // Startpunkt immer hinzufügen
+                const homeLi = document.createElement('li');
+                homeLi.className = 'breadcrumb-item';
+                
+                const homeLink = document.createElement('a');
+                homeLink.className = 'breadcrumb-link';
+                homeLink.href = localStorage.getItem('loggedIn') === 'true' ? 'dashboard.html' : 'index.html';
+                homeLink.textContent = 'Start';
+                homeLink.onclick = (e) => {
+                    e.preventDefault();
+                    this.clear();
+                    window.location.href = homeLink.href;
+                };
+                
+                homeLi.appendChild(homeLink);
+                this.list.appendChild(homeLi);
+                
+                // Restlichen Pfad rendern
+                this.path.forEach((item, index) => {
+                    const li = document.createElement('li');
+                    li.className = 'breadcrumb-item';
+                    
+                    if (index === this.path.length - 1) {
+                        // Letzter Eintrag (aktuell)
+                        const span = document.createElement('span');
+                        span.className = 'breadcrumb-current';
+                        span.textContent = item.label;
+                        li.appendChild(span);
+                    } else {
+                        // Navigierbarer Eintrag
+                        const a = document.createElement('a');
+                        a.className = 'breadcrumb-link';
+                        a.href = item.url || '#';
+                        a.textContent = item.label;
+                        
+                        // Event-Handler für Navigation
+                        a.onclick = (e) => {
+                            e.preventDefault();
+                            this.navigateTo(index);
+                        };
+                        
+                        li.appendChild(a);
+                    }
+                    
+                    this.list.appendChild(li);
+                });
+            },
+            
+            // Speichert den aktuellen Pfad im localStorage
+            saveState: function() {
+                try {
+                    localStorage.setItem('breadcrumbPath', JSON.stringify(this.path));
+                } catch (error) {
+                    console.error('Fehler beim Speichern des Breadcrumb-Pfads:', error);
+                }
+            },
+            
+            // Lädt den gespeicherten Pfad aus dem localStorage
+            loadState: function() {
+                try {
+                    const savedPath = localStorage.getItem('breadcrumbPath');
+                    if (savedPath) {
+                        this.path = JSON.parse(savedPath);
+                    }
+                } catch (error) {
+                    console.error('Fehler beim Laden des Breadcrumb-Pfads:', error);
+                    this.path = [];
+                }
+            }
+        };
+        
+        // Breadcrumb-Navigation initialisieren
+        document.addEventListener('DOMContentLoaded', function() {
+            window.breadcrumbs.init();
+        });
 
         // Stellt sicher, dass showLogs global verfügbar ist
         window.showLogs = function() {

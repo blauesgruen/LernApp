@@ -1,0 +1,385 @@
+// question-creator.js - Verwaltung der Fragenerstellung
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Prüfen, ob der Benutzer eingeloggt ist
+    const isLoggedIn = localStorage.getItem('loggedIn') === 'true';
+    const username = localStorage.getItem('username');
+    
+    if (!isLoggedIn || !username) {
+        // Nicht eingeloggt - zurück zur Login-Seite
+        window.location.href = 'login.html';
+        return;
+    }
+
+    // Elemente für das Fragenformular
+    const questionForm = document.getElementById('question-form');
+    const categorySelect = document.getElementById('question-category');
+    const groupSelect = document.getElementById('question-group');
+    const questionTextInput = document.getElementById('question-text');
+    const questionImageInput = document.getElementById('question-image');
+    const imagePreview = document.getElementById('image-preview');
+    const explanationInput = document.getElementById('question-explanation');
+    const difficultyInput = document.getElementById('question-difficulty');
+    const recentQuestionsList = document.getElementById('recent-questions-list');
+
+    // Base64-kodiertes Bild
+    let imageBase64 = null;
+
+    // Initialisierung
+    initializePage();
+
+    // Event Listener für Kategorie-Auswahl
+    if (categorySelect) {
+        categorySelect.addEventListener('change', async function() {
+            await updateGroupSelect();
+        });
+    }
+
+    // Event Listener für Bild-Upload
+    if (questionImageInput) {
+        questionImageInput.addEventListener('change', handleImageUpload);
+    }
+
+    // Event Listener für das Fragen-Formular
+    if (questionForm) {
+        questionForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            // Prüfen, ob alle Felder ausgefüllt sind
+            if (!validateForm()) {
+                return;
+            }
+            
+            // Antwortoptionen sammeln - nur die richtige Antwort
+            const correctAnswerText = document.getElementById('answer-0').value.trim();
+            
+            if (!correctAnswerText) {
+                showError('Bitte gib eine richtige Antwort ein.');
+                return;
+            }
+            
+            // Nur die richtige Antwort wird angegeben
+            const options = [
+                {
+                    text: correctAnswerText,
+                    isCorrect: true
+                }
+            ];
+            
+            // Fragedaten erstellen
+            const questionData = {
+                text: questionTextInput.value.trim(),
+                imageUrl: imageBase64,
+                options: options,
+                explanation: explanationInput.value.trim(),
+                categoryId: categorySelect.value,
+                groupId: groupSelect.value,
+                difficulty: parseInt(difficultyInput.value),
+                createdBy: username
+            };
+            
+            try {
+                // Frage erstellen
+                const newQuestion = await window.quizDB.createQuestion(questionData);
+                
+                if (newQuestion) {
+                    showSuccess('Frage wurde erfolgreich erstellt!');
+                    
+                    // Formular zurücksetzen
+                    resetForm();
+                    
+                    // Zuletzt erstellte Fragen aktualisieren
+                    await loadRecentQuestions();
+                } else {
+                    showError('Fehler beim Erstellen der Frage.');
+                }
+            } catch (error) {
+                console.error('Fehler beim Erstellen der Frage:', error);
+                showError(`Fehler: ${error.message}`);
+            }
+        });
+    }
+
+    /**
+     * Initialisiert die Seite
+     */
+    async function initializePage() {
+        try {
+            // Kategorien laden und Auswahlfelder aktualisieren
+            await updateCategorySelect();
+            
+            // Gruppen aktualisieren (leer, da noch keine Kategorie gewählt)
+            await updateGroupSelect();
+            
+            // Zuletzt erstellte Fragen laden
+            await loadRecentQuestions();
+            
+            // Breadcrumbs initialisieren, falls verfügbar
+            if (window.breadcrumbs) {
+                window.breadcrumbs.set([
+                    { label: 'Verwaltung', url: 'admin.html' },
+                    { label: 'Fragen erstellen', url: 'question-creator.html' }
+                ]);
+            }
+        } catch (error) {
+            console.error('Fehler beim Initialisieren der Seite:', error);
+            showError('Fehler beim Laden der Daten. Bitte aktualisiere die Seite.');
+        }
+    }
+
+    /**
+     * Aktualisiert das Kategorie-Auswahlfeld
+     */
+    async function updateCategorySelect() {
+        try {
+            const categories = await window.quizDB.loadCategories();
+            
+            // Auswahlfeld leeren
+            categorySelect.innerHTML = '<option value="">-- Kategorie wählen --</option>';
+            
+            // Kategorien hinzufügen
+            categories.forEach(category => {
+                const mainCategoryName = category.mainCategory === window.quizDB.MAIN_CATEGORY.TEXT ? 'Textfragen' : 'Bilderquiz';
+                const optionText = `${category.name} (${mainCategoryName})`;
+                
+                const option = document.createElement('option');
+                option.value = category.id;
+                option.textContent = optionText;
+                option.dataset.mainCategory = category.mainCategory;
+                categorySelect.appendChild(option);
+            });
+        } catch (error) {
+            console.error('Fehler beim Aktualisieren des Kategorie-Auswahlfelds:', error);
+            showError('Fehler beim Laden der Kategorien.');
+        }
+    }
+
+    /**
+     * Aktualisiert das Gruppen-Auswahlfeld basierend auf der gewählten Kategorie
+     */
+    async function updateGroupSelect() {
+        try {
+            const categoryId = categorySelect.value;
+            
+            // Auswahlfeld leeren
+            groupSelect.innerHTML = '<option value="">-- Gruppe wählen --</option>';
+            
+            if (!categoryId) {
+                groupSelect.innerHTML += '<option value="" disabled>Wähle zuerst eine Kategorie</option>';
+                return;
+            }
+            
+            // Gruppen laden
+            const groups = await window.quizDB.loadGroups();
+            
+            // Gruppen für die gewählte Kategorie filtern
+            const filteredGroups = groups.filter(group => group.categoryId === categoryId);
+            
+            if (filteredGroups.length === 0) {
+                groupSelect.innerHTML += '<option value="" disabled>Keine Gruppen für diese Kategorie</option>';
+                return;
+            }
+            
+            // Gruppen hinzufügen
+            filteredGroups.forEach(group => {
+                const option = document.createElement('option');
+                option.value = group.id;
+                option.textContent = group.name;
+                groupSelect.appendChild(option);
+            });
+        } catch (error) {
+            console.error('Fehler beim Aktualisieren des Gruppen-Auswahlfelds:', error);
+            showError('Fehler beim Laden der Gruppen.');
+        }
+    }
+
+    /**
+     * Verarbeitet den Bild-Upload und erstellt eine Vorschau
+     */
+    function handleImageUpload() {
+        const file = questionImageInput.files[0];
+        
+        if (!file) {
+            imagePreview.innerHTML = '';
+            imageBase64 = null;
+            return;
+        }
+        
+        if (!file.type.startsWith('image/')) {
+            showError('Bitte wähle eine Bilddatei aus.');
+            questionImageInput.value = '';
+            imagePreview.innerHTML = '';
+            imageBase64 = null;
+            return;
+        }
+        
+        // Größe prüfen (max. 5 MB)
+        if (file.size > 5 * 1024 * 1024) {
+            showError('Das Bild ist zu groß. Maximale Größe: 5 MB.');
+            questionImageInput.value = '';
+            imagePreview.innerHTML = '';
+            imageBase64 = null;
+            return;
+        }
+        
+        const reader = new FileReader();
+        
+        reader.onload = function(e) {
+            // Base64-kodiertes Bild speichern
+            imageBase64 = e.target.result;
+            
+            // Vorschau erstellen
+            imagePreview.innerHTML = `<img src="${imageBase64}" alt="Vorschau">`;
+        };
+        
+        reader.onerror = function() {
+            showError('Fehler beim Lesen der Bilddatei.');
+            imagePreview.innerHTML = '';
+            imageBase64 = null;
+        };
+        
+        reader.readAsDataURL(file);
+    }
+
+    /**
+     * Lädt die zuletzt erstellten Fragen
+     */
+    async function loadRecentQuestions() {
+        try {
+            recentQuestionsList.innerHTML = '<p class="loading-info">Fragen werden geladen...</p>';
+            
+            // Alle Fragen, Kategorien und Gruppen laden
+            const [questions, categories, groups] = await Promise.all([
+                window.quizDB.loadQuestions(),
+                window.quizDB.loadCategories(),
+                window.quizDB.loadGroups()
+            ]);
+            
+            // Maps für schnellen Zugriff erstellen
+            const categoryMap = {};
+            categories.forEach(category => {
+                categoryMap[category.id] = category;
+            });
+            
+            const groupMap = {};
+            groups.forEach(group => {
+                groupMap[group.id] = group;
+            });
+            
+            // Nur die letzten 5 Fragen des aktuellen Benutzers anzeigen
+            const userQuestions = questions
+                .filter(question => question.createdBy === username)
+                .sort((a, b) => b.createdAt - a.createdAt)
+                .slice(0, 5);
+            
+            if (userQuestions.length === 0) {
+                recentQuestionsList.innerHTML = '<p class="info-text">Du hast noch keine Fragen erstellt.</p>';
+                return;
+            }
+            
+            // Fragen anzeigen
+            let html = '';
+            
+            userQuestions.forEach(question => {
+                const category = categoryMap[question.categoryId] || { name: 'Unbekannte Kategorie' };
+                const group = groupMap[question.groupId] || { name: 'Unbekannte Gruppe' };
+                
+                // Richtige Antwort finden
+                const correctAnswer = question.options.find(option => option.isCorrect);
+                
+                html += `
+                    <div class="question-item">
+                        <div class="question-header">
+                            <div class="question-badges">
+                                <span class="question-badge">${category.name}</span>
+                                <span class="question-badge">${group.name}</span>
+                                <span class="question-difficulty">Schwierigkeit: ${'★'.repeat(question.difficulty)}</span>
+                            </div>
+                        </div>
+                        <div class="question-content">
+                            <p class="question-text">${question.text}</p>
+                            ${question.imageUrl ? `<div class="question-image"><img src="${question.imageUrl}" alt="Fragebild"></div>` : ''}
+                        </div>
+                        <div class="question-answer">
+                            <span class="correct-answer-label">Richtige Antwort:</span>
+                            <span class="correct-answer-text">${correctAnswer ? correctAnswer.text : 'Keine richtige Antwort definiert'}</span>
+                        </div>
+                        <div class="question-footer">
+                            <span class="question-date">Erstellt am: ${new Date(question.createdAt).toLocaleDateString()}</span>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            recentQuestionsList.innerHTML = html;
+        } catch (error) {
+            console.error('Fehler beim Laden der zuletzt erstellten Fragen:', error);
+            recentQuestionsList.innerHTML = '<p class="error-text">Fehler beim Laden der Fragen.</p>';
+        }
+    }
+
+    /**
+     * Validiert das Fragenformular
+     * @returns {boolean} True, wenn das Formular gültig ist
+     */
+    function validateForm() {
+        // Kategorie prüfen
+        if (!categorySelect.value) {
+            showError('Bitte wähle eine Kategorie aus.');
+            categorySelect.focus();
+            return false;
+        }
+        
+        // Gruppe prüfen
+        if (!groupSelect.value) {
+            showError('Bitte wähle eine Gruppe aus.');
+            groupSelect.focus();
+            return false;
+        }
+        
+        // Fragetext prüfen
+        if (!questionTextInput.value.trim()) {
+            showError('Bitte gib einen Fragetext ein.');
+            questionTextInput.focus();
+            return false;
+        }
+        
+        // Bildprüfung für Bilderquiz
+        const selectedOption = categorySelect.options[categorySelect.selectedIndex];
+        if (selectedOption && selectedOption.dataset.mainCategory === window.quizDB.MAIN_CATEGORY.IMAGE && !imageBase64) {
+            showError('Für ein Bilderquiz muss ein Bild hinzugefügt werden.');
+            questionImageInput.focus();
+            return false;
+        }
+        
+        // Richtige Antwort prüfen
+        const correctAnswer = document.getElementById('answer-0');
+        if (!correctAnswer.value.trim()) {
+            showError('Bitte gib eine richtige Antwort ein.');
+            correctAnswer.focus();
+            return false;
+        }
+        
+        return true;
+    }
+
+    /**
+     * Setzt das Formular zurück
+     */
+    function resetForm() {
+        // Texteingaben zurücksetzen
+        questionTextInput.value = '';
+        explanationInput.value = '';
+        
+        // Bild zurücksetzen
+        questionImageInput.value = '';
+        imagePreview.innerHTML = '';
+        imageBase64 = null;
+        
+        // Schwierigkeitsgrad zurücksetzen
+        difficultyInput.value = 3;
+        
+        // Richtige Antwort zurücksetzen
+        document.getElementById('answer-0').value = '';
+    }
+});
