@@ -15,7 +15,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const categoryForm = document.getElementById('category-form');
     const categoryNameInput = document.getElementById('category-name');
     const categoryDescriptionInput = document.getElementById('category-description');
-    const mainCategoryRadios = document.getElementsByName('main-category');
     const categoriesList = document.getElementById('categories-list');
 
     // Elemente für Gruppen-Formular
@@ -37,23 +36,11 @@ document.addEventListener('DOMContentLoaded', function() {
             // Daten aus dem Formular sammeln
             const name = categoryNameInput.value.trim();
             const description = categoryDescriptionInput.value.trim();
-            let mainCategory = '';
-            
-            // Ausgewählte Hauptkategorie ermitteln
-            for (const radio of mainCategoryRadios) {
-                if (radio.checked) {
-                    mainCategory = radio.value;
-                    break;
-                }
-            }
+            // Standardmäßig TEXT als Hauptkategorie verwenden - dies wird später ohnehin durch den Frageinhalt bestimmt
+            const mainCategory = window.quizDB.MAIN_CATEGORY.TEXT;
             
             if (!name) {
                 showError('Bitte gib einen Namen für die Kategorie ein.');
-                return;
-            }
-            
-            if (!mainCategory) {
-                showError('Bitte wähle eine Hauptkategorie aus.');
                 return;
             }
             
@@ -175,7 +162,10 @@ document.addEventListener('DOMContentLoaded', function() {
             
             const categories = await window.quizDB.loadCategories();
             
-            if (categories.length === 0) {
+            // Systemkategorien herausfiltern (Textfragen & Bilderquiz)
+            const userCategories = categories.filter(category => category.createdBy !== 'system');
+            
+            if (userCategories.length === 0) {
                 categoriesList.innerHTML = '<p class="info-text">Keine Kategorien vorhanden. Erstelle deine erste Kategorie!</p>';
                 return;
             }
@@ -183,14 +173,11 @@ document.addEventListener('DOMContentLoaded', function() {
             // Kategorien anzeigen
             let html = '';
             
-            categories.forEach(category => {
-                const mainCategoryName = category.mainCategory === window.quizDB.MAIN_CATEGORY.TEXT ? 'Textfragen' : 'Bilderquiz';
-                
+            userCategories.forEach(category => {
                 html += `
                     <div class="item">
                         <div class="item-header">
                             <h3>${category.name}</h3>
-                            <span class="item-badge">${mainCategoryName}</span>
                         </div>
                         <p class="item-description">${category.description || 'Keine Beschreibung'}</p>
                         <div class="item-footer">
@@ -215,14 +202,16 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             const categories = await window.quizDB.loadCategories();
             
+            // Systemkategorien herausfiltern (Textfragen & Bilderquiz)
+            const userCategories = categories.filter(category => category.createdBy !== 'system');
+            
             // Auswahlfelder leeren
             groupCategorySelect.innerHTML = '<option value="">-- Kategorie wählen --</option>';
             filterCategorySelect.innerHTML = '<option value="">Alle Kategorien</option>';
             
             // Kategorien hinzufügen
-            categories.forEach(category => {
-                const mainCategoryName = category.mainCategory === window.quizDB.MAIN_CATEGORY.TEXT ? 'Textfragen' : 'Bilderquiz';
-                const optionText = `${category.name} (${mainCategoryName})`;
+            userCategories.forEach(category => {
+                const optionText = category.name;
                 
                 // Option für Gruppen-Formular
                 const groupOption = document.createElement('option');

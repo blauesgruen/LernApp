@@ -174,21 +174,23 @@ document.addEventListener('DOMContentLoaded', function() {
             // Kategorien laden
             const categories = await window.quizDB.loadCategories();
             
-            // Kategorien für den gewählten Quiz-Typ filtern
-            const filteredCategories = categories.filter(category => category.mainCategory === quizType);
+            // Zeige nur die Systemkategorien im Quiz-Bereich (Textfragen & Bilderquiz)
+            // Filtere nach gewähltem Quiz-Typ
+            const systemCategories = categories.filter(category => 
+                category.createdBy === 'system' && category.mainCategory === quizType
+            );
             
-            if (filteredCategories.length === 0) {
+            // Füge Systemkategorien hinzu
+            if (systemCategories.length > 0) {
+                systemCategories.forEach(category => {
+                    const option = document.createElement('option');
+                    option.value = category.id;
+                    option.textContent = category.name;
+                    categorySelect.appendChild(option);
+                });
+            } else {
                 categorySelect.innerHTML += '<option value="" disabled>Keine Kategorien für diesen Quiz-Typ</option>';
-                return;
             }
-            
-            // Kategorien hinzufügen
-            filteredCategories.forEach(category => {
-                const option = document.createElement('option');
-                option.value = category.id;
-                option.textContent = category.name;
-                categorySelect.appendChild(option);
-            });
             
             // Gruppen aktualisieren
             await updateGroupSelect();
@@ -305,24 +307,23 @@ async function startQuiz() {
  */
 async function displayCurrentQuestion() {
     const question = questions[currentQuestionIndex];
-    const categories = await window.quizDB.loadCategories();
-    const category = categories.find(cat => cat.id === currentSettings.categoryId);
-    const quizType = category ? category.mainCategory : null;
-    
     // Quiz-Fortschritt aktualisieren
     quizProgress.textContent = `Frage ${currentQuestionIndex + 1}/${questions.length}`;
     
-    // Anzeige je nach Quiz-Typ anpassen
-    if (quizType === window.quizDB.MAIN_CATEGORY.IMAGE) {
-        // Bei Bilderquiz: Bild als Hauptfrage anzeigen, Text optional
-        questionText.textContent = question.text || "Was ist auf dem Bild zu sehen?";
+    // Anzeige je nach Inhalt der Frage anpassen
+    questionText.textContent = question.text;
+    
+    // Wenn die Frage ein Bild hat, dieses anzeigen
+    if (question.imageUrl && question.imageUrl.trim() !== "") {
         questionImage.src = question.imageUrl;
         questionImageContainer.classList.remove('hidden');
-        // Bildcontainer größer anzeigen
-        questionImageContainer.classList.add('main-question-image');
+        // Bei prominenten Bildern: Größer anzeigen
+        if (!question.text || question.text.trim() === "") {
+            questionImageContainer.classList.add('main-question-image');
+        } else {
+            questionImageContainer.classList.remove('main-question-image');
+        }
     } else {
-        // Bei Textfragen: Nur Text anzeigen, kein Bild
-        questionText.textContent = question.text;
         questionImageContainer.classList.add('hidden');
         questionImageContainer.classList.remove('main-question-image');
     }

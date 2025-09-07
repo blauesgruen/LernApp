@@ -28,18 +28,9 @@
                                 <label for="category-description">Beschreibung:</label>
                                 <textarea id="category-description" placeholder="Kurze Beschreibung der Kategorie"></textarea>
                             </div>
-                            <div class="form-group">
-                                <label>Hauptkategorie:</label>
-                                <div class="radio-group">
-                                    <label class="radio-option">
-                                        <input type="radio" name="main-category" value="text" checked> 
-                                        Textfragen
-                                    </label>
-                                    <label class="radio-option">
-                                        <input type="radio" name="main-category" value="image"> 
-                                        Bilderquiz
-                                    </label>
-                                </div>
+                            <!-- Die Auswahl der Hauptkategorie wurde entfernt, da diese automatisch bestimmt wird -->
+                            <div class="form-info">
+                                <p><i class="fas fa-info-circle"></i> Die Kategorien werden automatisch im Quiz sowohl für Text- als auch für Bildfragen verwendet, je nachdem welche Frageninhalte verfügbar sind.</p>
                             </div>
                             <button type="submit" class="btn-primary">Kategorie erstellen</button>
                         </form>

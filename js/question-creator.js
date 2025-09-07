@@ -171,9 +171,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 categoryId: categorySelect.value,
                 groupId: groupSelect.value,
                 difficulty: parseInt(difficultyInput.value),
-                createdBy: username,
-                // Typ automatisch basierend auf dem Vorhandensein eines Bildes setzen
-                questionType: imageBase64 ? window.quizDB.MAIN_CATEGORY.IMAGE : window.quizDB.MAIN_CATEGORY.TEXT
+                createdBy: username
+                // Der questionType wird automatisch in createQuestion basierend auf der Kategorie abgeleitet
             };
             
             try {
@@ -240,8 +239,11 @@ document.addEventListener('DOMContentLoaded', function() {
             // Auswahlfeld leeren
             categorySelect.innerHTML = '<option value="">-- Kategorie wählen --</option>';
             
+            // Nur benutzerdefinierte Kategorien anzeigen (keine Systemkategorien)
+            const userCategories = categories.filter(category => category.createdBy !== 'system');
+            
             // Kategorien hinzufügen
-            categories.forEach(category => {
+            userCategories.forEach(category => {
                 const option = document.createElement('option');
                 option.value = category.id;
                 option.textContent = category.name;
@@ -389,8 +391,11 @@ document.addEventListener('DOMContentLoaded', function() {
             // Auswahlfeld leeren
             groupCategorySelect.innerHTML = '<option value="">-- Kategorie wählen --</option>';
             
+            // Nur benutzerdefinierte Kategorien anzeigen (keine Systemkategorien)
+            const userCategories = categories.filter(category => category.createdBy !== 'system');
+            
             // Kategorien hinzufügen
-            categories.forEach(category => {
+            userCategories.forEach(category => {
                 const option = document.createElement('option');
                 option.value = category.id;
                 option.textContent = category.name;

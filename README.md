@@ -274,7 +274,7 @@ Die LernApp generiert automatisch Quizze aus den eingepflegten Fragen:
 
 1. Wähle eine Kategorie und Gruppe
 2. Gib den Fragetext ein
-3. Füge ggf. ein Bild hinzu (erforderlich für Bilderquiz)
+3. Optional kannst du ein Bild hinzufügen
 4. Gib die richtige Antwort ein
 5. Füge eine optionale Erklärung hinzu
 

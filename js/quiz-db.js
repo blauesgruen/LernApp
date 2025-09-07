@@ -79,13 +79,13 @@ async function saveCategories(categories) {
  * Erstellt eine neue Kategorie
  * @param {string} name - Name der Kategorie
  * @param {string} description - Beschreibung der Kategorie
- * @param {string} mainCategory - Hauptkategorie (MAIN_CATEGORY.TEXT oder MAIN_CATEGORY.IMAGE)
+ * @param {string} [mainCategory=MAIN_CATEGORY.TEXT] - Hauptkategorie (standardmäßig TEXT)
  * @param {string} createdBy - Benutzername des Erstellers
  * @returns {Promise<object|null>} Die erstellte Kategorie oder null bei Fehler
  */
-async function createCategory(name, description, mainCategory, createdBy) {
-    if (!name || !mainCategory) {
-        console.error("Name und Hauptkategorie sind erforderlich.");
+async function createCategory(name, description, mainCategory = MAIN_CATEGORY.TEXT, createdBy) {
+    if (!name) {
+        console.error("Name der Kategorie ist erforderlich.");
         return null;
     }
 
@@ -224,6 +224,14 @@ async function createQuestion(questionData) {
 
     try {
         const questions = await loadQuestions();
+        const categories = await loadCategories();
+        
+        // Kategorie finden, um den Fragetyp automatisch zu bestimmen
+        const category = categories.find(cat => cat.id === questionData.categoryId);
+        if (!category) {
+            console.error("Kategorie nicht gefunden");
+            return null;
+        }
         
         // Neue Frage erstellen
         const newQuestion = {
@@ -279,25 +287,22 @@ async function getQuizQuestions(categoryId, groupId = null, count = 10) {
             filteredQuestions = filteredQuestions.filter(q => q.groupId === groupId);
         }
         
-        // Fragen nach dem Vorhandensein eines Bildes filtern, falls in der Frage ein Typ angegeben ist
+        // Den für das Quiz angeforderten Typ bestimmen (TEXT oder IMAGE)
         const requestedType = category.mainCategory;
         
-        // Fragen, die sowohl Text als auch Bild haben, bleiben immer erhalten
-        // Für TEXT-Kategorien: Fragen ohne Bild oder mit Text UND Bild
-        // Für IMAGE-Kategorien: Fragen mit Bild oder mit Text UND Bild
+        // Fragen nach ihrem Inhalt filtern
         if (requestedType === MAIN_CATEGORY.TEXT) {
-            // Fragen ohne Bild bleiben im TEXT-Typ
-            // Fragen mit Text UND Bild bleiben ebenfalls
+            // TEXT-Kategorie: Fragen, die Text haben oder kein Bild (also alle reinen Textfragen)
             filteredQuestions = filteredQuestions.filter(q => 
-                !q.imageUrl || q.imageUrl.trim() === '' || 
-                (q.questionType === MAIN_CATEGORY.TEXT) ||
-                (q.text && q.text.trim() !== '') // Fragen mit Text bleiben auch, selbst wenn sie ein Bild haben
+                // Eine Frage wird als Textfrage betrachtet, wenn sie Text hat und kein Bild ODER
+                // wenn sie sowohl Text als auch Bild hat (diese stehen in beiden Kategorien zur Verfügung)
+                !q.imageUrl || q.imageUrl.trim() === '' || (q.text && q.text.trim() !== '')
             );
         } else if (requestedType === MAIN_CATEGORY.IMAGE) {
-            // Fragen mit Bild bleiben im IMAGE-Typ
+            // IMAGE-Kategorie: Fragen, die ein Bild haben
             filteredQuestions = filteredQuestions.filter(q => 
-                (q.imageUrl && q.imageUrl.trim() !== '') || 
-                (q.questionType === MAIN_CATEGORY.IMAGE)
+                // Eine Frage wird als Bildfrage betrachtet, wenn sie ein Bild hat
+                q.imageUrl && q.imageUrl.trim() !== ''
             );
         }
         
