@@ -1,0 +1,7 @@
+.question-explanation {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px dashed #e0e0e0;
+    color: #555;
+    font-style: italic;
+}

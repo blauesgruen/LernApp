@@ -1,0 +1,184 @@
+/* Fragen-Ersteller CSS */
+
+/* Verbesserte Seitenstruktur */
+.page-layout {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 25px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.category-management-column,
+.question-creation-column {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+/* Bessere Karten-Darstellung */
+.question-creator-card {
+    background-color: #fff;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.question-creator-card h3 {
+    margin-top: 0;
+    border-bottom: 2px solid #f0f0f0;
+    padding-bottom: 10px;
+    margin-bottom: 15px;
+    color: #333;
+    font-size: 1.3rem;
+}
+
+/* Verbesserte Bildvorschau */
+.image-upload-container {
+    margin-bottom: 15px;
+}
+
+.image-upload-label {
+    display: inline-block;
+    padding: 8px 16px;
+    background-color: #007bff;
+    color: white;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-bottom: 10px;
+    transition: background-color 0.3s;
+}
+
+.image-upload-label:hover {
+    background-color: #0069d9;
+}
+
+.image-name {
+    margin-top: 5px;
+    font-size: 0.9rem;
+    color: #666;
+}
+
+.image-preview {
+    margin-top: 15px;
+    max-width: 100%;
+    display: none; /* Standardmäßig ausgeblendet, wird per JS eingeblendet */
+    border-radius: 8px;
+    overflow: hidden;
+    text-align: center;
+    background-color: #f9f9f9;
+}
+
+.image-preview.has-image {
+    border: 1px solid #ddd;
+    padding: 5px;
+}
+
+.image-preview img {
+    max-width: 100%;
+    max-height: 200px; /* Begrenzt die Höhe der Bildvorschau */
+    object-fit: contain;
+}
+
+/* Verbesserte Anzeige der Fragen */
+.question-item {
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 15px;
+    border-left: 3px solid #007bff;
+}
+
+.question-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.question-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+}
+
+.question-badge {
+    font-size: 12px;
+    padding: 3px 8px;
+    border-radius: 10px;
+    background-color: #007bff;
+    color: white;
+}
+
+.question-difficulty {
+    font-size: 12px;
+    color: #f1c40f;
+}
+
+.question-content {
+    margin: 15px 0;
+}
+
+.question-text {
+    font-size: 16px;
+    font-weight: 500;
+    margin-bottom: 10px;
+    color: #333;
+}
+
+.question-image {
+    max-width: 100%;
+    margin: 10px 0;
+    text-align: center;
+    background-color: #f0f0f0;
+    border-radius: 8px;
+    padding: 5px;
+}
+
+.question-image img {
+    max-width: 100%;
+    max-height: 150px;
+    object-fit: contain;
+    border-radius: 5px;
+}
+
+.question-answer {
+    background-color: #e8f4fc;
+    padding: 10px;
+    border-radius: 5px;
+    margin: 10px 0;
+}
+
+.correct-answer-label {
+    font-weight: bold;
+    color: #28a745;
+    margin-right: 5px;
+}
+
+.question-footer {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: #6c757d;
+    margin-top: 10px;
+}
+
+.question-explanation {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px dashed #e0e0e0;
+    color: #555;
+    font-style: italic;
+}
+
+/* Responsives Design */
+@media (max-width: 768px) {
+    .page-layout {
+        grid-template-columns: 1fr;
+    }
+    
+    .question-badges {
+        flex-direction: column;
+    }
+}

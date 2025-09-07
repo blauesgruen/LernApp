@@ -456,9 +456,13 @@ document.addEventListener('DOMContentLoaded', function() {
      */
     function handleImageUpload() {
         const file = questionImageInput.files[0];
+        const imageNameElement = document.getElementById('image-name');
         
         if (!file) {
+            imagePreview.style.display = 'none';
             imagePreview.innerHTML = '';
+            imagePreview.classList.remove('has-image');
+            imageNameElement.textContent = '';
             imageBase64 = null;
             return;
         }
@@ -466,7 +470,10 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!file.type.startsWith('image/')) {
             showError('Bitte wähle eine Bilddatei aus.');
             questionImageInput.value = '';
+            imagePreview.style.display = 'none';
             imagePreview.innerHTML = '';
+            imagePreview.classList.remove('has-image');
+            imageNameElement.textContent = '';
             imageBase64 = null;
             return;
         }
@@ -475,7 +482,10 @@ document.addEventListener('DOMContentLoaded', function() {
         if (file.size > 5 * 1024 * 1024) {
             showError('Das Bild ist zu groß. Maximale Größe: 5 MB.');
             questionImageInput.value = '';
+            imagePreview.style.display = 'none';
             imagePreview.innerHTML = '';
+            imagePreview.classList.remove('has-image');
+            imageNameElement.textContent = '';
             imageBase64 = null;
             return;
         }
@@ -486,13 +496,21 @@ document.addEventListener('DOMContentLoaded', function() {
             // Base64-kodiertes Bild speichern
             imageBase64 = e.target.result;
             
-            // Vorschau erstellen
+            // Vorschau erstellen und anzeigen
+            imagePreview.style.display = 'block';
+            imagePreview.classList.add('has-image');
             imagePreview.innerHTML = `<img src="${imageBase64}" alt="Vorschau">`;
+            
+            // Bildnamen anzeigen
+            imageNameElement.textContent = file.name;
         };
         
         reader.onerror = function() {
             showError('Fehler beim Lesen der Bilddatei.');
+            imagePreview.style.display = 'none';
             imagePreview.innerHTML = '';
+            imagePreview.classList.remove('has-image');
+            imageNameElement.textContent = '';
             imageBase64 = null;
         };
         
@@ -561,6 +579,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="question-answer">
                             <span class="correct-answer-label">Richtige Antwort:</span>
                             <span class="correct-answer-text">${correctAnswer ? correctAnswer.text : 'Keine richtige Antwort definiert'}</span>
+                            ${question.explanation ? `<div class="question-explanation"><small><strong>Erklärung:</strong> ${question.explanation}</small></div>` : ''}
                         </div>
                         <div class="question-footer">
                             <span class="question-date">Erstellt am: ${new Date(question.createdAt).toLocaleDateString()}</span>
@@ -624,6 +643,9 @@ document.addEventListener('DOMContentLoaded', function() {
         // Bild zurücksetzen
         questionImageInput.value = '';
         imagePreview.innerHTML = '';
+        imagePreview.style.display = 'none';
+        imagePreview.classList.remove('has-image');
+        document.getElementById('image-name').textContent = '';
         imageBase64 = null;
         
         // Schwierigkeitsgrad zurücksetzen
