@@ -22,115 +22,164 @@ document.addEventListener('DOMContentLoaded', function() {
     const difficultyInput = document.getElementById('question-difficulty');
     const recentQuestionsList = document.getElementById('recent-questions-list');
 
-    // Elemente für Kategorie-Verwaltung
-    const categoryForm = document.getElementById('category-form');
-    const categoryNameInput = document.getElementById('category-name');
-    const categoriesList = document.getElementById('categories-list');
-
-    // Elemente für Gruppen-Verwaltung
-    const groupForm = document.getElementById('group-form');
-    const groupCategorySelect = document.getElementById('group-category');
-    const groupNameInput = document.getElementById('group-name');
-    const groupsList = document.getElementById('groups-list');
+    // Elemente für Kategorie- und Gruppenauswahl
+    const categoryTree = document.getElementById('category-tree');
 
     // Base64-kodiertes Bild
     let imageBase64 = null;
 
     // Initialisierung
     initializePage();
+    
+    // Event Listener für Fenstergrößenänderung
+    window.addEventListener('resize', function() {
+        adjustCategoryTreeHeight();
+    });
 
-    // Event Listener für Kategorie-Auswahl
-    if (categorySelect) {
-        categorySelect.addEventListener('change', async function() {
-            await updateGroupSelect();
-        });
-    }
+    // Event-Listener für Bildupload bleibt erhalten
 
     // Event Listener für Bild-Upload
     if (questionImageInput) {
         questionImageInput.addEventListener('change', handleImageUpload);
     }
 
-    // Event Listener für Kategorie-Formular
-    if (categoryForm) {
-        categoryForm.addEventListener('submit', async function(e) {
-            e.preventDefault();
+    // Verzeichnisbaum für Kategorien und Gruppen erstellen
+    async function renderCategoryTree() {
+        try {
+            categoryTree.innerHTML = '<p class="loading-info">Kategorien werden geladen...</p>';
             
-            const name = categoryNameInput.value.trim();
-            // Standardmäßig "any" als Kategorie-Typ verwenden
-            const mainCategory = "any";
+            const [categories, groups] = await Promise.all([
+                window.quizDB.loadCategories(),
+                window.quizDB.loadGroups()
+            ]);
             
-            if (!name) {
-                showError('Bitte gib einen Kategorienamen ein.');
+            // Nur benutzerdefinierte Kategorien verwenden (keine Systemkategorien)
+            const userCategories = categories.filter(category => category.createdBy !== 'system');
+            
+            if (userCategories.length === 0) {
+                categoryTree.innerHTML = `
+                    <p class="info-text">Keine Kategorien gefunden. 
+                    Erstellen Sie Kategorien in der <a href="category-management.html">Kategorie-Verwaltung</a>.</p>
+                `;
                 return;
             }
             
-            try {
-                const newCategory = await window.quizDB.createCategory(
-                    name,
-                    mainCategory,
-                    username
-                );
+            // Kategorien nach Namen sortieren
+            userCategories.sort((a, b) => a.name.localeCompare(b.name));
+            
+            let html = '';
+            
+            userCategories.forEach(category => {
+                // Gruppieren der Gruppen nach Kategorie
+                const categoryGroups = groups.filter(group => group.categoryId === category.id);
+                categoryGroups.sort((a, b) => a.name.localeCompare(b.name));
                 
-                if (newCategory) {
-                    showSuccess('Kategorie wurde erfolgreich erstellt!');
-                    
-                    // Formular zurücksetzen
-                    categoryForm.reset();
-                    
-                    // Listen aktualisieren
-                    await updateCategoriesDisplay();
-                    await updateCategorySelect();
-                    await updateGroupCategorySelect();
+                html += `
+                    <div class="tree-item tree-item-category" data-id="${category.id}">
+                        <span class="tree-item-toggle"><i class="fas fa-chevron-right"></i></span>
+                        <span class="tree-item-icon"><i class="fas fa-folder"></i></span>
+                        ${category.name}
+                    </div>
+                    <div class="tree-group-container" style="display: none;" data-category-id="${category.id}">
+                `;
+                
+                if (categoryGroups.length > 0) {
+                    categoryGroups.forEach(group => {
+                        html += `
+                            <div class="tree-item tree-item-group" data-category-id="${category.id}" data-id="${group.id}">
+                                <span class="tree-item-icon"><i class="fas fa-tag"></i></span>
+                                ${group.name}
+                            </div>
+                        `;
+                    });
                 } else {
-                    showError('Fehler beim Erstellen der Kategorie.');
+                    html += `
+                        <div class="tree-item-empty">
+                            <span class="tree-item-icon"><i class="fas fa-info-circle"></i></span>
+                            Keine Gruppen in dieser Kategorie
+                        </div>
+                    `;
                 }
-            } catch (error) {
-                console.error('Fehler beim Erstellen der Kategorie:', error);
-                showError(`Fehler: ${error.message}`);
-            }
-        });
+                
+                html += '</div>';
+            });
+            
+            categoryTree.innerHTML = html;
+            
+            // Event-Listener für Kategorien im Baum
+            document.querySelectorAll('.tree-item-category').forEach(item => {
+                item.addEventListener('click', function(e) {
+                    const categoryId = this.getAttribute('data-id');
+                    
+                    // Toggle der Gruppenanzeige
+                    const groupContainer = document.querySelector(`.tree-group-container[data-category-id="${categoryId}"]`);
+                    const toggleIcon = this.querySelector('.tree-item-toggle i');
+                    
+                    if (groupContainer) {
+                        const isVisible = groupContainer.style.display !== 'none';
+                        groupContainer.style.display = isVisible ? 'none' : 'block';
+                        
+                        // Icon ändern
+                        if (toggleIcon) {
+                            toggleIcon.className = isVisible ? 'fas fa-chevron-right' : 'fas fa-chevron-down';
+                        }
+                    }
+                    
+                    // Kategorie auswählen
+                    document.querySelectorAll('.tree-item-category').forEach(cat => {
+                        cat.classList.remove('active');
+                    });
+                    this.classList.add('active');
+                    
+                    // Werte im Hidden-Input setzen
+                    categorySelect.value = categoryId;
+                    
+                    // Verhindern, dass ein Klick auf das Toggle-Icon auch die Kategorie auswählt
+                    if (e.target.closest('.tree-item-toggle')) {
+                        e.stopPropagation();
+                    }
+                });
+            });
+            
+            // Event-Listener für Gruppen im Baum
+            document.querySelectorAll('.tree-item-group').forEach(item => {
+                item.addEventListener('click', function() {
+                    const categoryId = this.getAttribute('data-category-id');
+                    const groupId = this.getAttribute('data-id');
+                    
+                    // Klassen für aktive Elemente setzen
+                    document.querySelectorAll('.tree-item-category').forEach(cat => {
+                        cat.classList.remove('active');
+                    });
+                    document.querySelectorAll('.tree-item-group').forEach(group => {
+                        group.classList.remove('active');
+                    });
+                    
+                    // Aktive Kategorie finden und markieren
+                    const parentCategory = document.querySelector(`.tree-item-category[data-id="${categoryId}"]`);
+                    if (parentCategory) {
+                        parentCategory.classList.add('active');
+                    }
+                    
+                    // Aktive Gruppe markieren
+                    this.classList.add('active');
+                    
+                    // Werte in Hidden-Inputs setzen
+                    categorySelect.value = categoryId;
+                    groupSelect.value = groupId;
+                });
+            });
+            
+        } catch (error) {
+            console.error('Fehler beim Rendern des Kategorie-Baums:', error);
+            categoryTree.innerHTML = '<p class="error-text">Fehler beim Laden der Kategorien und Gruppen.</p>';
+        }
     }
     
-    // Event Listener für Gruppen-Formular
-    if (groupForm) {
-        groupForm.addEventListener('submit', async function(e) {
-            e.preventDefault();
-            
-            const categoryId = groupCategorySelect.value;
-            const name = groupNameInput.value.trim();
-            
-            if (!categoryId || !name) {
-                showError('Bitte fülle alle erforderlichen Felder aus.');
-                return;
-            }
-            
-            try {
-                const newGroup = await window.quizDB.createGroup(
-                    name,
-                    categoryId,
-                    username
-                );
-                
-                if (newGroup) {
-                    showSuccess('Gruppe wurde erfolgreich erstellt!');
-                    
-                    // Formular zurücksetzen
-                    groupForm.reset();
-                    
-                    // Listen aktualisieren
-                    await updateGroupsDisplay();
-                } else {
-                    showError('Fehler beim Erstellen der Gruppe.');
-                }
-            } catch (error) {
-                console.error('Fehler beim Erstellen der Gruppe:', error);
-                showError(`Fehler: ${error.message}`);
-            }
-        });
-    }
-
-    // Event Listener für das Fragen-Formular
+    // Event Listener für Bild-Upload
+    if (questionImageInput) {
+        questionImageInput.addEventListener('change', handleImageUpload);
+    }    // Event Listener für das Fragen-Formular
     if (questionForm) {
         questionForm.addEventListener('submit', async function(e) {
             e.preventDefault();
@@ -183,6 +232,12 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             try {
+                // Zeige Ladeanzeige
+                const submitButton = questionForm.querySelector('button[type="submit"]');
+                const originalButtonText = submitButton.innerHTML;
+                submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Wird gespeichert...';
+                submitButton.disabled = true;
+                
                 // Frage erstellen
                 const newQuestion = await window.quizDB.createQuestion(questionData);
                 
@@ -197,9 +252,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 } else {
                     showError('Fehler beim Erstellen der Frage.');
                 }
+                
+                // Button zurücksetzen
+                submitButton.innerHTML = originalButtonText;
+                submitButton.disabled = false;
             } catch (error) {
                 console.error('Fehler beim Erstellen der Frage:', error);
                 showError(`Fehler: ${error.message}`);
+                
+                // Button zurücksetzen
+                const submitButton = questionForm.querySelector('button[type="submit"]');
+                if (submitButton) {
+                    submitButton.innerHTML = '<i class="fas fa-save"></i> Frage speichern';
+                    submitButton.disabled = false;
+                }
             }
         });
     }
@@ -209,19 +275,14 @@ document.addEventListener('DOMContentLoaded', function() {
      */
     async function initializePage() {
         try {
-            // Kategorien laden und Auswahlfelder aktualisieren
-            await updateCategorySelect();
-            await updateCategoriesDisplay();
-            
-            // Gruppen-Kategorie-Auswahlfeld aktualisieren
-            await updateGroupCategorySelect();
-            
-            // Gruppen aktualisieren (leer, da noch keine Kategorie gewählt)
-            await updateGroupSelect();
-            await updateGroupsDisplay();
+            // Kategorie-Verzeichnisbaum rendern
+            await renderCategoryTree();
             
             // Zuletzt erstellte Fragen laden
             await loadRecentQuestions();
+            
+            // Höhe des Kategorie-Baums dynamisch anpassen
+            adjustCategoryTreeHeight();
             
             // Breadcrumbs initialisieren, falls verfügbar
             if (window.breadcrumbs) {
@@ -235,195 +296,54 @@ document.addEventListener('DOMContentLoaded', function() {
             showError('Fehler beim Laden der Daten. Bitte aktualisiere die Seite.');
         }
     }
-
-    /**
-     * Aktualisiert das Kategorie-Auswahlfeld
-     */
-    async function updateCategorySelect() {
-        try {
-            const categories = await window.quizDB.loadCategories();
-            
-            // Auswahlfeld leeren
-            categorySelect.innerHTML = '<option value="">-- Kategorie wählen --</option>';
-            
-            // Nur benutzerdefinierte Kategorien anzeigen (keine Systemkategorien)
-            const userCategories = categories.filter(category => category.createdBy !== 'system');
-            
-            // Kategorien hinzufügen
-            userCategories.forEach(category => {
-                const option = document.createElement('option');
-                option.value = category.id;
-                option.textContent = category.name;
-                categorySelect.appendChild(option);
-            });
-        } catch (error) {
-            console.error('Fehler beim Aktualisieren des Kategorie-Auswahlfelds:', error);
-            showError('Fehler beim Laden der Kategorien.');
-        }
-    }
-
-    /**
-     * Aktualisiert die Anzeige der Kategorien
-     */
-    async function updateCategoriesDisplay() {
-        try {
-            categoriesList.innerHTML = '<p class="loading-info">Kategorien werden geladen...</p>';
-            
-            const categories = await window.quizDB.loadCategories();
-            
-            if (categories.length === 0) {
-                categoriesList.innerHTML = '<p class="info-text">Keine Kategorien vorhanden. Erstelle deine erste Kategorie.</p>';
-                return;
-            }
-            
-            let html = '';
-            
-            // Eigene Kategorien anzeigen (nicht vom System erstellt)
-            const userCategories = categories.filter(category => category.createdBy !== 'system');
-            
-            if (userCategories.length === 0) {
-                html = '<p class="info-text">Du hast noch keine eigenen Kategorien erstellt.</p>';
-            } else {
-                userCategories.forEach(category => {
-                    html += `
-                        <div class="category-item" data-id="${category.id}">
-                            <div class="category-info">
-                                <h4>${category.name}</h4>
-                            </div>
-                            <div class="category-actions">
-                                <button type="button" class="action-btn delete" title="Kategorie löschen" data-id="${category.id}">
-                                    <i class="fas fa-trash-alt"></i>
-                                </button>
-                            </div>
-                        </div>
-                    `;
-                });
-            }
-            
-            categoriesList.innerHTML = html;
-            
-            // Event-Listener für Lösch-Buttons
-            document.querySelectorAll('.category-item .delete').forEach(button => {
-                button.addEventListener('click', async function() {
-                    const categoryId = this.getAttribute('data-id');
-                    if (confirm('Möchtest du diese Kategorie wirklich löschen? Alle zugehörigen Gruppen werden ebenfalls gelöscht.')) {
-                        // Hier Code zum Löschen der Kategorie einfügen (zukünftige Erweiterung)
-                        alert('Löschen von Kategorien ist noch nicht implementiert.');
-                    }
-                });
-            });
-        } catch (error) {
-            console.error('Fehler beim Aktualisieren der Kategorien-Anzeige:', error);
-            categoriesList.innerHTML = '<p class="error-text">Fehler beim Laden der Kategorien.</p>';
-        }
-    }
     
     /**
-     * Aktualisiert die Anzeige der Gruppen
+     * Passt die Höhe des Kategorie-Baums an die Bildschirmhöhe an
      */
-    async function updateGroupsDisplay() {
-        try {
-            groupsList.innerHTML = '<p class="loading-info">Gruppen werden geladen...</p>';
-            
-            const [groups, categories] = await Promise.all([
-                window.quizDB.loadGroups(),
-                window.quizDB.loadCategories()
-            ]);
-            
-            // Kategorien für schnellen Zugriff mappen
-            const categoryMap = {};
-            categories.forEach(category => {
-                categoryMap[category.id] = category;
-            });
-            
-            if (groups.length === 0) {
-                groupsList.innerHTML = '<p class="info-text">Keine Gruppen vorhanden. Erstelle deine erste Gruppe.</p>';
-                return;
-            }
-            
-            let html = '';
-            
-            // Eigene Gruppen anzeigen (nicht vom System erstellt)
-            const userGroups = groups.filter(group => group.createdBy !== 'system');
-            
-            if (userGroups.length === 0) {
-                html = '<p class="info-text">Du hast noch keine eigenen Gruppen erstellt.</p>';
-            } else {
-                userGroups.forEach(group => {
-                    const category = categoryMap[group.categoryId] || { name: 'Unbekannte Kategorie' };
-                    
-                    html += `
-                        <div class="group-item" data-id="${group.id}">
-                            <div class="group-info">
-                                <span class="group-category">${category.name}</span>
-                                <h4>${group.name}</h4>
-                            </div>
-                            <div class="group-actions">
-                                <button type="button" class="action-btn delete" title="Gruppe löschen" data-id="${group.id}">
-                                    <i class="fas fa-trash-alt"></i>
-                                </button>
-                            </div>
-                        </div>
-                    `;
-                });
-            }
-            
-            groupsList.innerHTML = html;
-            
-            // Event-Listener für Lösch-Buttons
-            document.querySelectorAll('.group-item .delete').forEach(button => {
-                button.addEventListener('click', async function() {
-                    const groupId = this.getAttribute('data-id');
-                    if (confirm('Möchtest du diese Gruppe wirklich löschen?')) {
-                        // Hier Code zum Löschen der Gruppe einfügen (zukünftige Erweiterung)
-                        alert('Löschen von Gruppen ist noch nicht implementiert.');
-                    }
-                });
-            });
-        } catch (error) {
-            console.error('Fehler beim Aktualisieren der Gruppen-Anzeige:', error);
-            groupsList.innerHTML = '<p class="error-text">Fehler beim Laden der Gruppen.</p>';
-        }
+    function adjustCategoryTreeHeight() {
+        const categoryTree = document.getElementById('category-tree');
+        if (!categoryTree) return;
+        
+        // Verfügbare Höhe berechnen (abzüglich Header und anderer Elemente)
+        const windowHeight = window.innerHeight;
+        const headerHeight = document.querySelector('#header-container')?.offsetHeight || 0;
+        const footerHeight = document.querySelector('#footer-container')?.offsetHeight || 0;
+        
+        // Abstand von oben und andere UI-Elemente berücksichtigen
+        const treeContainer = categoryTree.parentElement;
+        const treeContainerRect = treeContainer.getBoundingClientRect();
+        const topOffset = treeContainerRect.top;
+        
+        // Maximale Höhe berechnen (mit Puffer)
+        const maxHeight = windowHeight - topOffset - footerHeight - 80; // 80px Puffer
+        
+        // Höhe setzen, mindestens 200px, maximal berechnete Höhe
+        const newHeight = Math.max(200, Math.min(maxHeight, 600)); // Zwischen 200px und 600px
+        categoryTree.style.maxHeight = `${newHeight}px`;
     }
-    
+
     /**
-     * Aktualisiert das Kategorie-Auswahlfeld im Gruppen-Formular
+     * Aktualisiert die Kategorie-Dropdown-Menüs
+     * Diese Funktion wird nicht mehr benötigt, da wir nur noch den Verzeichnisbaum verwenden
      */
-    async function updateGroupCategorySelect() {
+    async function updateCategoryDropdowns() {
         try {
+            // Nur noch für das Logging - Kein UI-Update mehr
             const categories = await window.quizDB.loadCategories();
-            
-            // Auswahlfeld leeren
-            groupCategorySelect.innerHTML = '<option value="">-- Kategorie wählen --</option>';
-            
-            // Nur benutzerdefinierte Kategorien anzeigen (keine Systemkategorien)
-            const userCategories = categories.filter(category => category.createdBy !== 'system');
-            
-            // Kategorien hinzufügen
-            userCategories.forEach(category => {
-                const option = document.createElement('option');
-                option.value = category.id;
-                option.textContent = category.name;
-                groupCategorySelect.appendChild(option);
-            });
+            console.log('Kategorien geladen:', categories.length);
         } catch (error) {
-            console.error('Fehler beim Aktualisieren des Gruppen-Kategorie-Auswahlfelds:', error);
-            showError('Fehler beim Laden der Kategorien für Gruppen.');
+            console.error('Fehler beim Aktualisieren der Kategorie-Auswahlfelder:', error);
         }
     }
 
     /**
-     * Aktualisiert das Gruppen-Auswahlfeld basierend auf der gewählten Kategorie
+     * Aktualisiert die Gruppen-Dropdown basierend auf der ausgewählten Kategorie
+     * Diese Funktion wird nicht mehr benötigt, da wir nur noch den Verzeichnisbaum verwenden
      */
-    async function updateGroupSelect() {
+    async function updateGroupDropdown(categoryId) {
         try {
-            const categoryId = categorySelect.value;
-            
-            // Auswahlfeld leeren
-            groupSelect.innerHTML = '<option value="">-- Gruppe wählen --</option>';
-            
+            // Nur noch für das Logging - Kein UI-Update mehr
             if (!categoryId) {
-                groupSelect.innerHTML += '<option value="" disabled>Wähle zuerst eine Kategorie</option>';
                 return;
             }
             
@@ -432,22 +352,9 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Gruppen für die gewählte Kategorie filtern
             const filteredGroups = groups.filter(group => group.categoryId === categoryId);
-            
-            if (filteredGroups.length === 0) {
-                groupSelect.innerHTML += '<option value="" disabled>Keine Gruppen für diese Kategorie</option>';
-                return;
-            }
-            
-            // Gruppen hinzufügen
-            filteredGroups.forEach(group => {
-                const option = document.createElement('option');
-                option.value = group.id;
-                option.textContent = group.name;
-                groupSelect.appendChild(option);
-            });
+            console.log('Gruppen für Kategorie geladen:', filteredGroups.length);
         } catch (error) {
             console.error('Fehler beim Aktualisieren des Gruppen-Auswahlfelds:', error);
-            showError('Fehler beim Laden der Gruppen.');
         }
     }
 
@@ -563,6 +470,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Richtige Antwort finden
                 const correctAnswer = question.options.find(option => option.isCorrect);
                 
+                // Formatiertes Datum
+                const createdAt = new Date(question.createdAt);
+                const formattedDate = createdAt.toLocaleDateString('de-DE', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+                
                 html += `
                     <div class="question-item">
                         <div class="question-header">
@@ -582,7 +499,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             ${question.explanation ? `<div class="question-explanation"><small><strong>Erklärung:</strong> ${question.explanation}</small></div>` : ''}
                         </div>
                         <div class="question-footer">
-                            <span class="question-date">Erstellt am: ${new Date(question.createdAt).toLocaleDateString()}</span>
+                            <span class="question-date">Erstellt am: ${formattedDate}</span>
                         </div>
                     </div>
                 `;
@@ -603,14 +520,12 @@ document.addEventListener('DOMContentLoaded', function() {
         // Kategorie prüfen
         if (!categorySelect.value) {
             showError('Bitte wähle eine Kategorie aus.');
-            categorySelect.focus();
             return false;
         }
         
         // Gruppe prüfen
         if (!groupSelect.value) {
             showError('Bitte wähle eine Gruppe aus.');
-            groupSelect.focus();
             return false;
         }
         

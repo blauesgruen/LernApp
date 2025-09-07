@@ -435,7 +435,7 @@ img.icon {
 }
 
 .form-group {
-    margin-bottom: 10px;
+    margin-bottom: 20px; /* Mehr Abstand zwischen Formular-Elementen */
 }
 
 .form-group label {
@@ -804,18 +804,18 @@ img.icon {
 
 /* Neue Stile für das Speicherort-Formular */
 .form-info {
-    margin: 10px 0 15px 0;
-    padding: 10px;
+    margin: 12px 0 18px 0;
+    padding: 12px 15px;
     background-color: #f0f7ff;
-    border-radius: 6px;
-    border-left: 3px solid #007BFF;
+    border-radius: 8px;
+    border-left: 4px solid #007BFF;
 }
 
 .form-info p {
     margin: 0;
     color: #555;
-    font-size: 14px;
-    line-height: 1.4;
+    font-size: 15px;
+    line-height: 1.5;
 }
 
 /* Stil für Speicherort-Formular */

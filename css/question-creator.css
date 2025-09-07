@@ -1,53 +1,159 @@
 /* Fragen-Ersteller CSS */
 
+/* Info-Banner */
+.info-banner {
+    background-color: #f8f9fa;
+    border-left: 4px solid #17a2b8;
+    padding: 12px 20px;
+    margin: 0 auto 30px;
+    max-width: 1600px;
+    border-radius: 8px;
+}
+
+.info-banner p {
+    margin: 0;
+    color: #495057;
+}
+
+.info-banner a {
+    color: #007bff;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.info-banner a:hover {
+    text-decoration: underline;
+}
+
 /* Verbesserte Seitenstruktur */
 .page-layout {
     display: grid;
-    grid-template-columns: 1fr 2fr;
-    gap: 25px;
-    max-width: 1200px;
+    grid-template-columns: 1fr 3fr; /* Verändert von 1fr 2fr für besseres Verhältnis */
+    gap: 40px; /* Erhöhter Abstand zwischen den Spalten */
+    max-width: 1600px; /* Erhöhte maximale Breite für bessere Ausnutzung großer Displays */
     margin: 0 auto;
+    padding: 0 20px; /* Seitenabstand auf kleinen Bildschirmen */
 }
 
-.category-management-column,
+.category-selection-column,
 .question-creation-column {
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 30px; /* Erhöhter Abstand zwischen Karten */
+}
+
+/* Kategorie-Baum */
+.category-tree-container {
+    margin-top: 25px;
+}
+
+.category-tree-container h4 {
+    margin-bottom: 15px;
+    color: #495057;
+    font-size: 1.1rem;
+    border-bottom: 1px solid #e9ecef;
+    padding-bottom: 8px;
+}
+
+.category-tree {
+    max-height: 300px; /* Diese Höhe wird später durch JavaScript dynamisch angepasst */
+    overflow-y: auto;
+    padding: 10px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    transition: max-height 0.3s ease-in-out;
+}
+
+.tree-item {
+    padding: 8px 5px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    display: flex;
+    align-items: center;
+    margin-bottom: 2px;
+}
+
+.tree-item:hover {
+    background-color: #e9ecef;
+}
+
+.tree-item.active {
+    background-color: #e2f0ff;
+    font-weight: 600;
+}
+
+.tree-item-icon {
+    margin-right: 8px;
+    width: 18px;
+    text-align: center;
+    color: #6c757d;
+}
+
+.tree-item-toggle {
+    margin-right: 5px;
+    width: 18px;
+    text-align: center;
+    color: #6c757d;
+    cursor: pointer;
+}
+
+.tree-item-category {
+    font-weight: 600;
+    color: #343a40;
+}
+
+.tree-item-group {
+    padding-left: 25px;
+    color: #495057;
+}
+
+.tree-item-empty {
+    padding: 8px 5px 8px 25px;
+    color: #6c757d;
+    font-style: italic;
+    font-size: 0.9em;
+}
+
+.tree-group-container {
+    margin-left: 15px;
+    border-left: 1px dotted #dee2e6;
+    transition: height 0.3s ease-in-out;
 }
 
 /* Bessere Karten-Darstellung */
 .question-creator-card {
     background-color: #fff;
-    border-radius: 10px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-    padding: 20px;
-    margin-bottom: 20px;
+    border-radius: 12px; /* Leicht erhöhter Radius */
+    box-shadow: 0 3px 15px rgba(0, 0, 0, 0.08); /* Feinere Schatten */
+    padding: 25px; /* Mehr Innenabstand */
+    margin-bottom: 0; /* Margin entfernt, da wir gap für den Abstand nutzen */
 }
 
 .question-creator-card h3 {
     margin-top: 0;
     border-bottom: 2px solid #f0f0f0;
-    padding-bottom: 10px;
-    margin-bottom: 15px;
+    padding-bottom: 12px;
+    margin-bottom: 20px; /* Mehr Abstand nach unten */
     color: #333;
-    font-size: 1.3rem;
+    font-size: 1.4rem; /* Etwas größere Überschriften */
 }
 
 /* Verbesserte Bildvorschau */
 .image-upload-container {
-    margin-bottom: 15px;
+    margin-bottom: 25px;
 }
 
 .image-upload-label {
     display: inline-block;
-    padding: 8px 16px;
+    padding: 10px 20px;
     background-color: #007bff;
     color: white;
-    border-radius: 5px;
+    border-radius: 6px;
     cursor: pointer;
-    margin-bottom: 10px;
+    margin-bottom: 12px;
     transition: background-color 0.3s;
+    font-size: 16px;
 }
 
 .image-upload-label:hover {
@@ -55,8 +161,8 @@
 }
 
 .image-name {
-    margin-top: 5px;
-    font-size: 0.9rem;
+    margin-top: 8px;
+    font-size: 0.95rem;
     color: #666;
 }
 
@@ -77,17 +183,36 @@
 
 .image-preview img {
     max-width: 100%;
-    max-height: 200px; /* Begrenzt die Höhe der Bildvorschau */
+    max-height: 250px; /* Erhöhte Höhe für Bildvorschau */
     object-fit: contain;
+}
+
+/* Verbesserte Form-Actions */
+.form-actions {
+    margin-top: 25px;
+    display: flex;
+    justify-content: flex-start;
+}
+
+.btn-primary {
+    padding: 10px 18px;
+    font-size: 16px;
+    transition: background-color 0.3s;
+}
+
+.btn-primary:disabled {
+    background-color: #6c757d;
+    cursor: not-allowed;
+    opacity: 0.65;
 }
 
 /* Verbesserte Anzeige der Fragen */
 .question-item {
     background-color: #f8f9fa;
-    border-radius: 8px;
-    padding: 15px;
-    margin-bottom: 15px;
-    border-left: 3px solid #007bff;
+    border-radius: 10px;
+    padding: 18px;
+    margin-bottom: 18px;
+    border-left: 4px solid #007bff;
 }
 
 .question-header {
@@ -121,9 +246,9 @@
 }
 
 .question-text {
-    font-size: 16px;
+    font-size: 17px;
     font-weight: 500;
-    margin-bottom: 10px;
+    margin-bottom: 15px;
     color: #333;
 }
 
@@ -145,9 +270,9 @@
 
 .question-answer {
     background-color: #e8f4fc;
-    padding: 10px;
-    border-radius: 5px;
-    margin: 10px 0;
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin: 12px 0;
 }
 
 .correct-answer-label {
@@ -156,29 +281,66 @@
     margin-right: 5px;
 }
 
+.items-list {
+    margin-top: 25px;
+    max-height: 400px;
+    overflow-y: auto;
+    padding-right: 10px;
+}
+
+.category-item, .group-item {
+    padding: 15px;
+    background-color: #f9f9fa;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: background-color 0.2s;
+}
+
+.category-item:hover, .group-item:hover {
+    background-color: #f0f0f0;
+}
+
 .question-footer {
     display: flex;
     justify-content: space-between;
-    font-size: 12px;
+    font-size: 14px;
     color: #6c757d;
-    margin-top: 10px;
+    margin-top: 12px;
 }
 
 .question-explanation {
-    margin-top: 8px;
-    padding-top: 8px;
+    margin-top: 10px;
+    padding-top: 10px;
     border-top: 1px dashed #e0e0e0;
     color: #555;
     font-style: italic;
+    font-size: 15px;
+    line-height: 1.5;
 }
 
 /* Responsives Design */
+@media (max-width: 1200px) {
+    .page-layout {
+        grid-template-columns: 1fr 2fr; /* Verhältnis anpassen für mittlere Bildschirme */
+        gap: 30px;
+    }
+}
+
 @media (max-width: 768px) {
     .page-layout {
-        grid-template-columns: 1fr;
+        grid-template-columns: 1fr; /* Einspaltiges Layout für kleine Bildschirme */
+        gap: 25px;
+        padding: 0 15px;
     }
     
     .question-badges {
         flex-direction: column;
+    }
+    
+    .question-creator-card {
+        padding: 20px; /* Weniger Padding auf kleinen Bildschirmen */
     }
 }

@@ -15,53 +15,23 @@
         <section id="question-creator-section">
             <h1>Fragen erstellen</h1>
             
+            <div class="info-banner">
+                <p><i class="fas fa-info-circle"></i> Kategorien und Gruppen können in der <a href="category-management.html">Kategorie-Verwaltung</a> erstellt werden.</p>
+            </div>
+            
             <div class="page-layout">
-                <div class="category-management-column">
+                <div class="category-selection-column">
                     <div class="question-creator-card">
-                        <h3>Kategorien verwalten</h3>
-                        <form id="category-form">
-                            <div class="form-group">
-                                <label for="category-name">Kategorienname:</label>
-                                <input type="text" id="category-name" required placeholder="Name der Kategorie...">
-                            </div>
-                            
-                            
-                            <div class="form-actions">
-                                <button type="submit" class="btn-primary">
-                                    <i class="fas fa-plus-circle"></i> Kategorie erstellen
-                                </button>
-                            </div>
-                        </form>
+                        <h3>Kategorie und Gruppe wählen</h3>
                         
-                        <div class="items-list" id="categories-list">
-                            <p class="loading-info">Kategorien werden geladen...</p>
-                        </div>
-                    </div>
-                    
-                    <div class="question-creator-card">
-                        <h3>Gruppen verwalten</h3>
-                        <form id="group-form">
-                            <div class="form-group">
-                                <label for="group-category">Kategorie:</label>
-                                <select id="group-category" required>
-                                    <option value="">-- Kategorie wählen --</option>
-                                </select>
-                            </div>
-                            
-                            <div class="form-group">
-                                <label for="group-name">Gruppenname:</label>
-                                <input type="text" id="group-name" required placeholder="Name der Gruppe...">
-                            </div>
-                            
-                            <div class="form-actions">
-                                <button type="submit" class="btn-primary">
-                                    <i class="fas fa-plus-circle"></i> Gruppe erstellen
-                                </button>
-                            </div>
-                        </form>
+                        <!-- Versteckte Felder für die ausgewählte Kategorie und Gruppe -->
+                        <input type="hidden" id="question-category">
+                        <input type="hidden" id="question-group">
                         
-                        <div class="items-list" id="groups-list">
-                            <p class="loading-info">Gruppen werden geladen...</p>
+                        <div class="category-tree-container">
+                            <div id="category-tree" class="category-tree">
+                                <p class="loading-info">Kategorien werden geladen...</p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -71,21 +41,6 @@
                         <h3>Neue Frage erstellen</h3>
                         <form id="question-form">
                             <div class="form-column">
-                                <div class="form-group">
-                                    <label for="question-category">Kategorie:</label>
-                                    <select id="question-category" required>
-                                        <option value="">-- Kategorie wählen --</option>
-                                    </select>
-                                </div>
-                                
-                                <div class="form-group">
-                                    <label for="question-group">Gruppe:</label>
-                                    <select id="question-group" required>
-                                        <option value="">-- Gruppe wählen --</option>
-                                        <option value="" disabled>Wähle zuerst eine Kategorie</option>
-                                    </select>
-                                </div>
-                                
                                 <div class="form-group">
                                     <label for="question-text">Fragetext:</label>
                                     <textarea id="question-text" rows="4" required placeholder="Gib hier deine Frage ein..."></textarea>
