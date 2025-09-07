@@ -974,6 +974,14 @@ img.icon {
     margin-bottom: 5px;
 }
 
+.category-type.text-type {
+    background-color: #4CAF50; /* Grün für Textfragen */
+}
+
+.category-type.image-type {
+    background-color: #2196F3; /* Blau für Bilderquiz */
+}
+
 .category-item .category-actions,
 .group-item .group-actions {
     display: flex;

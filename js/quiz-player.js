@@ -144,6 +144,9 @@ document.addEventListener('DOMContentLoaded', function() {
             // Quiz-Typen und Kategorien laden
             await updateCategorySelect();
             
+            // Debug-Information über verfügbare Fragen
+            await logAvailableQuestions();
+            
             // Breadcrumbs initialisieren, falls verfügbar
             if (window.breadcrumbs) {
                 window.breadcrumbs.set([
@@ -153,6 +156,56 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch (error) {
             console.error('Fehler beim Initialisieren der Quiz-Seite:', error);
             showError('Fehler beim Laden der Daten. Bitte aktualisiere die Seite.');
+        }
+    }
+    
+    /**
+     * Protokolliert einen Überblick über die verfügbaren Fragen zur Fehlerdiagnose
+     */
+    async function logAvailableQuestions() {
+        try {
+            const questions = await window.quizDB.loadQuestions();
+            const categories = await window.quizDB.loadCategories();
+            
+            // Überblick über alle Fragen
+            console.log(`Gesamtzahl verfügbarer Fragen: ${questions.length}`);
+            
+            // Anzahl der Fragen pro Kategorie
+            const questionsByCategory = {};
+            categories.forEach(category => {
+                questionsByCategory[category.id] = {
+                    name: category.name,
+                    type: category.mainCategory,
+                    totalCount: 0,
+                    textQuestions: 0,
+                    imageQuestions: 0
+                };
+            });
+            
+            // Zählen der Fragen pro Kategorie und Typ
+            questions.forEach(question => {
+                if (questionsByCategory[question.categoryId]) {
+                    questionsByCategory[question.categoryId].totalCount++;
+                    
+                    if (question.imageUrl && question.imageUrl.trim() !== '') {
+                        questionsByCategory[question.categoryId].imageQuestions++;
+                    }
+                    
+                    if (question.text && question.text.trim() !== '') {
+                        questionsByCategory[question.categoryId].textQuestions++;
+                    }
+                }
+            });
+            
+            // Überblick ausgeben
+            console.log('Fragen pro Kategorie:');
+            Object.keys(questionsByCategory).forEach(categoryId => {
+                const info = questionsByCategory[categoryId];
+                console.log(`- ${info.name} (${info.type}): ${info.totalCount} Fragen gesamt (${info.textQuestions} mit Text, ${info.imageQuestions} mit Bild)`);
+            });
+            
+        } catch (error) {
+            console.error('Fehler beim Protokollieren der verfügbaren Fragen:', error);
         }
     }
 
@@ -171,25 +224,49 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             
-            // Kategorien laden
-            const categories = await window.quizDB.loadCategories();
+            // Kategorien und Fragen laden
+            const [categories, questions] = await Promise.all([
+                window.quizDB.loadCategories(),
+                window.quizDB.loadQuestions()
+            ]);
             
-            // Zeige nur die Systemkategorien im Quiz-Bereich (Textfragen & Bilderquiz)
-            // Filtere nach gewähltem Quiz-Typ
-            const systemCategories = categories.filter(category => 
-                category.createdBy === 'system' && category.mainCategory === quizType
-            );
+            // Kategorien ermitteln, die Fragen mit Bildern haben
+            const categoriesWithImages = new Set();
+            questions.forEach(question => {
+                if (question.imageUrl && question.imageUrl.trim() !== '') {
+                    categoriesWithImages.add(question.categoryId);
+                }
+            });
             
-            // Füge Systemkategorien hinzu
-            if (systemCategories.length > 0) {
-                systemCategories.forEach(category => {
+            console.log('Kategorien mit Bildern:', Array.from(categoriesWithImages));
+            
+            // Kategorien filtern basierend auf dem Quiz-Typ
+            let userCategories = categories.filter(category => category.createdBy !== 'system');
+            
+            if (quizType === window.quizDB.MAIN_CATEGORY.IMAGE) {
+                // Für Bilderquiz: Nur Kategorien anzeigen, die Fragen mit Bildern haben
+                userCategories = userCategories.filter(category => 
+                    categoriesWithImages.has(category.id) || category.mainCategory === quizType
+                );
+            } else if (quizType === window.quizDB.MAIN_CATEGORY.TEXT) {
+                // Für Textquiz: Alle benutzerdefinierten Kategorien anzeigen oder solche mit mainCategory === 'text'
+                userCategories = userCategories.filter(category => 
+                    category.mainCategory === quizType || !category.mainCategory
+                );
+            }
+            
+            console.log(`Gefilterte Kategorien für ${quizType}:`, userCategories);
+            
+            // Füge benutzerdefinierte Kategorien hinzu
+            if (userCategories.length > 0) {
+                userCategories.forEach(category => {
                     const option = document.createElement('option');
                     option.value = category.id;
                     option.textContent = category.name;
                     categorySelect.appendChild(option);
                 });
             } else {
-                categorySelect.innerHTML += '<option value="" disabled>Keine Kategorien für diesen Quiz-Typ</option>';
+                categorySelect.innerHTML += '<option value="" disabled>Keine Kategorien für diesen Quiz-Typ vorhanden</option>';
             }
             
             // Gruppen aktualisieren
@@ -240,33 +317,67 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     /**
-     * Lädt die Quiz-Fragen basierend auf den Einstellungen
-     * @param {string} categoryId - ID der Kategorie
-     * @param {string} groupId - ID der Gruppe (optional)
-     * @param {number} questionCount - Anzahl der Fragen
-     * @returns {Promise<Array>} Die geladenen Fragen
-     */
-    async function loadQuizQuestions(categoryId, groupId, questionCount) {
-        try {
-            if (!categoryId) {
-                showError('Bitte wähle eine Kategorie aus.');
-                return [];
-            }
-            
-            // Fragen laden
-            const questions = await window.quizDB.getQuizQuestions(
-                categoryId,
-                groupId || null,
-                questionCount
-            );
-            
-            return questions;
-        } catch (error) {
-            console.error('Fehler beim Laden der Quiz-Fragen:', error);
-            showError('Fehler beim Laden der Fragen.');
+ * Lädt die Quiz-Fragen basierend auf den Einstellungen
+ * @param {string} categoryId - ID der Kategorie
+ * @param {string} groupId - ID der Gruppe (optional)
+ * @param {number} questionCount - Anzahl der Fragen
+ * @returns {Promise<Array>} Die geladenen Fragen
+ */
+async function loadQuizQuestions(categoryId, groupId, questionCount) {
+    try {
+        if (!categoryId) {
+            showError('Bitte wähle eine Kategorie aus.');
             return [];
         }
+        
+        // Den Quiz-Typ aus den aktuellen Einstellungen verwenden
+        const quizType = quizTypeSelect.value;
+        console.log(`Quiz-Typ beim Laden der Fragen: ${quizType}`);
+        
+        // Fragen laden
+        const questions = await window.quizDB.getQuizQuestions(
+            categoryId,
+            groupId || null,
+            questionCount
+        );
+        
+        // Debug-Information
+        console.log(`Geladene Fragen gesamt: ${questions.length}`);
+        
+        // Fragen nach dem Quiz-Typ filtern
+        let filteredQuestions = questions;
+        
+        if (quizType === window.quizDB.MAIN_CATEGORY.IMAGE) {
+            // Für Bilderquiz: Nur Fragen mit Bildern, Text ist optional
+            filteredQuestions = questions.filter(q => q.imageUrl && q.imageUrl.trim() !== '');
+            console.log(`Fragen mit Bildern: ${filteredQuestions.length} von ${questions.length}`);
+        } else if (quizType === window.quizDB.MAIN_CATEGORY.TEXT) {
+            // Für Textquiz: Nur Fragen mit Text
+            filteredQuestions = questions.filter(q => q.text && q.text.trim() !== '');
+            console.log(`Fragen mit Text: ${filteredQuestions.length} von ${questions.length}`);
+        }
+        
+        if (filteredQuestions.length === 0) {
+            if (quizType === window.quizDB.MAIN_CATEGORY.IMAGE) {
+                showWarning('Keine Bildfragen in dieser Kategorie gefunden. Bitte füge Fragen mit Bildern hinzu.');
+            } else {
+                showWarning('Keine Textfragen in dieser Kategorie gefunden. Bitte füge Fragen mit Text hinzu.');
+            }
+            console.warn(`Keine Fragen für Kategorie ${categoryId} und Typ ${quizType} gefunden.`);
+            return [];
+        }
+        
+        if (filteredQuestions.length > 0) {
+            console.log('Beispielfrage:', filteredQuestions[0]);
+        }
+        
+        return filteredQuestions;
+    } catch (error) {
+        console.error('Fehler beim Laden der Quiz-Fragen:', error);
+        showError('Fehler beim Laden der Fragen.');
+        return [];
     }
+}
 
 /**
  * Startet das Quiz
@@ -310,22 +421,36 @@ async function displayCurrentQuestion() {
     // Quiz-Fortschritt aktualisieren
     quizProgress.textContent = `Frage ${currentQuestionIndex + 1}/${questions.length}`;
     
-    // Anzeige je nach Inhalt der Frage anpassen
-    questionText.textContent = question.text;
+    // Prüfen, ob die Frage ein Bild hat
+    const hasImage = question.imageUrl && question.imageUrl.trim() !== '';
+    // Prüfen, ob es sich um eine Textfrage oder eine Bildfrage handelt
+    const quizType = currentSettings.type;
+    console.log(`Quiz-Typ beim Anzeigen der Frage: ${quizType}, Bild vorhanden: ${hasImage}`);
     
-    // Wenn die Frage ein Bild hat, dieses anzeigen
-    if (question.imageUrl && question.imageUrl.trim() !== "") {
-        questionImage.src = question.imageUrl;
-        questionImageContainer.classList.remove('hidden');
-        // Bei prominenten Bildern: Größer anzeigen
-        if (!question.text || question.text.trim() === "") {
-            questionImageContainer.classList.add('main-question-image');
+    if (quizType === window.quizDB.MAIN_CATEGORY.TEXT) {
+        // Bei Textfragen: Text anzeigen, kein Bild
+        if (question.text && question.text.trim() !== "") {
+            questionText.textContent = question.text;
         } else {
-            questionImageContainer.classList.remove('main-question-image');
+            questionText.textContent = "Keine Fragebeschreibung vorhanden";
         }
-    } else {
         questionImageContainer.classList.add('hidden');
-        questionImageContainer.classList.remove('main-question-image');
+    } else if (quizType === window.quizDB.MAIN_CATEGORY.IMAGE) {
+        // Bei Bildfragen: NUR Bild anzeigen, KEIN Text
+        questionText.textContent = ""; // Fragetext leeren
+        
+        if (hasImage) {
+            // Bild anzeigen
+            questionImage.src = question.imageUrl;
+            questionImageContainer.classList.remove('hidden');
+            questionImageContainer.classList.add('main-question-image');
+            console.log("Bildquelle gesetzt:", question.imageUrl);
+        } else {
+            // Fehler: Bildfrage ohne Bild
+            questionImageContainer.classList.add('hidden');
+            questionText.textContent = "Fehler: Bildfrage ohne Bild!";
+            console.error("Bildfrage ohne Bild gefunden:", question);
+        }
     }
     
     // Antworten anzeigen

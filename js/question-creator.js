@@ -60,8 +60,8 @@ document.addEventListener('DOMContentLoaded', function() {
             
             const name = categoryNameInput.value.trim();
             const description = categoryDescriptionInput.value.trim();
-            // Verwende standardmäßig TEXT als Hauptkategorie
-            const mainCategory = window.quizDB.MAIN_CATEGORY.TEXT;
+            // Standardmäßig "any" als Kategorie-Typ verwenden
+            const mainCategory = "any";
             
             if (!name) {
                 showError('Bitte gib einen Kategorienamen ein.');
@@ -162,18 +162,31 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             ];
             
+            // Kategorie-Typ ermitteln
+            const categoryId = categorySelect.value;
+            const categories = await window.quizDB.loadCategories();
+            const selectedCategory = categories.find(cat => cat.id === categoryId);
+            
             // Fragedaten erstellen
             const questionData = {
                 text: questionTextInput.value.trim(),
                 imageUrl: imageBase64,
                 options: options,
                 explanation: explanationInput.value.trim(),
-                categoryId: categorySelect.value,
+                categoryId: categoryId,
                 groupId: groupSelect.value,
                 difficulty: parseInt(difficultyInput.value),
                 createdBy: username
-                // Der questionType wird automatisch in createQuestion basierend auf der Kategorie abgeleitet
             };
+            
+            // Sicherstellen, dass entweder Text oder Bild vorhanden ist
+            const hasText = questionData.text && questionData.text.trim() !== '';
+            const hasImage = questionData.imageUrl && questionData.imageUrl.trim() !== '';
+            
+            if (!hasText && !hasImage) {
+                showError('Eine Frage benötigt entweder einen Fragetext oder ein Bild.');
+                return;
+            }
             
             try {
                 // Frage erstellen

@@ -36,8 +36,8 @@ document.addEventListener('DOMContentLoaded', function() {
             // Daten aus dem Formular sammeln
             const name = categoryNameInput.value.trim();
             const description = categoryDescriptionInput.value.trim();
-            // Standardmäßig TEXT als Hauptkategorie verwenden - dies wird später ohnehin durch den Frageinhalt bestimmt
-            const mainCategory = window.quizDB.MAIN_CATEGORY.TEXT;
+            // Standardmäßig beide Quiz-Typen unterstützen
+            const mainCategory = "any";
             
             if (!name) {
                 showError('Bitte gib einen Namen für die Kategorie ein.');
@@ -211,18 +211,16 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Kategorien hinzufügen
             userCategories.forEach(category => {
-                const optionText = category.name;
-                
                 // Option für Gruppen-Formular
                 const groupOption = document.createElement('option');
                 groupOption.value = category.id;
-                groupOption.textContent = optionText;
+                groupOption.textContent = category.name;
                 groupCategorySelect.appendChild(groupOption);
                 
                 // Option für Filter
                 const filterOption = document.createElement('option');
                 filterOption.value = category.id;
-                filterOption.textContent = optionText;
+                filterOption.textContent = category.name;
                 filterCategorySelect.appendChild(filterOption);
             });
         } catch (error) {

@@ -274,36 +274,58 @@ async function getQuizQuestions(categoryId, groupId = null, count = 10) {
         const questions = await loadQuestions();
         const categories = await loadCategories();
         
+        console.log(`Fragen laden für Kategorie ${categoryId}, Gruppe ${groupId || 'alle'}, Anzahl ${count}`);
+        console.log(`Fragen insgesamt: ${questions.length}`);
+        
         // Kategorie finden, um den Quiz-Typ zu bestimmen
         const category = categories.find(cat => cat.id === categoryId);
         if (!category) {
-            console.error("Kategorie nicht gefunden");
+            console.error(`Kategorie mit ID ${categoryId} nicht gefunden`);
             return [];
         }
         
+        console.log(`Gefundene Kategorie: ${category.name}, Typ: ${category.mainCategory}`);
+        
         // Fragen nach Kategorie und optionaler Gruppe filtern
         let filteredQuestions = questions.filter(q => q.categoryId === categoryId);
+        console.log(`Fragen für Kategorie ${categoryId}: ${filteredQuestions.length}`);
+        
         if (groupId) {
             filteredQuestions = filteredQuestions.filter(q => q.groupId === groupId);
+            console.log(`Fragen für Gruppe ${groupId}: ${filteredQuestions.length}`);
         }
         
-        // Den für das Quiz angeforderten Typ bestimmen (TEXT oder IMAGE)
+        // Den für das Quiz angeforderten Typ bestimmen, falls explizit angegeben
         const requestedType = category.mainCategory;
+        console.log(`Angeforderter Quiz-Typ: ${requestedType || 'any'}`);
         
-        // Fragen nach ihrem Inhalt filtern
+        // Filter basierend auf dem angeforderten Quiz-Typ
+        // Bei 'any' (neues Standard-Verhalten) werden keine Fragen gefiltert
         if (requestedType === MAIN_CATEGORY.TEXT) {
-            // TEXT-Kategorie: Fragen, die Text haben oder kein Bild (also alle reinen Textfragen)
+            // TEXT-Kategorie: Fragen, die Text haben
+            const beforeFilter = filteredQuestions.length;
             filteredQuestions = filteredQuestions.filter(q => 
-                // Eine Frage wird als Textfrage betrachtet, wenn sie Text hat und kein Bild ODER
-                // wenn sie sowohl Text als auch Bild hat (diese stehen in beiden Kategorien zur Verfügung)
-                !q.imageUrl || q.imageUrl.trim() === '' || (q.text && q.text.trim() !== '')
+                q.text && q.text.trim() !== ''
             );
+            console.log(`Textfragen nach Filterung: ${filteredQuestions.length} (${beforeFilter - filteredQuestions.length} entfernt)`);
         } else if (requestedType === MAIN_CATEGORY.IMAGE) {
-            // IMAGE-Kategorie: Fragen, die ein Bild haben
+            // IMAGE-Kategorie: Fragen mit Bildern
+            const beforeFilter = filteredQuestions.length;
             filteredQuestions = filteredQuestions.filter(q => 
-                // Eine Frage wird als Bildfrage betrachtet, wenn sie ein Bild hat
                 q.imageUrl && q.imageUrl.trim() !== ''
             );
+            
+            console.log(`Bildfragen nach Filterung: ${filteredQuestions.length} (${beforeFilter - filteredQuestions.length} entfernt)`);
+            
+            // Protokollieren Sie jede Frage, die ein Bild haben sollte
+            if (filteredQuestions.length > 0) {
+                console.log("Gefundene Bildfragen:");
+                filteredQuestions.forEach((q, index) => {
+                    console.log(`Bildfrage ${index+1}: ID=${q.id}, Bild=${q.imageUrl ? 'vorhanden' : 'fehlt'}, Text="${q.text}"`);
+                });
+            } else {
+                console.warn("Keine Bildfragen mit gültigen Bildern gefunden!");
+            }
         }
         
         // Wenn nicht genug Fragen vorhanden sind, Warnung ausgeben
@@ -316,6 +338,7 @@ async function getQuizQuestions(categoryId, groupId = null, count = 10) {
         
         // Die finalen Fragen auswählen und für jede Frage zusätzliche falsche Antworten generieren
         const finalQuestions = shuffledQuestions.slice(0, Math.min(count, shuffledQuestions.length));
+        console.log(`Finale Fragenanzahl für Quiz: ${finalQuestions.length}`);
         
         // Alle korrekten Antworten aus allen Fragen sammeln, um daraus falsche Antworten zu generieren
         const allCorrectAnswers = questions

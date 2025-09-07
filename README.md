@@ -269,6 +269,7 @@ Die LernApp generiert automatisch Quizze aus den eingepflegten Fragen:
 - **Zufällige Auswahl**: Das System wählt Fragen zufällig aus der Datenbank basierend auf Kategorie und Gruppe
 - **Keine Wiederholungen**: Innerhalb eines Quiz werden Fragen nicht wiederholt
 - **Gemischte Antworten**: Die Reihenfolge der Antwortoptionen wird für jede Frage neu gemischt
+- **Automatische Quiz-Typzuordnung**: Fragen werden automatisch dem passenden Quiz-Typ zugeordnet
 
 #### Fragen erstellen
 
@@ -278,17 +279,7 @@ Die LernApp generiert automatisch Quizze aus den eingepflegten Fragen:
 4. Gib die richtige Antwort ein
 5. Füge eine optionale Erklärung hinzu
 
-Das System ergänzt automatisch die falschen Antwortoptionen aus dem Pool aller anderen richtigen Antworten.
-
-### Automatisches Quiz-System
-
-Die LernApp verfügt über ein intelligentes System zur automatischen Erstellung von Quizzes:
-
-#### Funktionsweise
-- **Dynamische Fragenerstellung**: Quizzes werden dynamisch aus einer Datenbank von Fragen generiert.
-- **Zufällige Auswahl**: Fragen werden zufällig ausgewählt, ohne Wiederholungen innerhalb eines Quiz-Durchlaufs.
-- **Gemischte Antwortoptionen**: Die Reihenfolge der Antwortoptionen wird bei jedem Quiz neu gemischt.
-- **Kategorie- und Gruppenfilterung**: Quizzes können auf bestimmte Kategorien und Gruppen eingeschränkt werden.
+Das System ergänzt automatisch die falschen Antwortoptionen aus dem Pool aller anderen richtigen Antworten und ordnet die Fragen automatisch dem entsprechenden Quiz-Typ zu.
 
 #### Erstellen von Fragen
 Die App ermöglicht die Erstellung von Fragen mit:
@@ -300,7 +291,10 @@ Die App ermöglicht die Erstellung von Fragen mit:
 
 #### Quiz-Anpassungen
 - Anzahl der Fragen kann vom Benutzer bestimmt werden
-- Quiz-Typ (Text oder Bild) wird automatisch anhand der Kategorie erkannt
+- Zwei verschiedene Quiz-Typen sind verfügbar:
+  - **Textfragen**: Zeigt den Fragentext an, Bilder werden ausgeblendet
+  - **Bilderquiz**: Zeigt nur Bilder an, ohne begleitenden Fragetext
+- Fragen werden automatisch dem passenden Quiz-Typ zugeordnet
 - Fragen und Antworten werden für jeden Quiz-Durchlauf neu gemischt
 
 #### Fragendatenbank
