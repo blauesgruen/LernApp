@@ -1,0 +1,65 @@
+/* Responsive Design für 3 Spalten */
+@media (max-width: 1200px) {
+    .page-layout {
+        grid-template-columns: 1fr 1fr;
+    }
+    .group-questions-column {
+        grid-column: 1 / -1; /* Span über beide Spalten */
+    }
+}
+
+@media (max-width: 768px) {
+    .page-layout {
+        grid-template-columns: 1fr;
+    }
+    .category-selection-column,
+    .question-creation-column,
+    .group-questions-column {
+        grid-column: 1;
+    }
+}
+
+/* Styling für die Fragenliste in der Gruppe */
+.group-questions-list {
+    max-height: 600px;
+    overflow-y: auto;
+}
+
+.question-list-item {
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 10px;
+    border-left: 4px solid #007bff;
+    position: relative;
+}
+
+.question-list-item:hover {
+    background-color: #e9ecef;
+}
+
+.question-list-item .question-text {
+    margin: 0 0 8px 0;
+    font-weight: 500;
+}
+
+.question-list-item .question-meta {
+    font-size: 0.9em;
+    color: #6c757d;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.question-has-image {
+    color: #28a745;
+    font-weight: 500;
+}
+
+/* Info-Text für leere Listen */
+.info-text {
+    color: #6c757d;
+    font-style: italic;
+    text-align: center;
+    padding: 20px;
+}

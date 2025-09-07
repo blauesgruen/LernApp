@@ -1,0 +1,56 @@
+/* CSS-Ergänzungen für Question Creator */
+
+/* Anpassung der Textfelder auf die Breite des Upload-Buttons */
+.question-creator-card textarea,
+.question-creator-card input[type="text"],
+.question-creator-card select,
+.question-creator-card .image-upload-label,
+.question-creator-card .btn-primary {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* Verbesserte Textfeld-Stile */
+.question-creator-card textarea {
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1rem;
+    font-family: inherit;
+    resize: vertical;
+}
+
+/* Einheitlicher Upload-Button */
+.image-upload-label {
+    display: block;
+    width: 100%;
+    text-align: center;
+    padding: 10px 20px;
+    background-color: #007bff;
+    color: white;
+    border-radius: 6px;
+    cursor: pointer;
+    margin-bottom: 12px;
+    transition: background-color 0.3s;
+    font-size: 16px;
+    box-sizing: border-box;
+}
+
+/* Schwierigkeitsgradregler auf volle Breite */
+.difficulty-selector {
+    width: 100%;
+}
+
+#question-difficulty {
+    width: 100%;
+}
+
+/* Formularaktionen auf volle Breite */
+.form-actions {
+    width: 100%;
+}
+
+.form-actions button {
+    width: 100%;
+}

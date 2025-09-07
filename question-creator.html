@@ -6,6 +6,9 @@
     <title>Fragen erstellen - LernApp</title>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="css/question-creator.css">
+    <link rel="stylesheet" href="css/question-creator-fix.css">
+    <link rel="stylesheet" href="css/question-creator-questions.css">
+    <link rel="stylesheet" href="css/back-button.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.1/css/all.min.css">
 </head>
 <body>
@@ -13,7 +16,12 @@
 
     <main>
         <section id="question-creator-section">
-            <h1>Fragen erstellen</h1>
+            <div class="section-header">
+                <a href="javascript:history.back()" class="back-button">
+                    <i class="fas fa-arrow-left"></i> Zurück
+                </a>
+                <h1>Fragen erstellen</h1>
+            </div>
             
             <div class="info-banner">
                 <p><i class="fas fa-info-circle"></i> Kategorien und Gruppen können in der <a href="category-management.html">Kategorie-Verwaltung</a> erstellt werden.</p>
@@ -75,12 +83,12 @@
                                 </div>
                             
                                 <h3>Antwort</h3>
-                                <p class="help-text">Gib die richtige Antwort ein. Falsche Antwortoptionen werden automatisch aus anderen Fragen generiert.</p>
+                                <!-- <p class="help-text">Gib die richtige Antwort ein. Falsche Antwortoptionen werden automatisch aus anderen Fragen generiert.</p> -->
                                 
                                 <div id="answers-container">
                                     <div class="answer-option">
                                         <div class="answer-header">
-                                            <label for="answer-0">Richtige Antwort:</label>
+                                            <!-- <label for="answer-0">Gib hier die richtige Antwort ein:</label> -->
                                         </div>
                                         <textarea id="answer-0" class="answer-text" rows="2" required placeholder="Die richtige Antwort..."></textarea>
                                     </div>
@@ -94,11 +102,14 @@
                             </div>
                         </form>
                     </div>
-                    
-                    <div class="recent-questions-section">
-                        <h2>Zuletzt erstellte Fragen</h2>
-                        <div id="recent-questions-list" class="items-list">
-                            <p class="loading-info">Fragen werden geladen...</p>
+                </div>
+                
+                <!-- Neue dritte Spalte: Fragen der ausgewählten Gruppe -->
+                <div class="group-questions-column">
+                    <div class="question-creator-card">
+                        <h3>Fragen in dieser Gruppe</h3>
+                        <div id="group-questions-list" class="items-list">
+                            <p class="info-text">Wähle eine Gruppe aus, um deren Fragen zu sehen</p>
                         </div>
                     </div>
                 </div>

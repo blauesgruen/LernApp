@@ -20,7 +20,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const imagePreview = document.getElementById('image-preview');
     const explanationInput = document.getElementById('question-explanation');
     const difficultyInput = document.getElementById('question-difficulty');
-    const recentQuestionsList = document.getElementById('recent-questions-list');
+    const groupQuestionsList = document.getElementById('group-questions-list');
 
     // Elemente für Kategorie- und Gruppenauswahl
     const categoryTree = document.getElementById('category-tree');
@@ -30,6 +30,56 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Initialisierung
     initializePage();
+    
+    /**
+     * Lädt die Fragen für eine bestimmte Gruppe und zeigt sie an
+     */
+    async function loadQuestionsForGroup(groupId) {
+        try {
+            if (!groupId) {
+                groupQuestionsList.innerHTML = '<p class="info-text">Wähle eine Gruppe aus, um deren Fragen zu sehen</p>';
+                return;
+            }
+            
+            groupQuestionsList.innerHTML = '<p class="loading-info">Fragen werden geladen...</p>';
+            
+            // Alle Fragen laden
+            const questions = await window.quizDB.loadQuestions();
+            
+            // Fragen für die ausgewählte Gruppe filtern
+            const groupQuestions = questions.filter(q => q.groupId === groupId);
+            
+            if (groupQuestions.length === 0) {
+                groupQuestionsList.innerHTML = '<p class="info-text">Keine Fragen in dieser Gruppe vorhanden</p>';
+                return;
+            }
+            
+            // Liste der Fragen erzeugen
+            let html = '';
+            
+            groupQuestions.forEach(question => {
+                const hasImage = question.imageUrl && question.imageUrl.trim() !== '';
+                const questionText = question.text && question.text.trim() !== '' 
+                    ? question.text 
+                    : 'Bildfrage ohne Text';
+                
+                html += `
+                    <div class="question-list-item" data-id="${question.id}">
+                        <p class="question-text">${questionText}</p>
+                        <div class="question-meta">
+                            <span>${hasImage ? '<span class="question-has-image"><i class="fas fa-image"></i> Bild: ja</span>' : ''}</span>
+                            <span>Schwierigkeit: ${question.difficulty}/5</span>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            groupQuestionsList.innerHTML = html;
+        } catch (error) {
+            console.error('Fehler beim Laden der Gruppenfragen:', error);
+            groupQuestionsList.innerHTML = '<p class="error-text">Fehler beim Laden der Fragen.</p>';
+        }
+    }
     
     // Event Listener für Fenstergrößenänderung
     window.addEventListener('resize', function() {
@@ -111,17 +161,35 @@ document.addEventListener('DOMContentLoaded', function() {
                 item.addEventListener('click', function(e) {
                     const categoryId = this.getAttribute('data-id');
                     
-                    // Toggle der Gruppenanzeige
+                    // Alle anderen Kategorien einklappen
+                    document.querySelectorAll('.tree-item-category').forEach(category => {
+                        const catId = category.getAttribute('data-id');
+                        if (catId !== categoryId) {
+                            // Andere Kategorie als die angeklickte
+                            const otherGroupContainer = document.querySelector(`.tree-group-container[data-category-id="${catId}"]`);
+                            const otherToggleIcon = category.querySelector('.tree-item-toggle i');
+                            
+                            // Nur einklappen, wenn sie aktuell ausgeklappt ist
+                            if (otherGroupContainer && otherGroupContainer.style.display !== 'none') {
+                                otherGroupContainer.style.display = 'none';
+                                if (otherToggleIcon) {
+                                    otherToggleIcon.className = 'fas fa-chevron-right';
+                                }
+                            }
+                        }
+                    });
+                    
+                    // Die angeklickte Kategorie immer ausklappen
                     const groupContainer = document.querySelector(`.tree-group-container[data-category-id="${categoryId}"]`);
                     const toggleIcon = this.querySelector('.tree-item-toggle i');
                     
                     if (groupContainer) {
-                        const isVisible = groupContainer.style.display !== 'none';
-                        groupContainer.style.display = isVisible ? 'none' : 'block';
+                        // Immer ausklappen (nicht umschalten)
+                        groupContainer.style.display = 'block';
                         
-                        // Icon ändern
+                        // Icon immer auf ausgeklappt setzen
                         if (toggleIcon) {
-                            toggleIcon.className = isVisible ? 'fas fa-chevron-right' : 'fas fa-chevron-down';
+                            toggleIcon.className = 'fas fa-chevron-down';
                         }
                     }
                     
@@ -167,6 +235,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Werte in Hidden-Inputs setzen
                     categorySelect.value = categoryId;
                     groupSelect.value = groupId;
+                    
+                    // Fragen für diese Gruppe laden und anzeigen
+                    loadQuestionsForGroup(groupId);
                 });
             });
             
@@ -247,8 +318,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Formular zurücksetzen
                     resetForm();
                     
-                    // Zuletzt erstellte Fragen aktualisieren
-                    await loadRecentQuestions();
+                    // Fragen der aktuell ausgewählten Gruppe aktualisieren
+                    if (groupSelect.value) {
+                        await loadQuestionsForGroup(groupSelect.value);
+                    }
                 } else {
                     showError('Fehler beim Erstellen der Frage.');
                 }
@@ -278,8 +351,10 @@ document.addEventListener('DOMContentLoaded', function() {
             // Kategorie-Verzeichnisbaum rendern
             await renderCategoryTree();
             
-            // Zuletzt erstellte Fragen laden
-            await loadRecentQuestions();
+            // Fragen der ausgewählten Gruppe laden (falls eine ausgewählt ist)
+            if (groupSelect.value) {
+                await loadQuestionsForGroup(groupSelect.value);
+            }
             
             // Höhe des Kategorie-Baums dynamisch anpassen
             adjustCategoryTreeHeight();
@@ -422,94 +497,6 @@ document.addEventListener('DOMContentLoaded', function() {
         };
         
         reader.readAsDataURL(file);
-    }
-
-    /**
-     * Lädt die zuletzt erstellten Fragen
-     */
-    async function loadRecentQuestions() {
-        try {
-            recentQuestionsList.innerHTML = '<p class="loading-info">Fragen werden geladen...</p>';
-            
-            // Alle Fragen, Kategorien und Gruppen laden
-            const [questions, categories, groups] = await Promise.all([
-                window.quizDB.loadQuestions(),
-                window.quizDB.loadCategories(),
-                window.quizDB.loadGroups()
-            ]);
-            
-            // Maps für schnellen Zugriff erstellen
-            const categoryMap = {};
-            categories.forEach(category => {
-                categoryMap[category.id] = category;
-            });
-            
-            const groupMap = {};
-            groups.forEach(group => {
-                groupMap[group.id] = group;
-            });
-            
-            // Nur die letzten 5 Fragen des aktuellen Benutzers anzeigen
-            const userQuestions = questions
-                .filter(question => question.createdBy === username)
-                .sort((a, b) => b.createdAt - a.createdAt)
-                .slice(0, 5);
-            
-            if (userQuestions.length === 0) {
-                recentQuestionsList.innerHTML = '<p class="info-text">Du hast noch keine Fragen erstellt.</p>';
-                return;
-            }
-            
-            // Fragen anzeigen
-            let html = '';
-            
-            userQuestions.forEach(question => {
-                const category = categoryMap[question.categoryId] || { name: 'Unbekannte Kategorie' };
-                const group = groupMap[question.groupId] || { name: 'Unbekannte Gruppe' };
-                
-                // Richtige Antwort finden
-                const correctAnswer = question.options.find(option => option.isCorrect);
-                
-                // Formatiertes Datum
-                const createdAt = new Date(question.createdAt);
-                const formattedDate = createdAt.toLocaleDateString('de-DE', {
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                });
-                
-                html += `
-                    <div class="question-item">
-                        <div class="question-header">
-                            <div class="question-badges">
-                                <span class="question-badge">${category.name}</span>
-                                <span class="question-badge">${group.name}</span>
-                                <span class="question-difficulty">Schwierigkeit: ${'★'.repeat(question.difficulty)}</span>
-                            </div>
-                        </div>
-                        <div class="question-content">
-                            <p class="question-text">${question.text}</p>
-                            ${question.imageUrl ? `<div class="question-image"><img src="${question.imageUrl}" alt="Fragebild"></div>` : ''}
-                        </div>
-                        <div class="question-answer">
-                            <span class="correct-answer-label">Richtige Antwort:</span>
-                            <span class="correct-answer-text">${correctAnswer ? correctAnswer.text : 'Keine richtige Antwort definiert'}</span>
-                            ${question.explanation ? `<div class="question-explanation"><small><strong>Erklärung:</strong> ${question.explanation}</small></div>` : ''}
-                        </div>
-                        <div class="question-footer">
-                            <span class="question-date">Erstellt am: ${formattedDate}</span>
-                        </div>
-                    </div>
-                `;
-            });
-            
-            recentQuestionsList.innerHTML = html;
-        } catch (error) {
-            console.error('Fehler beim Laden der zuletzt erstellten Fragen:', error);
-            recentQuestionsList.innerHTML = '<p class="error-text">Fehler beim Laden der Fragen.</p>';
-        }
     }
 
     /**

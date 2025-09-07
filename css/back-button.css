@@ -1,0 +1,35 @@
+/* Stil für den Zurück-Button und Seitenkopf */
+.section-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.section-header h1 {
+    margin: 0;
+    flex-grow: 1;
+}
+
+.back-button {
+    display: inline-flex;
+    align-items: center;
+    background-color: #f8f9fa;
+    color: #495057;
+    padding: 8px 16px;
+    border-radius: 4px;
+    text-decoration: none;
+    margin-right: 15px;
+    font-weight: 500;
+    border: 1px solid #dee2e6;
+    transition: all 0.2s ease;
+}
+
+.back-button:hover {
+    background-color: #e9ecef;
+    color: #212529;
+    border-color: #ced4da;
+}
+
+.back-button i {
+    margin-right: 6px;
+}

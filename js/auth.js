@@ -331,7 +331,7 @@ async function handleLogin(username, password) {
             
             // In jedem Fall zum Dashboard weiterleiten
             window.location.href = 'dashboard.html';
-        }, 1000);
+        }, 1000);about:blank#blocked
     } else {
         logMessage('Kein passender Benutzer gefunden oder Passwort stimmt nicht überein.', 'error');
         showError('Benutzername oder Passwort falsch!');
@@ -347,6 +347,42 @@ function handleLogout() {
     logMessage('Benutzer wurde ausgeloggt.');
     refreshUIAfterAuthChange(); // UI aktualisieren
     window.location.href = 'index.html'; // Weiterleitung zur Login-Seite
+}
+
+// Überprüft, ob der Benutzer das erste Mal eingeloggt ist
+function isFirstLogin() {
+    return !localStorage.getItem('hasLoggedInBefore');
+}
+
+// Setzt den Status nach dem ersten Login
+function setFirstLoginStatus() {
+    localStorage.setItem('hasLoggedInBefore', 'true');
+}
+
+// Zeigt das Speicherort-Fenster nur beim ersten Login
+async function showStorageLocationPrompt() {
+    if (isFirstLogin()) {
+        const useCustomPath = confirm(
+            'Möchten Sie einen benutzerdefinierten Speicherort für Ihre Daten festlegen? ' +
+            'Wenn Sie auf "Abbrechen" klicken, wird der Standardspeicherort verwendet.'
+        );
+
+        if (useCustomPath) {
+            logMessage('Benutzer möchte einen benutzerdefinierten Speicherort festlegen');
+            const directoryResult = await window.openDirectoryPicker();
+
+            if (directoryResult) {
+                logMessage('Benutzer hat Speicherort ausgewählt: ' + directoryResult.path);
+                await window.setStoragePath(directoryResult);
+            } else {
+                logMessage('Benutzer hat den Dialog abgebrochen. Standardpfad wird verwendet.');
+            }
+        } else {
+            logMessage('Standardpfad wird verwendet.');
+        }
+
+        setFirstLoginStatus();
+    }
 }
 
 // Verknüpfe den UI-Button mit der zentralen Logging-Funktion
