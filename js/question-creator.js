@@ -25,14 +25,12 @@ document.addEventListener('DOMContentLoaded', function() {
     // Elemente für Kategorie-Verwaltung
     const categoryForm = document.getElementById('category-form');
     const categoryNameInput = document.getElementById('category-name');
-    const categoryDescriptionInput = document.getElementById('category-description');
     const categoriesList = document.getElementById('categories-list');
 
     // Elemente für Gruppen-Verwaltung
     const groupForm = document.getElementById('group-form');
     const groupCategorySelect = document.getElementById('group-category');
     const groupNameInput = document.getElementById('group-name');
-    const groupDescriptionInput = document.getElementById('group-description');
     const groupsList = document.getElementById('groups-list');
 
     // Base64-kodiertes Bild
@@ -59,7 +57,6 @@ document.addEventListener('DOMContentLoaded', function() {
             e.preventDefault();
             
             const name = categoryNameInput.value.trim();
-            const description = categoryDescriptionInput.value.trim();
             // Standardmäßig "any" als Kategorie-Typ verwenden
             const mainCategory = "any";
             
@@ -71,7 +68,6 @@ document.addEventListener('DOMContentLoaded', function() {
             try {
                 const newCategory = await window.quizDB.createCategory(
                     name,
-                    description,
                     mainCategory,
                     username
                 );
@@ -103,7 +99,6 @@ document.addEventListener('DOMContentLoaded', function() {
             
             const categoryId = groupCategorySelect.value;
             const name = groupNameInput.value.trim();
-            const description = groupDescriptionInput.value.trim();
             
             if (!categoryId || !name) {
                 showError('Bitte fülle alle erforderlichen Felder aus.');
@@ -114,7 +109,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 const newGroup = await window.quizDB.createGroup(
                     name,
                     categoryId,
-                    description,
                     username
                 );
                 
@@ -295,7 +289,6 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="category-item" data-id="${category.id}">
                             <div class="category-info">
                                 <h4>${category.name}</h4>
-                                ${category.description ? `<p>${category.description}</p>` : ''}
                             </div>
                             <div class="category-actions">
                                 <button type="button" class="action-btn delete" title="Kategorie löschen" data-id="${category.id}">
@@ -364,7 +357,6 @@ document.addEventListener('DOMContentLoaded', function() {
                             <div class="group-info">
                                 <span class="group-category">${category.name}</span>
                                 <h4>${group.name}</h4>
-                                ${group.description ? `<p>${group.description}</p>` : ''}
                             </div>
                             <div class="group-actions">
                                 <button type="button" class="action-btn delete" title="Gruppe löschen" data-id="${group.id}">

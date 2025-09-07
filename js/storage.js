@@ -8,6 +8,9 @@
 // Standardpfad für Daten (wenn kein benutzerdefinierter Pfad angegeben wurde)
 const DEFAULT_STORAGE_PATH = 'lernapp_data';
 
+// Exportiere den Standardpfad, damit andere Skripte darauf zugreifen können
+window.DEFAULT_STORAGE_PATH = DEFAULT_STORAGE_PATH;
+
 // Variable für den aktuellen Handle zum Ordner (File System Access API)
 let directoryHandle = null;
 
@@ -21,18 +24,28 @@ function isFileSystemAccessSupported() {
 
 /**
  * Überprüft, ob ein Speicherort bereits konfiguriert wurde.
+ * @param {string} [username] - Optional: Der Benutzername, für den der Speicherort überprüft werden soll.
  * @returns {boolean} True, wenn ein Speicherort konfiguriert wurde, sonst False.
  */
-function isStoragePathConfigured() {
-    return localStorage.getItem('storagePath') !== null;
+function isStoragePathConfigured(username) {
+    const currentUser = username || localStorage.getItem('username');
+    if (!currentUser) {
+        return localStorage.getItem('storagePath') !== null;
+    }
+    return localStorage.getItem(`storagePath_${currentUser}`) !== null;
 }
 
 /**
  * Gibt den aktuell konfigurierten Speicherort zurück.
+ * @param {string} [username] - Optional: Der Benutzername, für den der Speicherort zurückgegeben werden soll.
  * @returns {string} Der konfigurierte Speicherort oder der Standardpfad.
  */
-function getStoragePath() {
-    return localStorage.getItem('storagePath') || DEFAULT_STORAGE_PATH;
+function getStoragePath(username) {
+    const currentUser = username || localStorage.getItem('username');
+    if (!currentUser) {
+        return localStorage.getItem('storagePath') || DEFAULT_STORAGE_PATH;
+    }
+    return localStorage.getItem(`storagePath_${currentUser}`) || DEFAULT_STORAGE_PATH;
 }
 
 /**
@@ -75,11 +88,48 @@ async function openDirectoryPicker() {
 }
 
 /**
+ * Versucht, einen bereits konfigurierten Verzeichnis-Handle zu öffnen, ohne einen Dialog zu zeigen.
+ * @param {string} [username] - Optional: Der Benutzername, für den der Verzeichnis-Handle geöffnet werden soll.
+ * @returns {Promise<Object|null>} Promise mit dem Verzeichnis-Handle oder null bei Fehler.
+ */
+async function getDirectoryHandle(username) {
+    try {
+        // Prüfen, ob die File System Access API unterstützt wird
+        if (!isFileSystemAccessSupported()) {
+            console.log('Dateisystem-API wird nicht unterstützt.');
+            return null;
+        }
+        
+        // Prüfen, ob wir bereits einen Handle haben
+        if (directoryHandle) {
+            try {
+                // Versuchen, die Berechtigung zu erneuern
+                const permission = await directoryHandle.requestPermission({ mode: 'readwrite' });
+                if (permission === 'granted') {
+                    return directoryHandle;
+                }
+            } catch (error) {
+                console.warn('Fehler beim Zugriff auf den bestehenden Handle:', error);
+            }
+        }
+        
+        // Wir haben keinen Handle oder er ist nicht mehr gültig
+        // In diesem Fall können wir ohne Dialog nicht weitermachen
+        console.log('Kein gültiger Handle vorhanden. Direkter Zugriff nicht möglich.');
+        return null;
+    } catch (error) {
+        console.error('Fehler beim Zugriff auf den Verzeichnis-Handle:', error);
+        return null;
+    }
+}
+
+/**
  * Setzt einen neuen Speicherort.
  * @param {string|Object} path - Der neue Speicherort oder ein Objekt mit Pfad und Handle.
+ * @param {string} [username] - Optional: Der Benutzername, für den der Speicherort gesetzt werden soll.
  * @returns {Promise<boolean>} Promise, das zu True aufgelöst wird, wenn das Setzen erfolgreich war.
  */
-async function setStoragePath(path) {
+async function setStoragePath(path, username) {
     try {
         let pathString, handle;
         
@@ -107,15 +157,26 @@ async function setStoragePath(path) {
             throw new Error('Kein gültiger Pfad angegeben');
         }
         
-        localStorage.setItem('storagePath', pathString);
-        
-        // Überprüfen, ob der Pfad erfolgreich gespeichert wurde
-        if (localStorage.getItem('storagePath') === pathString) {
-            showSuccess(`Speicherort wurde auf "${pathString}" gesetzt.`);
-            return true;
+        // Speicherpfad für den aktuellen oder angegebenen Benutzer setzen
+        const currentUser = username || localStorage.getItem('username');
+        if (currentUser) {
+            localStorage.setItem(`storagePath_${currentUser}`, pathString);
+            // Überprüfen, ob der Pfad erfolgreich gespeichert wurde
+            if (localStorage.getItem(`storagePath_${currentUser}`) === pathString) {
+                showSuccess(`Speicherort für Benutzer "${currentUser}" wurde auf "${pathString}" gesetzt.`);
+                return true;
+            }
         } else {
-            throw new Error('Fehler beim Speichern des Pfads');
+            // Fallback für nicht eingeloggte Benutzer oder alte Implementierung
+            localStorage.setItem('storagePath', pathString);
+            // Überprüfen, ob der Pfad erfolgreich gespeichert wurde
+            if (localStorage.getItem('storagePath') === pathString) {
+                showSuccess(`Speicherort wurde auf "${pathString}" gesetzt.`);
+                return true;
+            }
         }
+        
+        throw new Error('Fehler beim Speichern des Pfads');
     } catch (error) {
         showError(`Fehler beim Setzen des Speicherorts: ${error.message}`);
         console.error('Fehler beim Setzen des Speicherorts:', error);
@@ -125,22 +186,34 @@ async function setStoragePath(path) {
 
 /**
  * Setzt den Speicherort auf den Standardpfad zurück.
+ * @param {string} [username] - Optional: Der Benutzername, für den der Speicherort zurückgesetzt werden soll.
  * @returns {Promise<boolean>} Promise, das zu True aufgelöst wird, wenn das Zurücksetzen erfolgreich war.
  */
-async function resetStoragePath() {
+async function resetStoragePath(username) {
     directoryHandle = null;
     localStorage.removeItem('hasDirectoryHandle');
-    return await setStoragePath(DEFAULT_STORAGE_PATH);
+    return await setStoragePath(DEFAULT_STORAGE_PATH, username);
 }
 
 /**
  * Erstellt einen vollständigen Pfad für eine bestimmte Datei oder Ressource.
  * @param {string} resourceName - Der Name der Ressource (z.B. 'questions.json').
+ * @param {string} [username] - Optional: Der Benutzername, für den der Ressourcenpfad erstellt werden soll.
  * @returns {string} Der vollständige Pfad zur Ressource.
  */
-function getResourcePath(resourceName) {
-    const basePath = getStoragePath();
+function getResourcePath(resourceName, username) {
+    const basePath = getStoragePath(username);
     return `${basePath}/${resourceName}`;
+}
+
+/**
+ * Prüft, ob der aktuell konfigurierte Speicherort der Standardpfad ist.
+ * @param {string} [username] - Optional: Der Benutzername, für den geprüft werden soll.
+ * @returns {boolean} True, wenn der Standardpfad konfiguriert ist, sonst False.
+ */
+function isDefaultPath(username) {
+    const path = getStoragePath(username);
+    return path === DEFAULT_STORAGE_PATH;
 }
 
 /**
@@ -184,9 +257,10 @@ async function verifyStoragePath() {
  * Speichert Daten unter dem angegebenen Ressourcennamen im konfigurierten Speicherort.
  * @param {string} resourceName - Der Name der Ressource (z.B. 'questions.json').
  * @param {Object|Array} data - Die zu speichernden Daten.
+ * @param {string} [username] - Optional: Der Benutzername, für den die Daten gespeichert werden sollen.
  * @returns {Promise<boolean>} Promise, das zu True aufgelöst wird, wenn das Speichern erfolgreich war.
  */
-async function saveData(resourceName, data) {
+async function saveData(resourceName, data, username) {
     try {
         if (!resourceName) {
             throw new Error('Kein Ressourcenname angegeben');
@@ -230,12 +304,12 @@ async function saveData(resourceName, data) {
                 }
                 
                 // Fallback auf localStorage
-                localStorage.setItem(getResourcePath(resourceName), jsonData);
+                localStorage.setItem(getResourcePath(resourceName, username), jsonData);
                 return true;
             }
         } else {
             // Fallback: In einer reinen Browser-Umgebung speichern wir im localStorage
-            localStorage.setItem(getResourcePath(resourceName), jsonData);
+            localStorage.setItem(getResourcePath(resourceName, username), jsonData);
             return true;
         }
     } catch (error) {
@@ -251,9 +325,10 @@ async function saveData(resourceName, data) {
  * Lädt Daten mit dem angegebenen Ressourcennamen aus dem konfigurierten Speicherort.
  * @param {string} resourceName - Der Name der Ressource (z.B. 'questions.json').
  * @param {Object|Array} defaultValue - Standardwert, falls keine Daten gefunden wurden.
+ * @param {string} [username] - Optional: Der Benutzername, für den die Daten geladen werden sollen.
  * @returns {Promise<Object|Array>} Promise, das zu den geladenen Daten aufgelöst wird.
  */
-async function loadData(resourceName, defaultValue = null) {
+async function loadData(resourceName, defaultValue = null, username) {
     try {
         if (!resourceName) {
             throw new Error('Kein Ressourcenname angegeben');
@@ -300,7 +375,7 @@ async function loadData(resourceName, defaultValue = null) {
         }
         
         // Fallback: In einer reinen Browser-Umgebung laden wir aus dem localStorage
-        const jsonData = localStorage.getItem(getResourcePath(resourceName));
+        const jsonData = localStorage.getItem(getResourcePath(resourceName, username));
         
         if (jsonData === null) {
             return defaultValue;
@@ -316,9 +391,10 @@ async function loadData(resourceName, defaultValue = null) {
 /**
  * Löscht Daten mit dem angegebenen Ressourcennamen aus dem konfigurierten Speicherort.
  * @param {string} resourceName - Der Name der Ressource (z.B. 'questions.json').
+ * @param {string} [username] - Optional: Der Benutzername, für den die Daten gelöscht werden sollen.
  * @returns {Promise<boolean>} Promise, das zu True aufgelöst wird, wenn das Löschen erfolgreich war.
  */
-async function deleteData(resourceName) {
+async function deleteData(resourceName, username) {
     try {
         if (!resourceName) {
             throw new Error('Kein Ressourcenname angegeben');
@@ -336,7 +412,7 @@ async function deleteData(resourceName) {
                 await directoryHandle.removeEntry(resourceName);
                 
                 // Auch aus localStorage entfernen (für den Fall, dass es dort auch gespeichert wurde)
-                localStorage.removeItem(getResourcePath(resourceName));
+                localStorage.removeItem(getResourcePath(resourceName, username));
                 
                 return true;
             } catch (error) {
@@ -350,7 +426,7 @@ async function deleteData(resourceName) {
         }
         
         // Fallback: In einer reinen Browser-Umgebung löschen wir aus dem localStorage
-        localStorage.removeItem(getResourcePath(resourceName));
+        localStorage.removeItem(getResourcePath(resourceName, username));
         
         return true;
     } catch (error) {
@@ -362,9 +438,10 @@ async function deleteData(resourceName) {
 
 /**
  * Listet alle verfügbaren Ressourcen im konfigurierten Speicherort auf.
+ * @param {string} [username] - Optional: Der Benutzername, für den die Ressourcen aufgelistet werden sollen.
  * @returns {Promise<Array<string>>} Promise, das zu einem Array von Ressourcennamen aufgelöst wird.
  */
-async function listResources() {
+async function listResources(username) {
     try {
         const resources = [];
         
@@ -392,7 +469,7 @@ async function listResources() {
         }
         
         // Fallback: In einer reinen Browser-Umgebung durchsuchen wir den localStorage
-        const path = getStoragePath();
+        const path = getStoragePath(username);
         for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
             if (key.startsWith(`${path}/`)) {
@@ -413,11 +490,12 @@ async function listResources() {
  * Prüft, ob der Dateizugriff nach dem Login konfiguriert werden muss.
  * Diese Funktion kann nach dem Login aufgerufen werden, um festzustellen,
  * ob der Benutzer den Speicherordner auswählen muss.
+ * @param {string} [username] - Optional: Der Benutzername, für den geprüft werden soll.
  * @returns {boolean} True, wenn der Benutzer den Speicherordner auswählen sollte, sonst False.
  */
-function needsStorageConfiguration() {
+function needsStorageConfiguration(username) {
     // Wenn kein Speicherort konfiguriert ist, ist keine Auswahl nötig (wird automatisch Standard verwendet)
-    if (!isStoragePathConfigured()) {
+    if (!isStoragePathConfigured(username)) {
         return false;
     }
     
@@ -439,21 +517,26 @@ window.setStoragePath = setStoragePath;
 window.resetStoragePath = resetStoragePath;
 window.verifyStoragePath = verifyStoragePath;
 window.openDirectoryPicker = openDirectoryPicker;
+window.getDirectoryHandle = getDirectoryHandle;
 window.saveData = saveData;
 window.loadData = loadData;
 window.deleteData = deleteData;
 window.listResources = listResources;
 window.needsStorageConfiguration = needsStorageConfiguration;
+window.isDefaultPath = isDefaultPath;
 
 // Bei DOMContentLoaded prüfen, ob ein Speicherort konfiguriert ist
 document.addEventListener('DOMContentLoaded', async () => {
-    if (!isStoragePathConfigured()) {
+    // Prüfen, ob ein Benutzer eingeloggt ist
+    const currentUsername = localStorage.getItem('username');
+    
+    if (!isStoragePathConfigured(currentUsername)) {
         console.log('Kein Speicherort konfiguriert. Standard wird verwendet:', DEFAULT_STORAGE_PATH);
         
         // Standard-Speicherort festlegen, wenn noch keiner gesetzt ist
-        await setStoragePath(DEFAULT_STORAGE_PATH);
+        await setStoragePath(DEFAULT_STORAGE_PATH, currentUsername);
     } else {
-        const path = getStoragePath();
+        const path = getStoragePath(currentUsername);
         console.log('Konfigurierter Speicherort:', path);
         
         // Prüfen, ob wir einen gespeicherten Handle wiederherstellen können
@@ -479,7 +562,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (window.showWarning) {
                 window.showWarning('Der konfigurierte Speicherort ist nicht zugänglich. Standardspeicherort wird verwendet.', 8000);
             }
-            await resetStoragePath();
+            await resetStoragePath(currentUsername);
         }
     }
 });

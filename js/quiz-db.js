@@ -78,12 +78,11 @@ async function saveCategories(categories) {
 /**
  * Erstellt eine neue Kategorie
  * @param {string} name - Name der Kategorie
- * @param {string} description - Beschreibung der Kategorie
  * @param {string} [mainCategory=MAIN_CATEGORY.TEXT] - Hauptkategorie (standardmäßig TEXT)
  * @param {string} createdBy - Benutzername des Erstellers
  * @returns {Promise<object|null>} Die erstellte Kategorie oder null bei Fehler
  */
-async function createCategory(name, description, mainCategory = MAIN_CATEGORY.TEXT, createdBy) {
+async function createCategory(name, mainCategory = MAIN_CATEGORY.TEXT, createdBy) {
     if (!name) {
         console.error("Name der Kategorie ist erforderlich.");
         return null;
@@ -96,7 +95,6 @@ async function createCategory(name, description, mainCategory = MAIN_CATEGORY.TE
         const newCategory = {
             id: `category-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             name,
-            description: description || "",
             mainCategory,
             createdBy,
             createdAt: Date.now()
@@ -144,11 +142,10 @@ async function saveGroups(groups) {
  * Erstellt eine neue Gruppe
  * @param {string} name - Name der Gruppe
  * @param {string} categoryId - ID der übergeordneten Kategorie
- * @param {string} description - Beschreibung der Gruppe
  * @param {string} createdBy - Benutzername des Erstellers
  * @returns {Promise<object|null>} Die erstellte Gruppe oder null bei Fehler
  */
-async function createGroup(name, categoryId, description, createdBy) {
+async function createGroup(name, categoryId, createdBy) {
     if (!name || !categoryId) {
         console.error("Name und Kategorie-ID sind erforderlich.");
         return null;
@@ -162,7 +159,6 @@ async function createGroup(name, categoryId, description, createdBy) {
             id: `group-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             name,
             categoryId,
-            description: description || "",
             createdBy,
             createdAt: Date.now()
         };

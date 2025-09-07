@@ -14,14 +14,12 @@ document.addEventListener('DOMContentLoaded', function() {
     // Elemente für Kategorie-Formular
     const categoryForm = document.getElementById('category-form');
     const categoryNameInput = document.getElementById('category-name');
-    const categoryDescriptionInput = document.getElementById('category-description');
     const categoriesList = document.getElementById('categories-list');
 
     // Elemente für Gruppen-Formular
     const groupForm = document.getElementById('group-form');
     const groupCategorySelect = document.getElementById('group-category');
     const groupNameInput = document.getElementById('group-name');
-    const groupDescriptionInput = document.getElementById('group-description');
     const filterCategorySelect = document.getElementById('filter-category');
     const groupsList = document.getElementById('groups-list');
 
@@ -35,7 +33,6 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Daten aus dem Formular sammeln
             const name = categoryNameInput.value.trim();
-            const description = categoryDescriptionInput.value.trim();
             // Standardmäßig beide Quiz-Typen unterstützen
             const mainCategory = "any";
             
@@ -48,7 +45,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Kategorie erstellen
                 const newCategory = await window.quizDB.createCategory(
                     name,
-                    description,
                     mainCategory,
                     username
                 );
@@ -58,7 +54,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     // Formular zurücksetzen
                     categoryNameInput.value = '';
-                    categoryDescriptionInput.value = '';
                     
                     // Listen aktualisieren
                     await loadCategories();
@@ -81,7 +76,6 @@ document.addEventListener('DOMContentLoaded', function() {
             // Daten aus dem Formular sammeln
             const categoryId = groupCategorySelect.value;
             const name = groupNameInput.value.trim();
-            const description = groupDescriptionInput.value.trim();
             
             if (!categoryId) {
                 showError('Bitte wähle eine Kategorie aus.');
@@ -98,7 +92,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 const newGroup = await window.quizDB.createGroup(
                     name,
                     categoryId,
-                    description,
                     username
                 );
                 
@@ -107,7 +100,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     // Formular zurücksetzen
                     groupNameInput.value = '';
-                    groupDescriptionInput.value = '';
                     
                     // Liste aktualisieren
                     await loadGroups();
@@ -179,7 +171,6 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="item-header">
                             <h3>${category.name}</h3>
                         </div>
-                        <p class="item-description">${category.description || 'Keine Beschreibung'}</p>
                         <div class="item-footer">
                             <span class="item-info">Erstellt von: ${category.createdBy}</span>
                             <span class="item-info">Erstellt am: ${new Date(category.createdAt).toLocaleDateString()}</span>
@@ -272,7 +263,6 @@ document.addEventListener('DOMContentLoaded', function() {
                             <h3>${group.name}</h3>
                             <span class="item-badge">${category.name}</span>
                         </div>
-                        <p class="item-description">${group.description || 'Keine Beschreibung'}</p>
                         <div class="item-footer">
                             <span class="item-info">Erstellt von: ${group.createdBy}</span>
                             <span class="item-info">Erstellt am: ${new Date(group.createdAt).toLocaleDateString()}</span>

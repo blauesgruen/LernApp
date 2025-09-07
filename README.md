@@ -224,16 +224,20 @@ Die LernApp bietet eine flexible Speicherkonfiguration für die Fragendatenbank 
 - Benutzer können einen benutzerdefinierten Pfad für die Speicherung der Fragenbank festlegen.
 - Die App unterstützt die Auswahl eines Ordners über den nativen Dateibrowser des Betriebssystems.
 - Ein gemeinsamer Pfad auf verschiedenen Geräten (z.B. in Dropbox) ermöglicht es, die gleichen Fragen auf all Ihren Geräten zu verwenden.
-- Bei der ersten Anmeldung wird ein Dialog angezeigt, der die Konfiguration des Speicherorts ermöglicht.
+- Nur beim ersten Login eines Benutzers wird der Dialog zur Auswahl des Speicherorts angezeigt.
+- Bei späteren Logins wird automatisch der gespeicherte Speicherort verwendet.
+- Wurde kein benutzerdefinierter Speicherort festgelegt, wird ohne weitere Nachfrage der Standardspeicherort verwendet.
 - Der Speicherort kann jederzeit über das Benutzerprofil geändert werden.
+- Jeder Benutzer hat seinen eigenen Speicherort, der nach dem Login automatisch geladen wird.
 
 #### Funktionen für den Speicherort
 - **isFileSystemAccessSupported()**: Überprüft, ob der Browser die File System Access API unterstützt.
 - **openDirectoryPicker()**: Öffnet den nativen Dateibrowser-Dialog zur Auswahl eines Ordners.
-- **isStoragePathConfigured()**: Überprüft, ob ein Speicherort bereits konfiguriert wurde.
-- **getStoragePath()**: Gibt den aktuell konfigurierten Speicherort zurück.
-- **setStoragePath(path)**: Setzt einen neuen Speicherort.
-- **resetStoragePath()**: Setzt den Speicherort auf den Standardpfad zurück.
+- **getDirectoryHandle(username)**: Versucht, auf den konfigurierten Ordner zuzugreifen, ohne einen Dialog anzuzeigen.
+- **isStoragePathConfigured(username)**: Überprüft, ob ein Speicherort für den angegebenen Benutzer konfiguriert wurde.
+- **getStoragePath(username)**: Gibt den konfigurierten Speicherort für den angegebenen Benutzer zurück.
+- **setStoragePath(path, username)**: Setzt einen neuen Speicherort für den angegebenen Benutzer.
+- **resetStoragePath(username)**: Setzt den Speicherort für den angegebenen Benutzer auf den Standardpfad zurück.
 - **verifyStoragePath()**: Prüft, ob der konfigurierte Speicherort existiert und zugänglich ist.
 
 ### Breadcrumb-Navigation
@@ -331,7 +335,6 @@ Die App ermöglicht die Erstellung von Fragen mit:
    {
      id: string,            // Eindeutige ID der Kategorie
      name: string,          // Name der Kategorie
-     description: string,   // Beschreibung der Kategorie
      createdBy: string,     // Benutzername des Erstellers
      createdAt: number      // Zeitstempel der Erstellung
    }

@@ -250,42 +250,86 @@ async function handleLogin(username, password) {
         logMessage('Login-Status wurde auf "eingeloggt" gesetzt.');
         
         // Überprüfen, ob es der erste Login dieses Benutzers ist
-        const isFirstLogin = !localStorage.getItem('firstLoginComplete');
+        const userFirstLoginKey = `firstLogin_${user.username}`;
+        const isFirstLogin = localStorage.getItem(userFirstLoginKey) !== 'completed';
+        
         if (isFirstLogin) {
-            logMessage('Erster Login des Benutzers erkannt.');
-        }
-        
-        // Prüfen, ob der Speicherort konfiguriert werden muss
-        let storagePath = '';
-        let needsConfiguration = false;
-        
-        if (window.needsStorageConfiguration && window.getStoragePath) {
-            needsConfiguration = window.needsStorageConfiguration();
-            storagePath = window.getStoragePath();
-            
-            if (needsConfiguration) {
-                logMessage('Benutzer muss den Speicherordner neu auswählen.');
-            }
+            logMessage('Erster Login des Benutzers erkannt: ' + user.username);
         }
         
         showSuccess('Login erfolgreich! Sie werden weitergeleitet...');
         
-        setTimeout(() => {
-            if (needsConfiguration) {
-                // Nach erfolgreichem Login eine Meldung anzeigen, dass der Speicherordner ausgewählt werden sollte
-                const confirmConfig = confirm(
-                    `Willkommen zurück! Der Speicherordner "${storagePath}" sollte neu ausgewählt werden, ` +
-                    `um vollen Zugriff auf Ihre Daten zu ermöglichen. Möchten Sie jetzt zu den Profileinstellungen wechseln?`
-                );
+        // Jetzt, wo der Benutzer angemeldet ist, können wir seinen spezifischen Speicherort überprüfen
+        setTimeout(async () => {
+            try {
+                // Prüfen ob ein Speicherort für den aktuellen Benutzer konfiguriert ist
+                const currentUsername = localStorage.getItem('username');
                 
-                if (confirmConfig) {
-                    // Zu den Profileinstellungen wechseln
-                    window.location.href = 'profile.html';
-                    return;
+                // Nur beim ersten Login den Speicherort-Dialog anzeigen
+                if (isFirstLogin) {
+                    logMessage('Erster Login: Frage nach Speicherort');
+                    
+                    // Standardpfad oder benutzerdefinierten Pfad wählen?
+                    if (window.isFileSystemAccessSupported && window.isFileSystemAccessSupported()) {
+                        const useCustomPath = confirm(
+                            'Möchten Sie einen benutzerdefinierten Speicherort für Ihre Daten festlegen? ' +
+                            'Wenn Sie auf "Abbrechen" klicken, wird der Standardspeicherort verwendet.'
+                        );
+                        
+                        if (useCustomPath) {
+                            logMessage('Benutzer möchte einen benutzerdefinierten Speicherort festlegen');
+                            
+                            // Speicherort-Dialog öffnen
+                            const directoryResult = await window.openDirectoryPicker();
+                            
+                            if (directoryResult) {
+                                // Speicherort erfolgreich ausgewählt
+                                logMessage('Benutzer hat Speicherort ausgewählt: ' + directoryResult.path);
+                                await window.setStoragePath(directoryResult, currentUsername);
+                            } else {
+                                // Benutzer hat abgebrochen, Standard verwenden
+                                logMessage('Benutzer hat die Speicherortwahl abgebrochen, verwende Standard');
+                                await window.resetStoragePath(currentUsername);
+                            }
+                        } else {
+                            // Benutzer möchte Standardpfad verwenden
+                            logMessage('Benutzer möchte Standardpfad verwenden');
+                            await window.resetStoragePath(currentUsername);
+                        }
+                    } else {
+                        // Browser unterstützt keine Dateisystemauswahl, verwende Standard
+                        logMessage('Browser unterstützt keine Dateisystemauswahl, verwende Standard');
+                        await window.resetStoragePath(currentUsername);
+                    }
+                    
+                    // Ersten Login als abgeschlossen markieren
+                    localStorage.setItem(userFirstLoginKey, 'completed');
+                } else {
+                    // Nicht erster Login: Prüfe ob ein benutzerdefinierter Speicherort konfiguriert ist
+                    if (window.isStoragePathConfigured && window.isStoragePathConfigured(currentUsername)) {
+                        const isDefaultPath = window.isDefaultPath && window.isDefaultPath(currentUsername);
+                        
+                        // Wenn nicht der Standardpfad konfiguriert ist, versuchen wir diesen zu öffnen (nur für Berechtigung)
+                        if (!isDefaultPath && window.isFileSystemAccessSupported && window.isFileSystemAccessSupported()) {
+                            // Nur einen einfachen Lesezugriff versuchen, damit die Berechtigung abgefragt wird
+                            try {
+                                const directoryHandle = await window.getDirectoryHandle(currentUsername);
+                                if (directoryHandle) {
+                                    // Erfolgreich auf Verzeichnis zugegriffen
+                                    logMessage('Speicherort erfolgreich geöffnet');
+                                }
+                            } catch (error) {
+                                // Fehler beim Zugriff - wir machen nichts weiter, da es nur um die Berechtigungsabfrage ging
+                                logMessage('Benutzer hat keinen Zugriff auf den konfigurierten Speicherort gewährt: ' + error.message, 'warn');
+                            }
+                        }
+                    }
                 }
+            } catch (error) {
+                logMessage('Fehler beim Zugriff auf den Speicherort: ' + error.message, 'error');
             }
             
-            // Normale Weiterleitung zum Dashboard
+            // In jedem Fall zum Dashboard weiterleiten
             window.location.href = 'dashboard.html';
         }, 1000);
     } else {
@@ -383,18 +427,9 @@ localStorage.setItem('persistentLogs', JSON.stringify(existingLogs));
 const logsAfterTest = JSON.parse(localStorage.getItem('persistentLogs')) || [];
 // logMessage('Logs nach Test: ' + JSON.stringify(logsAfterTest));
 
-// Überprüfen, ob das Element mit der ID 'login' nur auf Seiten existiert, wo es erwartet wird
+// Überprüfen, ob das Element mit der ID 'login' existiert
 if (document.getElementById('login')) {
-    const loginElement = document.getElementById('login');
-    loginElement.addEventListener('keydown', function(event) {
-        if (event.key === 'Enter') {
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
-            logMessage('Eingegebener Benutzername: ' + username);
-            logMessage('Eingegebenes Passwort: ' + password);
-            handleLogin(username, password);
-        }
-    });
+    logMessage('Login-Element wurde gefunden.', 'info');
 } else {
     logMessage('Element mit ID "login" ist auf dieser Seite nicht vorhanden.', 'info');
 }

@@ -46,8 +46,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // Aktuellen Speicherpfad anzeigen, falls vorhanden
     function updateStoragePathDisplay() {
         if (window.isStoragePathConfigured && window.getStoragePath) {
-            if (window.isStoragePathConfigured()) {
-                const path = window.getStoragePath();
+            const currentUsername = localStorage.getItem('username');
+            if (window.isStoragePathConfigured(currentUsername)) {
+                const path = window.getStoragePath(currentUsername);
                 currentStoragePathSpan.textContent = path;
                 
                 // Prüfen, ob wir einen Hinweis anzeigen sollen, dass der Ordner neu ausgewählt werden muss
@@ -249,7 +250,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.log('Ausgewählter Speicherort:', storagePathData.path);
                 
                 // Speicherpfad aktualisieren
-                const success = await window.setStoragePath(storagePathData);
+                const currentUsername = localStorage.getItem('username');
+                const success = await window.setStoragePath(storagePathData, currentUsername);
                 
                 if (success) {
                     // Handle wurde erfolgreich aktualisiert, alle Flags zurücksetzen
@@ -279,7 +281,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // Speicherpfad zurücksetzen
     if (resetStoragePathBtn && window.resetStoragePath) {
         resetStoragePathBtn.addEventListener('click', async function() {
-            const success = await window.resetStoragePath();
+            const currentUsername = localStorage.getItem('username');
+            const success = await window.resetStoragePath(currentUsername);
             
             if (success) {
                 updateStoragePathDisplay();
