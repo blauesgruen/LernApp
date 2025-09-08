@@ -10,7 +10,10 @@ const config = {
     // Hauptmodule
     modules: {
         persistentFileSystem: '/js/persistent-file-system.js',
+        storageIndexedDB: '/js/storage-indexeddb.js',
         storage: '/js/storage.js',
+        storageAccess: '/js/storage-access.js',
+        storageFix: '/js/storage-fix.js',
         debugTools: '/js/debug-persistent-storage.js'
     },
     
@@ -97,8 +100,17 @@ async function init() {
         // Persistentes Dateisystem laden
         await loadModule(config.modules.persistentFileSystem);
         
+        // IndexedDB Fallback-Speicher laden
+        await loadModule(config.modules.storageIndexedDB);
+        
+        // Storage-Access-Module laden (für Zugriffsüberprüfung)
+        await loadModule(config.modules.storageAccess);
+        
         // Hauptspeichermodul laden
         await loadModule(config.modules.storage);
+        
+        // Storage-Fix-Modul laden (für automatische Reparatur)
+        await loadModule(config.modules.storageFix);
         
         // Ladevorgang abgeschlossen
         log('Alle Speichermodule erfolgreich geladen', 'success');

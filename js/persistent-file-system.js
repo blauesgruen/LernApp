@@ -14,24 +14,65 @@ const DIR_HANDLE_KEY = 'main-directory-handle';
  */
 async function initHandleDb() {
     return new Promise((resolve, reject) => {
-        const request = indexedDB.open('LernAppDirectoryHandles', 1);
-        
-        request.onerror = (event) => {
-            console.error('Fehler beim Öffnen der IndexedDB:', event.target.error);
-            reject(event.target.error);
-        };
-        
-        request.onupgradeneeded = (event) => {
-            const db = event.target.result;
-            // Erstelle einen Object Store für die Verzeichnis-Handles
-            if (!db.objectStoreNames.contains(DIR_HANDLE_STORE_NAME)) {
+        try {
+            console.log('Initialisiere IndexedDB für Directory Handles...');
+            const request = indexedDB.open('LernAppDirectoryHandles', 2); // Erhöhte Version, um Update zu erzwingen
+            
+            request.onerror = (event) => {
+                console.error('Fehler beim Öffnen der IndexedDB:', event.target.error);
+                reject(event.target.error);
+            };
+            
+            request.onupgradeneeded = (event) => {
+                console.log('Aktualisiere IndexedDB-Schema...');
+                const db = event.target.result;
+                
+                // Lösche alten Object Store, falls vorhanden (bei Problemen)
+                if (db.objectStoreNames.contains(DIR_HANDLE_STORE_NAME)) {
+                    db.deleteObjectStore(DIR_HANDLE_STORE_NAME);
+                    console.log('Vorhandener Object Store wurde gelöscht und wird neu erstellt');
+                }
+                
+                // Erstelle einen Object Store für die Verzeichnis-Handles
                 db.createObjectStore(DIR_HANDLE_STORE_NAME);
-            }
-        };
-        
-        request.onsuccess = (event) => {
-            resolve(event.target.result);
-        };
+                console.log('Object Store für Directory Handles wurde erstellt');
+            };
+            
+            request.onsuccess = (event) => {
+                const db = event.target.result;
+                console.log('IndexedDB für Directory Handles erfolgreich geöffnet');
+                
+                // Überprüfe, ob der Object Store wirklich existiert
+                if (!db.objectStoreNames.contains(DIR_HANDLE_STORE_NAME)) {
+                    console.error('Object Store existiert nicht nach erfolgreicher Datenbankverbindung!');
+                    
+                    // Schließe die DB und öffne sie mit erhöhter Version
+                    db.close();
+                    const retryRequest = indexedDB.open('LernAppDirectoryHandles', 3);
+                    
+                    retryRequest.onupgradeneeded = (e) => {
+                        const retryDb = e.target.result;
+                        retryDb.createObjectStore(DIR_HANDLE_STORE_NAME);
+                        console.log('Object Store wurde im zweiten Versuch erstellt');
+                    };
+                    
+                    retryRequest.onsuccess = (e) => {
+                        console.log('IndexedDB wurde im zweiten Versuch erfolgreich geöffnet');
+                        resolve(e.target.result);
+                    };
+                    
+                    retryRequest.onerror = (e) => {
+                        console.error('Fehler beim zweiten Öffnungsversuch:', e.target.error);
+                        reject(e.target.error);
+                    };
+                } else {
+                    resolve(db);
+                }
+            };
+        } catch (err) {
+            console.error('Unerwarteter Fehler bei der IndexedDB-Initialisierung:', err);
+            reject(err);
+        }
     });
 }
 
@@ -80,35 +121,76 @@ async function storeDirectoryHandle(handle) {
  * @returns {Promise<FileSystemDirectoryHandle|null>} Das gespeicherte Verzeichnis-Handle oder null
  */
 async function loadDirectoryHandle() {
+    const logFunc = window.logger ? window.logger.info.bind(window.logger) : console.log;
+    const errorFunc = window.logger ? window.logger.error.bind(window.logger) : console.error;
+    
     try {
+        logFunc('Lade gespeichertes DirectoryHandle aus IndexedDB...');
+        
+        // Überprüfe zuerst, ob wir überhaupt ein Handle gespeichert haben
+        if (localStorage.getItem('hasStoredDirectoryHandle') !== 'true') {
+            logFunc('Kein gespeicherter DirectoryHandle vorhanden');
+            return null;
+        }
+        
         const db = await initHandleDb();
+        
         return new Promise((resolve, reject) => {
-            const transaction = db.transaction(DIR_HANDLE_STORE_NAME, 'readonly');
-            const store = transaction.objectStore(DIR_HANDLE_STORE_NAME);
-            
-            const request = store.get(DIR_HANDLE_KEY);
-            
-            request.onsuccess = () => {
-                if (request.result) {
-                    console.log('Verzeichnis-Handle aus IndexedDB geladen');
-                    resolve(request.result);
-                } else {
-                    console.log('Kein gespeichertes Verzeichnis-Handle gefunden');
+            try {
+                // Überprüfe, ob der Object Store existiert
+                if (!db.objectStoreNames.contains(DIR_HANDLE_STORE_NAME)) {
+                    errorFunc(`Object Store '${DIR_HANDLE_STORE_NAME}' existiert nicht in der Datenbank!`);
+                    localStorage.removeItem('hasStoredDirectoryHandle');
                     resolve(null);
+                    return;
                 }
-            };
-            
-            request.onerror = (event) => {
-                console.error('Fehler beim Laden des Verzeichnis-Handles:', event.target.error);
-                reject(event.target.error);
-            };
-            
-            transaction.oncomplete = () => {
-                db.close();
-            };
+                
+                const transaction = db.transaction(DIR_HANDLE_STORE_NAME, 'readonly');
+                const store = transaction.objectStore(DIR_HANDLE_STORE_NAME);
+                
+                const request = store.get(DIR_HANDLE_KEY);
+                
+                request.onsuccess = () => {
+                    if (request.result) {
+                        logFunc('Verzeichnis-Handle aus IndexedDB geladen');
+                        // Teste, ob das Handle noch funktioniert
+                        try {
+                            // Wir versuchen, eine Eigenschaft des Handles abzurufen
+                            // Ein ungültiges Handle würde hier einen Fehler werfen
+                            const name = request.result.name || "Unbenanntes Verzeichnis";
+                            logFunc(`Handle-Name: ${name}`);
+                            // Speichern der Information für künftige Überprüfungen
+                            localStorage.setItem('lastLoadedHandleName', name);
+                            resolve(request.result);
+                        } catch (validationError) {
+                            errorFunc('Geladenes Handle ist ungültig:', validationError);
+                            localStorage.removeItem('hasStoredDirectoryHandle');
+                            resolve(null);
+                        }
+                    } else {
+                        logFunc('Kein gespeichertes Verzeichnis-Handle gefunden');
+                        localStorage.removeItem('hasStoredDirectoryHandle');
+                        resolve(null);
+                    }
+                };
+                
+                request.onerror = (event) => {
+                    errorFunc('Fehler beim Laden des Verzeichnis-Handles:', event.target.error);
+                    reject(event.target.error);
+                };
+                
+                transaction.oncomplete = () => {
+                    db.close();
+                };
+            } catch (transactionError) {
+                errorFunc('Fehler bei der Transaktion:', transactionError);
+                localStorage.removeItem('hasStoredDirectoryHandle');
+                resolve(null);
+            }
         });
     } catch (error) {
-        console.error('Fehler beim Laden des Verzeichnis-Handles:', error);
+        errorFunc('Fehler beim Laden des Verzeichnis-Handles:', error);
+        localStorage.removeItem('hasStoredDirectoryHandle');
         return null;
     }
 }
@@ -539,6 +621,7 @@ window.restoreDirectoryHandle = restoreDirectoryHandle;
 window.verifyPermission = verifyPermission;
 window.storeDirectoryHandle = storeDirectoryHandle;
 window.loadDirectoryHandle = loadDirectoryHandle;
+window.initHandleDb = initHandleDb; // Fügen wir hinzu, damit es von storage-handler.js genutzt werden kann
 
 // Log-Nachricht
 console.log('%cPersistentes Dateisystem-Modul initialisiert', 'color: green; font-weight: bold');

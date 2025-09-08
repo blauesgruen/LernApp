@@ -284,7 +284,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Fragedaten erstellen
             const questionData = {
                 text: questionTextInput.value.trim(),
-                imageUrl: imageBase64,
+                imageUrl: imageBase64 || "",  // Stellt sicher, dass null-Werte als leerer String gespeichert werden
                 options: options,
                 explanation: explanationInput.value.trim(),
                 categoryId: categoryId,
@@ -475,16 +475,23 @@ document.addEventListener('DOMContentLoaded', function() {
         const reader = new FileReader();
         
         reader.onload = function(e) {
-            // Base64-kodiertes Bild speichern
-            imageBase64 = e.target.result;
-            
-            // Vorschau erstellen und anzeigen
-            imagePreview.style.display = 'block';
-            imagePreview.classList.add('has-image');
-            imagePreview.innerHTML = `<img src="${imageBase64}" alt="Vorschau">`;
-            
-            // Bildnamen anzeigen
-            imageNameElement.textContent = file.name;
+            // Wir komprimieren das Bild mit einer Hilfsfunktion
+            compressImage(e.target.result, file.type, (compressedBase64) => {
+                // Base64-kodiertes komprimiertes Bild speichern
+                imageBase64 = compressedBase64;
+                
+                // Vorschau erstellen und anzeigen
+                imagePreview.style.display = 'block';
+                imagePreview.classList.add('has-image');
+                imagePreview.innerHTML = `<img src="${imageBase64}" alt="Vorschau">`;
+                
+                // Bildnamen anzeigen
+                imageNameElement.textContent = file.name;
+                
+                // Größe des komprimierten Bildes anzeigen (optional)
+                const sizeKB = Math.round(compressedBase64.length / 1024);
+                console.log(`Bildgröße nach Komprimierung: ${sizeKB} KB`);
+            });
         };
         
         reader.onerror = function() {
@@ -497,6 +504,57 @@ document.addEventListener('DOMContentLoaded', function() {
         };
         
         reader.readAsDataURL(file);
+    }
+    
+    /**
+     * Komprimiert ein Bild mit Canvas
+     * @param {string} base64 - Das Originalbild als Base64-String
+     * @param {string} type - Der MIME-Typ des Bildes
+     * @param {function} callback - Callback-Funktion mit dem komprimierten Bild
+     */
+    function compressImage(base64, type, callback) {
+        const img = new Image();
+        img.src = base64;
+        
+        img.onload = function() {
+            // Maximale Größe für Quizbilder festlegen (z.B. 800x600)
+            const MAX_WIDTH = 800;
+            const MAX_HEIGHT = 600;
+            
+            let width = img.width;
+            let height = img.height;
+            
+            // Verhältnis beibehalten, aber Größe reduzieren
+            if (width > MAX_WIDTH) {
+                height = Math.round(height * (MAX_WIDTH / width));
+                width = MAX_WIDTH;
+            }
+            
+            if (height > MAX_HEIGHT) {
+                width = Math.round(width * (MAX_HEIGHT / height));
+                height = MAX_HEIGHT;
+            }
+            
+            // Canvas für die Komprimierung erstellen
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+            
+            // Qualität auf 0.7 (70%) setzen für JPEG, 0.8 für andere Formate
+            const quality = type === 'image/jpeg' ? 0.7 : 0.8;
+            
+            // Komprimiertes Bild als Base64 zurückgeben
+            const compressedBase64 = canvas.toDataURL(type, quality);
+            callback(compressedBase64);
+        };
+        
+        img.onerror = function() {
+            console.error('Fehler beim Laden des Bildes zur Komprimierung');
+            callback(base64); // Originalbild zurückgeben im Fehlerfall
+        };
     }
 
     /**

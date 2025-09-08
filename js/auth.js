@@ -226,24 +226,30 @@ async function handleLogin(username, password) {
         
         showSuccess('Login erfolgreich! Sie werden weitergeleitet...');
         
-        // Jetzt, wo der Benutzer angemeldet ist, können wir seinen spezifischen Speicherort überprüfen
+        // Jetzt, wo der Benutzer angemeldet ist, initialisieren wir seinen spezifischen Speicherort
         setTimeout(async () => {
             try {
                 // Prüfen ob ein Speicherort für den aktuellen Benutzer konfiguriert ist
                 const currentUsername = localStorage.getItem('username');
                 
+                // Speicherort für den Benutzer initialisieren
+                if (window.initializeStorageForUser) {
+                    logMessage('Initialisiere Speicherort für Benutzer: ' + currentUsername);
+                    await window.initializeStorageForUser(currentUsername);
+                } else {
+                    logMessage('Warnung: initializeStorageForUser-Funktion nicht verfügbar', 'warn');
+                }
+                
                 // Nur beim ersten Login den Speicherort-Dialog anzeigen
                 if (isFirstTimeUser) {
-                    logMessage('Erster Login: Frage nach Speicherort');
+                    logMessage('Erster Login: Verwende Standardspeicherort');
                     
-                    // Standardpfad oder benutzerdefinierten Pfad wählen?
+                    // Verwenden Sie immer den Standardspeicherort, ohne den Dialog anzuzeigen
                     if (window.isFileSystemAccessSupported && window.isFileSystemAccessSupported()) {
-                        const useCustomPath = confirm(
-                            'Möchten Sie einen benutzerdefinierten Speicherort für Ihre Daten festlegen? ' +
-                            'Wenn Sie auf "Abbrechen" klicken, wird der Standardspeicherort verwendet.'
-                        );
+                        // Verwende Standardspeicherort ohne Bestätigungsdialog
+                        const useCustomPath = false;  // Dialog wird übersprungen
                         
-                        if (useCustomPath) {
+                        if (useCustomPath) {  // Dieser Block wird nie ausgeführt
                             logMessage('Benutzer möchte einen benutzerdefinierten Speicherort festlegen');
                             
                             // Speicherort-Dialog öffnen
@@ -283,24 +289,33 @@ async function handleLogin(username, password) {
                         window.markFirstLoginCompleted(currentUsername);
                     }
                 } else {
-                    // Nicht erster Login: Prüfe ob ein benutzerdefinierter Speicherort konfiguriert ist
-                    if (window.isStoragePathConfigured && window.isStoragePathConfigured(currentUsername)) {
-                        const isDefaultPath = window.isDefaultPath && window.isDefaultPath(currentUsername);
-                        
-                        // Wenn nicht der Standardpfad konfiguriert ist, versuchen wir diesen zu öffnen (nur für Berechtigung)
-                        if (!isDefaultPath && window.isFileSystemAccessSupported && window.isFileSystemAccessSupported()) {
-                            // Nur einen einfachen Lesezugriff versuchen, damit die Berechtigung abgefragt wird
-                            try {
-                                const directoryHandle = await window.getDirectoryHandle(currentUsername);
-                                if (directoryHandle) {
-                                    // Erfolgreich auf Verzeichnis zugegriffen
-                                    logMessage('Speicherort erfolgreich geöffnet');
+                    // Nicht erster Login: Führe den definitiven Speicherortzugriffstest durch
+                    // Diese Prüfung ersetzt alle anderen Prüfungen auf Zugriff
+                    if (window.checkStorageAccess) {
+                        logMessage('Führe definitiven Speicherzugriffstest durch...');
+                        try {
+                            const accessResult = await window.checkStorageAccess(currentUsername);
+                            
+                            if (accessResult.accessAvailable) {
+                                logMessage(`Speicherzugriff erfolgreich: ${accessResult.message}`);
+                                
+                                // Erfolgreiche Meldung anzeigen, wenn wir Dateisystemzugriff haben
+                                if (accessResult.directoryHandle && window.showSuccess) {
+                                    window.showSuccess(`Speicherortzugriff bestätigt: ${accessResult.storagePath}`);
                                 }
-                            } catch (error) {
-                                // Fehler beim Zugriff - wir machen nichts weiter, da es nur um die Berechtigungsabfrage ging
-                                logMessage('Benutzer hat keinen Zugriff auf den konfigurierten Speicherort gewährt: ' + error.message, 'warn');
+                            } else {
+                                // Nur warnen, wenn kein Zugriff besteht - wir verwenden dann localStorage als Fallback
+                                logMessage(`Speicherzugriff nicht verfügbar: ${accessResult.message}`, 'warn');
+                                
+                                if (window.showWarning) {
+                                    window.showWarning('Kein Zugriff auf konfigurierten Speicherort. Daten werden lokal gespeichert.');
+                                }
                             }
+                        } catch (accessError) {
+                            logMessage('Fehler bei der Speicherzugriffsprüfung: ' + accessError.message, 'error');
                         }
+                    } else {
+                        logMessage('Warnung: Definitive Speicherzugriffsprüfung nicht verfügbar', 'warn');
                     }
                 }
             } catch (error) {

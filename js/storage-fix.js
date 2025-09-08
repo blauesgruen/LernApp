@@ -22,18 +22,47 @@ document.addEventListener('DOMContentLoaded', async () => {
                 return;
             }
             
-            // Prüfen, ob der Benutzer einen benutzerdefinierten Pfad verwendet
-            const isDefaultPathFn = window.isDefaultPath || function() { return true; };
-            if (isDefaultPathFn(username)) {
-                log('Benutzer verwendet den Standard-Speicherpfad, keine Aktion erforderlich.');
-                return;
+            // Verwende die neue, definitive Speicherzugriffsprüfung, wenn verfügbar
+            if (window.checkStorageAccess) {
+                log('Verwende definitive Speicherzugriffsprüfung...');
+                const accessResult = await window.checkStorageAccess(username);
+                
+                if (accessResult.accessAvailable) {
+                    log(`Speicherzugriffsprüfung erfolgreich: ${accessResult.message}`);
+                    return; // Nichts weiter tun, alles funktioniert
+                } else {
+                    log(`Speicherzugriffsprüfung fehlgeschlagen: ${accessResult.message}`);
+                    // Wenn die Prüfung einen Fehler festgestellt hat, aber die Benutzerinteraktion
+                    // aktiviert ist, warten wir auf das Ergebnis der definitiven Prüfung
+                    if (window._userInteractionActive) {
+                        log('Benutzerinteraktion aktiv, überlasse Reparatur der definitiven Prüfung');
+                        return;
+                    }
+                }
+            } else {
+                // Alte Prüfung als Fallback
+                // Prüfen, ob der Benutzer einen benutzerdefinierten Pfad verwendet
+                const isDefaultPathFn = window.isDefaultPath || function() { return true; };
+                if (isDefaultPathFn(username)) {
+                    log('Benutzer verwendet den Standard-Speicherpfad, keine Aktion erforderlich.');
+                    return;
+                }
+                
+                // Prüfen, ob ein DirectoryHandle erwartet wird
+                const expectDirectoryHandle = localStorage.getItem('hasStoredDirectoryHandle') === 'true' || 
+                                            localStorage.getItem('hasDirectoryHandle') === 'true';
+                
+                if (!expectDirectoryHandle) {
+                    log('Kein DirectoryHandle erwartet, keine Aktion erforderlich.');
+                    return;
+                }
             }
             
             // Prüfen, ob wir bereits einen Handle haben
             if (window.directoryHandle) {
-                log('DirectoryHandle ist bereits vorhanden, keine Aktion erforderlich.');
+                log('DirectoryHandle ist bereits vorhanden, überprüfe Zugriff...');
                 
-                // Trotzdem testen, ob wir Schreibzugriff haben
+                // Aktiver Test: Versuchen wir tatsächlich, etwas zu schreiben
                 try {
                     const testResult = await window.testFileAccess();
                     log(`Dateisystem-Zugriffstest: ${testResult ? 'Erfolgreich' : 'Fehlgeschlagen'}`);
@@ -42,6 +71,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     if (!testResult) {
                         log('Schreibzugriffstest fehlgeschlagen. Versuche Reparatur...');
                         await autoRepairDirectoryHandle();
+                    } else {
+                        log('Zugriffstest erfolgreich - Speicherort ist funktionsfähig');
                     }
                 } catch (testError) {
                     warn(`Fehler beim Testen des Dateisystemzugriffs: ${testError.message}`);
@@ -78,6 +109,18 @@ async function autoRepairDirectoryHandle() {
     const log = window.logger ? window.logger.info.bind(window.logger) : console.log;
     const warn = window.logger ? window.logger.warn.bind(window.logger) : console.warn;
     const error = window.logger ? window.logger.error.bind(window.logger) : console.error;
+    
+    // Prüfen, ob ein DirectoryHandle erwartet wird
+    const expectHandle = localStorage.getItem('hasStoredDirectoryHandle') === 'true' || 
+                       localStorage.getItem('hasDirectoryHandle') === 'true';
+    
+    if (!expectHandle) {
+        log('Kein DirectoryHandle erwartet, Wiederherstellung wird übersprungen.');
+        // Entferne alte Flags, die möglicherweise falsch gesetzt wurden
+        localStorage.removeItem('hasDirectoryHandle');
+        localStorage.removeItem('hasStoredDirectoryHandle');
+        return false;
+    }
     
     log('Starte automatische Wiederherstellung des DirectoryHandle...');
     
@@ -177,6 +220,15 @@ async function autoRepairDirectoryHandle() {
         }
     } catch (e) {
         warn(`Fehler bei Methode 3: ${e.message}`);
+        
+        // Wenn der Fehler darauf hindeutet, dass der Objektspeicher nicht gefunden wurde,
+        // dann existiert vermutlich kein gespeichertes Handle
+        if (e.message.includes('object stores was not found')) {
+            // Setze die Flags zurück, da kein Handle vorhanden ist
+            localStorage.removeItem('hasDirectoryHandle');
+            localStorage.removeItem('hasStoredDirectoryHandle');
+            log('Speicherortverfolgung zurückgesetzt, da kein Handle gefunden wurde.');
+        }
     }
     
     // Alle Methoden fehlgeschlagen

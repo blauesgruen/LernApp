@@ -39,7 +39,8 @@ function showNotification(message, type = 'info', duration = 5000) {
     }
     
     // Logging der Nachricht für Debugging-Zwecke, aber nur bei normalen Nachrichten
-    log(`Benachrichtigung (${type}): ${message}`, type === 'error' ? 'error' : 'info');
+    // Verwende console direkt, um rekursive Aufrufe zu vermeiden
+    console.log(`Benachrichtigung (${type}): ${message}`);
 
     // Bestehenden Container finden oder neuen erstellen
     let container = document.getElementById('notification-container');

@@ -229,13 +229,31 @@ async function createQuestion(questionData) {
             return null;
         }
         
+        // Effizientere ID-Generierung
+        const uniqueId = Date.now().toString(36) + Math.random().toString(36).substring(2, 5);
+        
+        // Prüfe und optimiere das Bild
+        let imageUrl = "";
+        if (questionData.imageUrl && typeof questionData.imageUrl === 'string' && questionData.imageUrl.trim() !== '') {
+            // Überprüfen, ob es sich um einen Base64-String handelt
+            if (questionData.imageUrl.startsWith('data:image')) {
+                // Wenn das Bild zu groß ist, Warnung ausgeben
+                if (questionData.imageUrl.length > 100000) { // ~100KB
+                    console.warn("Das Bild ist sehr groß (" + Math.round(questionData.imageUrl.length/1024) + " KB) und könnte Speicherprobleme verursachen");
+                }
+                imageUrl = questionData.imageUrl;
+            } else {
+                imageUrl = questionData.imageUrl;
+            }
+        }
+        
         // Neue Frage erstellen
         const newQuestion = {
-            id: `question-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            id: `question-${uniqueId}`,
             text: questionData.text,
-            imageUrl: questionData.imageUrl || "",
+            imageUrl: imageUrl,
             options: questionData.options.map(option => ({
-                id: `option-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+                id: `option-${uniqueId}-${Math.random().toString(36).substr(2, 3)}`,
                 text: option.text,
                 isCorrect: option.isCorrect
             })),
