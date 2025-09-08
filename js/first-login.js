@@ -111,18 +111,30 @@ function showFirstLoginDialog() {
 }
 
 /**
- * Markiert die Ersteinrichtung als abgeschlossen.
+ * Markiert die Ersteinrichtung als abgeschlossen für den aktuellen Benutzer.
  */
 function markFirstLoginComplete() {
-    localStorage.setItem('firstLoginComplete', 'true');
+    const username = localStorage.getItem('username');
+    if (username) {
+        localStorage.setItem(`firstLoginComplete_${username}`, 'true');
+        console.log(`First-Login für Benutzer '${username}' als abgeschlossen markiert.`);
+    } else {
+        localStorage.setItem('firstLoginComplete', 'true');
+        console.log('First-Login als abgeschlossen markiert (kein Benutzer gefunden).');
+    }
 }
 
 /**
- * Überprüft, ob die Ersteinrichtung bereits abgeschlossen wurde.
+ * Überprüft, ob die Ersteinrichtung bereits abgeschlossen wurde für den aktuellen Benutzer.
  * @returns {boolean} True, wenn die Ersteinrichtung abgeschlossen wurde, sonst False.
  */
 function isFirstLoginComplete() {
-    return localStorage.getItem('firstLoginComplete') === 'true';
+    const username = localStorage.getItem('username');
+    if (username) {
+        return localStorage.getItem(`firstLoginComplete_${username}`) === 'true';
+    } else {
+        return localStorage.getItem('firstLoginComplete') === 'true';
+    }
 }
 
 // Beim Laden der Seite prüfen, ob es sich um den ersten Login handelt
@@ -148,6 +160,29 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // Exportiere die Funktionen ins globale Window-Objekt
+window.markFirstLoginComplete = markFirstLoginComplete;
+window.isFirstLoginComplete = isFirstLoginComplete;
+
+/**
+ * Hilfs-Funktion zum Zurücksetzen des First-Login-Status für einen bestimmten Benutzer
+ * @param {string} username - Optional: Der Benutzername, für den der Status zurückgesetzt werden soll
+ */
+function resetFirstLoginStatus(username) {
+    if (!username) {
+        username = localStorage.getItem('username');
+    }
+    
+    if (username) {
+        localStorage.removeItem(`firstLoginComplete_${username}`);
+        console.log(`First-Login-Status für Benutzer '${username}' zurückgesetzt.`);
+    } else {
+        localStorage.removeItem('firstLoginComplete');
+        console.log('Allgemeiner First-Login-Status zurückgesetzt.');
+    }
+}
+
+// Auch diese Funktion exportieren
+window.resetFirstLoginStatus = resetFirstLoginStatus;
 window.showFirstLoginDialog = showFirstLoginDialog;
 window.markFirstLoginComplete = markFirstLoginComplete;
 window.isFirstLoginComplete = isFirstLoginComplete;

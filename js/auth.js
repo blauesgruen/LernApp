@@ -228,7 +228,7 @@ async function handleLogin(username, password) {
         setLoginStatus(true);
         logMessage('Login-Status wurde auf "eingeloggt" gesetzt.');
         
-        // Prüfen, ob es der erste Login dieses Benutzers ist und ob nach Speicherort gefragt werden soll
+        // Prüfen, ob es der erste Login dieses Benutzers ist
         const isFirstTimeUser = window.shouldAskForStoragePath && window.shouldAskForStoragePath(user.username);
         
         if (isFirstTimeUser) {
@@ -240,7 +240,6 @@ async function handleLogin(username, password) {
         // Jetzt, wo der Benutzer angemeldet ist, initialisieren wir seinen spezifischen Speicherort
         setTimeout(async () => {
             try {
-                // Prüfen ob ein Speicherort für den aktuellen Benutzer konfiguriert ist
                 const currentUsername = localStorage.getItem('username');
                 
                 // Zuerst die persistenten Speichermodule laden, falls noch nicht geladen
@@ -251,98 +250,54 @@ async function handleLogin(username, password) {
                     logMessage('Warnung: loadPersistentStorageModules-Funktion nicht verfügbar', 'warn');
                 }
                 
-                // Speicherort für den Benutzer initialisieren
+                // Speicherort für den Benutzer initialisieren ohne Dialog zu zeigen
                 if (window.initializeStorageForUser) {
                     logMessage('Initialisiere Speicherort für Benutzer: ' + currentUsername);
                     await window.initializeStorageForUser(currentUsername);
+                    
+                    // Bei erstem Login - Standardspeicherort verwenden und Login als abgeschlossen markieren
+                    if (isFirstTimeUser) {
+                        logMessage('Erster Login: Verwende automatisch den Standardspeicherort ohne Dialog');
+                        
+                        if (window.resetStoragePath) {
+                            await window.resetStoragePath(currentUsername);
+                            logMessage('Standardspeicherort für Benutzer festgelegt');
+                        }
+                        
+                        if (window.markFirstLoginCompleted) {
+                            logMessage('Markiere ersten Login als abgeschlossen für: ' + currentUsername);
+                            window.markFirstLoginCompleted(currentUsername);
+                        }
+                    } 
+                    // Bei erneutem Login - Speicherzugriff prüfen
+                    else {
+                        // Prüfe den Speicherzugriff, ohne einen Dialog zu zeigen
+                        if (window.checkStorageAccess) {
+                            logMessage('Prüfe Speicherzugriff für bestehenden Benutzer...');
+                            try {
+                                const accessResult = await window.checkStorageAccess(currentUsername);
+                                
+                                if (accessResult.accessAvailable) {
+                                    logMessage(`Speicherzugriff erfolgreich: ${accessResult.message}`);
+                                } else {
+                                    logMessage(`Speicherzugriff nicht verfügbar: ${accessResult.message}`, 'warn');
+                                }
+                            } catch (accessError) {
+                                logMessage('Fehler bei der Speicherzugriffsprüfung: ' + accessError.message, 'error');
+                            }
+                        }
+                    }
                 } else {
                     logMessage('Warnung: initializeStorageForUser-Funktion nicht verfügbar', 'warn');
                 }
                 
-                // Nur beim ersten Login den Speicherort-Dialog anzeigen
-                if (isFirstTimeUser) {
-                    logMessage('Erster Login: Verwende Standardspeicherort');
-                    
-                    // Verwenden Sie immer den Standardspeicherort, ohne den Dialog anzuzeigen
-                    if (window.isFileSystemAccessSupported && window.isFileSystemAccessSupported()) {
-                        // Verwende Standardspeicherort ohne Bestätigungsdialog
-                        const useCustomPath = false;  // Dialog wird übersprungen
-                        
-                        if (useCustomPath) {  // Dieser Block wird nie ausgeführt
-                            logMessage('Benutzer möchte einen benutzerdefinierten Speicherort festlegen');
-                            
-                            // Speicherort-Dialog öffnen
-                            const directoryResult = await window.openDirectoryPicker();
-                            
-                            if (directoryResult) {
-                                // Speicherort erfolgreich ausgewählt
-                                logMessage('Benutzer hat Speicherort ausgewählt: ' + directoryResult.path);
-                                // Hier übergeben wir den Namen als String und das Handle separat
-                                const storagePathData = {
-                                    path: directoryResult.path,
-                                    handle: directoryResult.handle
-                                };
-                                // Stelle sicher, dass der Pfad ein String ist
-                                if (typeof storagePathData.path !== 'string') {
-                                    storagePathData.path = String(storagePathData.path);
-                                }
-                                await window.setStoragePath(storagePathData, currentUsername);
-                            } else {
-                                // Benutzer hat abgebrochen, Standard verwenden
-                                logMessage('Benutzer hat die Speicherortwahl abgebrochen, verwende Standard');
-                                await window.resetStoragePath(currentUsername);
-                            }
-                        } else {
-                            // Benutzer möchte Standardpfad verwenden
-                            logMessage('Benutzer möchte Standardpfad verwenden');
-                            await window.resetStoragePath(currentUsername);
-                        }
-                    } else {
-                        // Browser unterstützt keine Dateisystemauswahl, verwende Standard
-                        logMessage('Browser unterstützt keine Dateisystemauswahl, verwende Standard');
-                        await window.resetStoragePath(currentUsername);
-                    }
-                    
-                    // Ersten Login als abgeschlossen markieren
-                    if (window.markFirstLoginCompleted) {
-                        window.markFirstLoginCompleted(currentUsername);
-                    }
-                } else {
-                    // Nicht erster Login: Führe den definitiven Speicherortzugriffstest durch
-                    // Diese Prüfung ersetzt alle anderen Prüfungen auf Zugriff
-                    if (window.checkStorageAccess) {
-                        logMessage('Führe definitiven Speicherzugriffstest durch...');
-                        try {
-                            const accessResult = await window.checkStorageAccess(currentUsername);
-                            
-                            if (accessResult.accessAvailable) {
-                                logMessage(`Speicherzugriff erfolgreich: ${accessResult.message}`);
-                                
-                                // Erfolgreiche Meldung anzeigen, wenn wir Dateisystemzugriff haben
-                                if (accessResult.directoryHandle && window.showSuccess) {
-                                    window.showSuccess(`Speicherortzugriff bestätigt: ${accessResult.storagePath}`);
-                                }
-                            } else {
-                                // Nur warnen, wenn kein Zugriff besteht - wir verwenden dann localStorage als Fallback
-                                logMessage(`Speicherzugriff nicht verfügbar: ${accessResult.message}`, 'warn');
-                                
-                                if (window.showWarning) {
-                                    window.showWarning('Kein Zugriff auf konfigurierten Speicherort. Daten werden lokal gespeichert.');
-                                }
-                            }
-                        } catch (accessError) {
-                            logMessage('Fehler bei der Speicherzugriffsprüfung: ' + accessError.message, 'error');
-                        }
-                    } else {
-                        logMessage('Warnung: Definitive Speicherzugriffsprüfung nicht verfügbar', 'warn');
-                    }
-                }
+                // In jedem Fall zum Dashboard weiterleiten
+                window.location.href = 'dashboard.html';
             } catch (error) {
                 logMessage('Fehler beim Zugriff auf den Speicherort: ' + error.message, 'error');
+                // Auch bei Fehler zum Dashboard weiterleiten
+                window.location.href = 'dashboard.html';
             }
-            
-            // In jedem Fall zum Dashboard weiterleiten
-            window.location.href = 'dashboard.html';
         }, 1000);
     } else {
         logMessage('Kein passender Benutzer gefunden oder Passwort stimmt nicht überein.', 'error');

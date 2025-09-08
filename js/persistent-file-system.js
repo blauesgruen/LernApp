@@ -210,7 +210,33 @@ async function verifyPermission(handle) {
         const state = await handle.queryPermission(opts);
         
         if (state === 'granted') {
+            // Speichern, dass die Berechtigung bereits erteilt wurde
+            localStorage.setItem('fs_permission_granted', 'true');
             return state;
+        }
+        
+        // Prüfen, ob der Benutzer in dieser Session schon einmal "später erinnern" geklickt hat
+        if (sessionStorage.getItem('permission_prompt_postponed') === 'true') {
+            console.log('Berechtigungsabfrage wurde bereits verschoben, zeige keinen Dialog an');
+            return 'prompt'; // Wir geben 'prompt' zurück, damit die App weiß, dass wir noch keine Berechtigung haben
+        }
+        
+        // Prüfen, ob wir überhaupt eine Berechtigung anfordern sollen
+        const username = localStorage.getItem('username');
+        const userPermissionKey = `fs_permission_asked_${username}`;
+        
+        // Wenn der Benutzer schon einmal nach Berechtigungen gefragt wurde und die Session neu ist,
+        // fragen wir nicht sofort wieder, sondern beim nächsten Mal
+        if (localStorage.getItem(userPermissionKey) === 'true' && 
+            !sessionStorage.getItem('permission_prompt_shown')) {
+            sessionStorage.setItem('permission_prompt_postponed', 'true');
+            console.log('Berechtigungsabfrage wird auf nächsten Besuch verschoben');
+            return 'prompt';
+        }
+        
+        // Markieren, dass dieser Benutzer schon einmal gefragt wurde
+        if (username) {
+            localStorage.setItem(userPermissionKey, 'true');
         }
         
         // Wenn nicht, fordere sie an
@@ -334,8 +360,20 @@ async function restoreDirectoryHandle() {
  * @param {FileSystemDirectoryHandle} handle - Das Verzeichnis-Handle, für das Berechtigungen benötigt werden
  */
 function createPermissionRequiredNotification(handle) {
-    // Prüfen, ob wir bereits eine Benachrichtigung angezeigt haben
+    // Prüfen, ob wir bereits eine Benachrichtigung angezeigt haben in dieser Session
     if (sessionStorage.getItem('permission_prompt_shown')) {
+        return;
+    }
+    
+    // Prüfen, ob der Benutzer bereits Berechtigungen erteilt hat (aus früheren Sessions)
+    if (localStorage.getItem('fs_permission_granted') === 'true') {
+        console.log('Berechtigungen wurden bereits erteilt, keine Benachrichtigung notwendig');
+        return;
+    }
+    
+    // Prüfen, ob wir die Benachrichtigung auf später verschieben sollen
+    if (sessionStorage.getItem('permission_prompt_postponed') === 'true') {
+        console.log('Berechtigungsabfrage wurde auf später verschoben');
         return;
     }
     
@@ -489,6 +527,14 @@ function createPermissionRequiredNotification(handle) {
         
         // Merken, dass wir die Benachrichtigung in dieser Session bereits angezeigt haben
         sessionStorage.setItem('permission_prompt_shown', 'true');
+        
+        // Merken, dass wir die Benachrichtigung auf später verschieben sollen
+        sessionStorage.setItem('permission_prompt_postponed', 'true');
+        
+        // Fehlermeldung anzeigen
+        if (window.showInfo) {
+            window.showInfo('Sie können die Berechtigung später im Profil erteilen. Daten werden vorerst nur im Browser gespeichert.');
+        }
     });
     
     // Merken, dass wir die Benachrichtigung angezeigt haben
@@ -547,6 +593,13 @@ async function handleDirectorySelection(handle) {
         const testResult = await testFileAccess();
         if (!testResult) {
             console.warn('Test-Dateizugriff fehlgeschlagen, aber Handle wurde gespeichert');
+        } else {
+            // Wenn der Test erfolgreich war, merken wir uns, dass die Berechtigung erteilt wurde
+            localStorage.setItem('fs_permission_granted', 'true');
+            
+            // Wir entfernen alle Flags, die die Anzeige des Dialogs verhindern würden
+            sessionStorage.removeItem('permission_prompt_shown');
+            sessionStorage.removeItem('permission_prompt_postponed');
         }
         
         return true;
@@ -633,6 +686,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 });
 
+/**
+ * Funktion zum Debuggen des Berechtigungsstatus
+ * @returns {Object} Der aktuelle Berechtigungsstatus
+ */
+function getPermissionStatus() {
+    return {
+        fs_permission_granted: localStorage.getItem('fs_permission_granted') === 'true',
+        permission_prompt_shown: sessionStorage.getItem('permission_prompt_shown') === 'true',
+        permission_prompt_postponed: sessionStorage.getItem('permission_prompt_postponed') === 'true',
+        username: localStorage.getItem('username'),
+        userPermissionKey: localStorage.getItem(`fs_permission_asked_${localStorage.getItem('username')}`) === 'true'
+    };
+}
+
 // Globale Funktionen exportieren
 window.openAndPersistDirectoryPicker = openAndPersistDirectoryPicker;
 window.handleDirectorySelection = handleDirectorySelection;
@@ -641,6 +708,7 @@ window.verifyPermission = verifyPermission;
 window.storeDirectoryHandle = storeDirectoryHandle;
 window.loadDirectoryHandle = loadDirectoryHandle;
 window.initHandleDb = initHandleDb; // Fügen wir hinzu, damit es von storage-handler.js genutzt werden kann
+window.getPermissionStatus = getPermissionStatus; // Debug-Funktion
 
 // Nur im Debug-Modus loggen
 if (window.localStorage.getItem('debug_mode') === 'true') {

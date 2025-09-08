@@ -1091,15 +1091,28 @@ function needsStorageConfiguration(username) {
 function shouldAskForStoragePath(username) {
     if (!username) return false;
     
-    // Prüfen, ob es der erste Login ist
+    // Prüfen, ob die Ersteinrichtung bereits abgeschlossen wurde (aus first-login.js)
+    if (window.isFirstLoginComplete && window.isFirstLoginComplete()) {
+        return false;
+    }
+    
+    // Prüfen, ob es der erste Login ist nach alter Methode (für Abwärtskompatibilität)
     const userFirstLoginKey = `firstLogin_${username}`;
     const isFirstLogin = localStorage.getItem(userFirstLoginKey) !== 'completed';
     
     // Prüfen, ob bereits ein benutzerspezifischer Speicherort festgelegt wurde
     const hasCustomPath = localStorage.getItem(`storagePath_${username}`) !== null;
     
-    // Nur fragen, wenn es der erste Login ist und noch kein Pfad festgelegt wurde
-    return isFirstLogin && !hasCustomPath;
+    // Prüfen, ob First-Login nach neuer Methode bereits abgeschlossen wurde
+    const newMethodComplete = localStorage.getItem(`firstLoginComplete_${username}`) === 'true';
+    
+    // Wenn nach neuer Methode abgeschlossen oder ein Pfad festgelegt wurde, nicht mehr fragen
+    if (newMethodComplete || hasCustomPath) {
+        return false;
+    }
+    
+    // Nur fragen, wenn es der erste Login nach alter Methode ist und die obigen Bedingungen nicht erfüllt sind
+    return isFirstLogin;
 }
 
 /**
@@ -1108,8 +1121,20 @@ function shouldAskForStoragePath(username) {
  */
 function markFirstLoginCompleted(username) {
     if (!username) return;
+    
+    // Alte Methode (für Abwärtskompatibilität)
     const userFirstLoginKey = `firstLogin_${username}`;
     localStorage.setItem(userFirstLoginKey, 'completed');
+    
+    // Neue Methode (aus first-login.js)
+    localStorage.setItem(`firstLoginComplete_${username}`, 'true');
+    
+    // Wenn die first-login.js Funktion verfügbar ist, verwenden wir auch diese
+    if (window.markFirstLoginComplete) {
+        window.markFirstLoginComplete();
+    }
+    
+    console.log(`First-Login für Benutzer '${username}' wurde als abgeschlossen markiert.`);
 }
 
 /**
