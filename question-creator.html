@@ -10,6 +10,8 @@
     <link rel="stylesheet" href="css/question-creator-questions.css">
     <link rel="stylesheet" href="css/back-button.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.1/css/all.min.css">
+    <!-- Zentrales Logging-System laden -->
+    <script src="js/logger.js"></script>
 </head>
 <body>
     <div id="header-container"></div>
@@ -127,20 +129,46 @@
         // Header und Footer dynamisch laden
         async function loadHeaderAndFooter() {
             try {
+                // Globale log-Funktion definieren, bevor Header geladen wird
+                if (!window.log) {
+                    window.log = function(message, type) {
+                        if (window.logger) {
+                            window.logger.log(message, type || 'info');
+                        } else if (window.logMessage) {
+                            window.logMessage(message, type || 'info');
+                        } else {
+                            console.log(message);
+                        }
+                    };
+                }
+
                 // Header und Footer laden
                 document.getElementById('header-container').innerHTML = await (await fetch('partials/header.html')).text();
                 document.getElementById('footer-container').innerHTML = await (await fetch('partials/footer.html')).text();
                 
-                // Skripte aus dem Header auswerten
+                // Skripte aus dem Header auswerten - mit expliziter Übergabe der log-Funktion
                 const headerScripts = document.getElementById('header-container').querySelectorAll('script');
                 for (const script of headerScripts) {
                     if (script.innerText) {
-                        eval(script.innerText);
+                        // log-Funktion explizit in den eval-Kontext einbinden
+                        const evalContext = 
+                            `var log = function(message, type) {
+                                if (window.logger) {
+                                    window.logger.log(message, type || 'info');
+                                } else if (window.logMessage) {
+                                    window.logMessage(message, type || 'info');
+                                } else {
+                                    console.log(message);
+                                }
+                            };
+                            ${script.innerText}`;
+                        eval(evalContext);
                     }
                 }
                 
                 // Explizit die Navigation aktualisieren
                 if (window.updateNavigation) {
+                    // Die log-Funktion ist jetzt bereits im globalen Kontext und im eval-Kontext definiert
                     window.updateNavigation();
                 }
             } catch (error) {

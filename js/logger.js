@@ -17,6 +17,9 @@ class Logger {
         
         // Button-bezogene Logs filtern, wenn nicht im Debug-Modus
         this.buttonLogsDisabled = true;
+        
+        // Flag, um Rekursion zu verhindern
+        this._showingNotification = false;
     }
     
     /**
@@ -26,6 +29,12 @@ class Logger {
      * @returns {boolean} true wenn das Log gefiltert werden soll, sonst false
      */
     shouldFilterLog(message, type) {
+        // Rekursive Logs filtern
+        if (this._showingNotification || 
+            (typeof message === 'string' && message.includes('Benachrichtigung (') && message.split('Benachrichtigung (').length > 2)) {
+            return true;
+        }
+        
         // Wenn Button-bezogene Logs deaktiviert sind
         if (this.buttonLogsDisabled && 
             (message.includes('Button') || message.includes('Buttons') || 
@@ -35,6 +44,13 @@ class Logger {
                 return false;
             }
             return true;
+        }
+        
+        // Stets Benutzer-bezogene Logs durchlassen
+        if (message.includes('Benutzer') || 
+            message.includes('Authentifizierungsstatus') || 
+            message.includes('Anzahl der Benutzer')) {
+            return false;
         }
         
         // Log-Level prüfen
@@ -63,15 +79,31 @@ class Logger {
             return;
         }
         
-        const timestamp = new Date().toISOString();
-        const logEntry = { timestamp, type, message };
+        // Vollständigen ISO-Zeitstempel für Speicherung verwenden
+        const isoTimestamp = new Date().toISOString();
+        // Für die Anzeige nur hh:mm Format verwenden
+        const now = new Date();
+        const displayTimestamp = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+        const logEntry = { timestamp: isoTimestamp, type, message };
 
         try {
             // Logs in localStorage abrufen und aktualisieren
             const existingLogs = JSON.parse(localStorage.getItem('persistentLogs')) || [];
 
-            // Doppelte Einträge vermeiden (Berücksichtigung von Zeitstempel und Typ)
-            if (!existingLogs.some(log => log.message === message && log.type === type)) {
+            // Doppelte Einträge vermeiden (Strenge Prüfung mit Zeitfenster)
+            // Prüfen, ob es in den letzten 2 Sekunden einen identischen Log gibt
+            const now = Date.now();
+            const isDuplicate = existingLogs.some(log => {
+                // Vergleich mit Zeitstempel und genauer Prüfung auf doppelte Einträge
+                if (log.message === message && log.type === type) {
+                    // Konvertiere ISO-String zurück zu Millisekunden für präzisen Zeitvergleich
+                    const logTime = new Date(log.timestamp).getTime();
+                    return (now - logTime) < 2000; // Innerhalb der letzten 2 Sekunden
+                }
+                return false;
+            });
+            
+            if (!isDuplicate) {
                 existingLogs.push(logEntry);
 
                 // Älteste Logs entfernen, wenn die maximale Kapazität erreicht wird
@@ -82,20 +114,45 @@ class Logger {
                 localStorage.setItem('persistentLogs', JSON.stringify(existingLogs));
             }
 
-            // Logs immer in der Konsole ausgeben
-            console[type](`[${timestamp}] ${type.toUpperCase()}: ${message}`);
+            // Logs immer in der Konsole ausgeben, mit reduziertem Zeitstempelformat (hh:mm)
+            console[type](`[${displayTimestamp}] ${type.toUpperCase()}: ${message}`);
             
             // Bei Fehlern und Warnungen auch als Benachrichtigung anzeigen, wenn die Funktion existiert
-            if ((type === 'error' || type === 'warn') && window.showNotification) {
+            // Prüfung auf rekursive Aufrufe, um Endlosschleifen zu vermeiden
+            if ((type === 'error' || type === 'warn') && window.showNotification && 
+                !message.includes('Benachrichtigung (')) {
                 const notificationType = type === 'error' ? 'error' : 'warning';
-                window.showNotification(message, notificationType, 5000);
+                try {
+                    // Direktes Flag setzen, um Rekursion zu verhindern
+                    this._showingNotification = true;
+                    window.showNotification(message, notificationType, 5000);
+                } finally {
+                    this._showingNotification = false;
+                }
             }
         } catch (error) {
             if (error.name === 'QuotaExceededError') {
-                const existingLogs = JSON.parse(localStorage.getItem('persistentLogs')) || [];
-                existingLogs.shift(); // Entferne das älteste Log
-                localStorage.setItem('persistentLogs', JSON.stringify(existingLogs));
-                this.log(message, type); // Erneut versuchen
+                try {
+                    // Versuche, den localStorage zu reduzieren
+                    const existingLogs = JSON.parse(localStorage.getItem('persistentLogs')) || [];
+                    
+                    // Lösche die Hälfte der Logs auf einmal, um nicht erneut in eine Rekursion zu geraten
+                    const halfLength = Math.floor(existingLogs.length / 2);
+                    if (halfLength > 0) {
+                        const reducedLogs = existingLogs.slice(halfLength);
+                        localStorage.setItem('persistentLogs', JSON.stringify(reducedLogs));
+                        console.warn(`Speicherplatz reduziert: ${existingLogs.length - reducedLogs.length} Logs entfernt`);
+                    } else {
+                        // Falls keine Logs mehr zu entfernen sind, lösche alle persistentLogs
+                        localStorage.removeItem('persistentLogs');
+                        console.warn('Speicherplatz erschöpft: Alle persistenten Logs wurden gelöscht');
+                    }
+                    
+                    // Logge direkt in der Konsole, ohne erneuten Versuch, um Rekursion zu vermeiden
+                    console[type](`[${timestamp}] ${type.toUpperCase()}: ${message} (Nicht persistent gespeichert)`);
+                } catch (innerError) {
+                    console.error('Kritischer Fehler beim Bereinigen des Logspeichers:', innerError);
+                }
             } else {
                 console.error('Fehler beim Logging:', error);
             }
@@ -214,6 +271,11 @@ window.logMessage = function(message, type = 'info') {
 
 // Logger-Instanz global verfügbar machen
 window.logger = logger;
+
+// Auch eine einfache log-Funktion bereitstellen für Code, der diese verwendet
+window.log = function(message, type) {
+    logger.log(message, type || 'info');
+};
 
 // Alte Funktionen überbrücken, damit vorhandener Code weiter funktioniert
 console.originalLog = console.log;

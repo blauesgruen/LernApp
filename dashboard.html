@@ -49,12 +49,11 @@
                     }
                 }
                 
-                // Explizit die Navigation aktualisieren
+                // Explizit die Navigation aktualisieren, wenn nötig
                 if (window.updateNavigation) {
-                    console.log('Navigation wird nach dem Laden des Headers aktualisiert.');
+                    // Wir vermeiden einen Log hier, um doppelte Einträge zu vermeiden
+                    // Die updateNavigation-Funktion hat bereits Throttling-Schutz
                     window.updateNavigation();
-                } else {
-                    console.log('updateNavigation-Funktion nicht gefunden.');
                 }
                 
                 // Breadcrumbs initialisieren (leerer Pfad für Dashboard als Startseite)

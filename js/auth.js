@@ -134,10 +134,8 @@ function retryUpdateHeaderVisibility(retries = 5, delay = 200) {
 
 // Initialisiert die Header-Buttons beim Laden der Seite
 document.addEventListener('DOMContentLoaded', () => {
-    logMessage('Authentifizierungsstatus: ' + (getLoginStatus() ? 'Eingeloggt' : 'Nicht eingeloggt'));
-    logMessage('Aktueller Benutzer: ' + (localStorage.getItem('username') || 'Kein Benutzer eingeloggt'));
-    logMessage('Anzahl der Benutzer in der Datenbank: ' + (JSON.parse(localStorage.getItem('users')) || []).length);
-
+    // Wir rufen nur refreshUIAfterAuthChange auf, das bereits alle nötigen Logs enthält
+    // und vermeiden so doppelte Log-Einträge
     refreshUIAfterAuthChange();
     retryUpdateHeaderVisibility();
 

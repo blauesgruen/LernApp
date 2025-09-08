@@ -1,5 +1,22 @@
 // profile.js - Handhabt die Profilverwaltung
 
+// Hilfsfunktion für konsistentes Logging in der gesamten Datei
+function logMessage(message, type = 'info', ...args) {
+    if (window.logger) {
+        window.logger.log(message, type, ...args);
+    } else if (window.logMessage) {
+        window.logMessage(message, type, ...args);
+    } else {
+        if (type === 'error') {
+            console.error(message, ...args);
+        } else if (type === 'warn') {
+            console.warn(message, ...args);
+        } else {
+            console.log(message, ...args);
+        }
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     // Elemente für Benutzername
     const usernameDisplay = document.getElementById('username-display');
@@ -55,8 +72,21 @@ document.addEventListener('DOMContentLoaded', function() {
         if (window.isStoragePathConfigured && window.getStoragePath) {
             const currentUsername = localStorage.getItem('username');
             if (window.isStoragePathConfigured(currentUsername)) {
-                const path = window.getStoragePath(currentUsername);
-                currentStoragePathSpan.textContent = path;
+                // Verwenden der neuen Funktion zur benutzerfreundlichen Anzeige des Speicherorts
+                let displayPath = 'Standard';
+                
+                if (window.getStorageDisplayName) {
+                    // Die neue Funktion verwenden, wenn verfügbar
+                    displayPath = window.getStorageDisplayName(currentUsername);
+                } else {
+                    // Fallback zur alten Methode
+                    let path = window.getStoragePath(currentUsername);
+                    if (path !== null && path !== undefined) {
+                        displayPath = String(path);
+                    }
+                }
+                
+                currentStoragePathSpan.textContent = displayPath;
                 
                 // Prüfen, ob wir einen Hinweis anzeigen sollen, dass der Ordner neu ausgewählt werden muss
                 if (localStorage.getItem('hasDirectoryHandle') === 'true' && 
@@ -80,7 +110,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 currentStoragePathSpan.textContent = 'Standard';
             }
         } else {
-            console.error("Speicherpfad-Funktionen nicht verfügbar");
+            // Fehlermeldung anzeigen und in den Log schreiben (showError loggt automatisch)
             showError("Speicherpfad-Funktionen nicht verfügbar. Bitte aktualisiere die Seite.");
             currentStoragePathSpan.textContent = 'Nicht verfügbar';
         }
@@ -127,7 +157,8 @@ document.addEventListener('DOMContentLoaded', function() {
                             await window.saveData('users.json', storedUsers);
                         }
                     } catch (error) {
-                        console.error('Fehler beim Aktualisieren der Benutzer in users.json:', error);
+                        // Warnung anzeigen aber fortfahren (wird automatisch auch geloggt)
+                        showWarning(`Benutzer in users.json konnten nicht aktualisiert werden: ${error.message}`);
                     }
                     
                     // Überprüfen, ob die Storage-API verfügbar ist
@@ -219,7 +250,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     showSuccess('Dein Benutzername wurde erfolgreich aktualisiert!');
                     newUsernameInput.value = '';
                 } catch (error) {
-                    console.error('Fehler beim Aktualisieren der Benutzerdaten:', error);
+                    // Fehler anzeigen, aber mitteilen, dass die Grundfunktion geklappt hat
                     showWarning('Dein Benutzername wurde aktualisiert, aber einige Daten konnten nicht vollständig aktualisiert werden.');
                 }
             } else {
@@ -240,45 +271,71 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             try {
+                // Setzen des expliziten Flags für den Directory Picker
+                window._forceDirectoryPicker = true;
+                
                 // Ordner-Auswahl-Dialog öffnen
-                const directoryHandle = await window.openDirectoryPicker();
+                let directoryHandle;
+                try {
+                    directoryHandle = await window.openDirectoryPicker();
+                } catch (dialogError) {
+                    if (dialogError.name === 'AbortError') {
+                        // Der Benutzer hat den Dialog abgebrochen - das ist kein Fehler
+                        showInfo('Ordnerauswahl wurde abgebrochen.');
+                        return;
+                    }
+                    throw dialogError; // Andere Fehler werden weitergegeben
+                }
                 
                 if (!directoryHandle) {
                     showError('Kein Ordner ausgewählt.');
                     return;
                 }
                 
+                // Prüfen, ob wir ein gültiges DirectoryHandle haben
+                if (!directoryHandle || typeof directoryHandle !== 'object') {
+                    showError('Ungültiges Verzeichnis ausgewählt. Bitte versuchen Sie es erneut.');
+                    return;
+                }
+                
                 // Pfad und Handle für den Speicherort vorbereiten
+                const directoryName = directoryHandle.name || 
+                                      (directoryHandle.toString ? directoryHandle.toString() : 'LernAppDatenbank');
                 const storagePathData = {
-                    path: directoryHandle.name || 'LernAppDatenbank',
+                    path: directoryName,
                     handle: directoryHandle
                 };
                 
-                console.log('Ausgewählter Speicherort:', storagePathData.path);
+                logMessage('Ausgewählter Speicherort: ' + storagePathData.path);
                 
-                // Speicherpfad aktualisieren
-                const currentUsername = localStorage.getItem('username');
-                const success = await window.setStoragePath(storagePathData, currentUsername);
-                
-                if (success) {
-                    // Handle wurde erfolgreich aktualisiert, alle Flags zurücksetzen
-                    localStorage.removeItem('needsHandleRenewal');
+                try {
+                    // Speicherpfad aktualisieren
+                    const currentUsername = localStorage.getItem('username');
+                    const success = await window.setStoragePath(storagePathData, currentUsername);
                     
-                    // UI aktualisieren
-                    updateStoragePathDisplay();
-                    
-                    // Zusätzliche Erfolgsmeldung
-                    showSuccess(`Speicherort "${storagePathData.path}" wurde erfolgreich konfiguriert und der Dateizugriff ist jetzt vollständig hergestellt.`);
-                } else {
-                    showError('Fehler beim Setzen des Speicherorts. Bitte versuchen Sie es erneut.');
+                    if (success) {
+                        // Handle wurde erfolgreich aktualisiert, alle Flags zurücksetzen
+                        localStorage.removeItem('needsHandleRenewal');
+                        
+                        // UI aktualisieren
+                        updateStoragePathDisplay();
+                        
+                        // Zusätzliche Erfolgsmeldung
+                        showSuccess(`Speicherort "${storagePathData.path}" wurde erfolgreich konfiguriert und der Dateizugriff ist jetzt vollständig hergestellt.`);
+                    } else {
+                        showError('Der Speicherort konnte nicht gesetzt werden. Bitte wählen Sie einen anderen Ordner.');
+                    }
+                } catch (error) {
+                    logMessage('Fehler beim Setzen des Speicherorts: ' + error.message, 'error');
+                    showError('Fehler beim Setzen des Speicherorts: ' + error.message);
                 }
             } catch (error) {
                 // Benutzer hat den Dialog abgebrochen oder es ist ein Fehler aufgetreten
                 if (error.name === 'AbortError') {
-                    console.log('Benutzer hat den Ordner-Auswahl-Dialog abgebrochen.');
+                    // Nur Info-Meldung, kein Fehler
                     showInfo('Ordnerauswahl wurde abgebrochen.');
                 } else {
-                    console.error('Fehler beim Öffnen des Ordner-Auswahl-Dialogs:', error);
+                    // Fehler anzeigen (wird automatisch auch geloggt)
                     showError(`Fehler beim Öffnen des Ordner-Auswahl-Dialogs: ${error.message}`);
                 }
             }
@@ -371,7 +428,21 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
 
                 // Ordner-Auswahl-Dialog öffnen
-                const result = await window.openDirectoryPicker();
+                let result;
+                
+                // Setzen des expliziten Flags für den Directory Picker
+                window._forceDirectoryPicker = true;
+                
+                try {
+                    result = await window.openDirectoryPicker();
+                } catch (dialogError) {
+                    if (dialogError.name === 'AbortError') {
+                        // Der Benutzer hat den Dialog abgebrochen - das ist kein Fehler
+                        showInfo('Ordnerauswahl wurde abgebrochen.');
+                        return;
+                    }
+                    throw dialogError; // Andere Fehler werden weitergegeben
+                }
                 
                 if (!result || !result.handle) {
                     showError('Kein Zielordner ausgewählt.');
@@ -420,7 +491,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     }, 3000);
                     
                 } catch (error) {
-                    console.error('Fehler bei der Migration:', error);
+                    // Fehler anzeigen (wird automatisch auch geloggt)
                     migrationStatus.textContent = `Fehler bei der Migration: ${error.message}`;
                     migrationProgressBar.style.width = '0%';
                     showError(`Fehler bei der Migration: ${error.message}`);
@@ -433,10 +504,10 @@ document.addEventListener('DOMContentLoaded', function() {
             } catch (error) {
                 // Benutzer hat den Dialog abgebrochen oder es ist ein Fehler aufgetreten
                 if (error.name === 'AbortError') {
-                    console.log('Benutzer hat den Ordner-Auswahl-Dialog abgebrochen.');
+                    // Nur Info-Meldung, kein Fehler
                     showInfo('Ordnerauswahl wurde abgebrochen.');
                 } else {
-                    console.error('Fehler beim Öffnen des Ordner-Auswahl-Dialogs:', error);
+                    // Fehler anzeigen (wird automatisch auch geloggt)
                     showError(`Fehler beim Öffnen des Ordner-Auswahl-Dialogs: ${error.message}`);
                 }
                 
@@ -515,7 +586,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     showError('Beim Löschen der Fragen ist ein Fehler aufgetreten.');
                 }
             } catch (error) {
-                console.error('Fehler beim Löschen der Fragen:', error);
+                // Fehler anzeigen (wird automatisch auch geloggt)
                 showError(`Fehler beim Löschen der Fragen: ${error.message}`);
                 deleteQuestionsModal.style.display = 'none';
             }
@@ -555,7 +626,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     window.location.href = 'index.html';
                 }, 2000);
             } catch (error) {
-                console.error('Fehler beim Löschen des Kontos:', error);
+                // Fehler anzeigen (wird automatisch auch geloggt)
                 showError(`Fehler beim Löschen des Kontos: ${error.message}`);
                 deleteAccountModal.style.display = 'none';
             }

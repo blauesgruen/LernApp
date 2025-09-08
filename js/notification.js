@@ -1,5 +1,29 @@
 // notification.js - Zentrales Fehler- und Meldemanagement
 
+// Hilfsfunktion für einheitliches Logging
+function log(message, type = 'info', ...args) {
+    // Erkennen von rekursiven Nachrichten (Benachrichtigung über Benachrichtigung)
+    if (message && typeof message === 'string' && message.includes('Benachrichtigung (')) {
+        // Rekursive Logs unterbrechen
+        console.warn('Rekursive Logging-Kette erkannt und unterbrochen:', message.substring(0, 50) + '...');
+        return;
+    }
+    
+    if (window.logger) {
+        window.logger.log(message, type, ...args);
+    } else if (window.logMessage) {
+        window.logMessage(message, type, ...args);
+    } else {
+        if (type === 'error') {
+            console.error(message, ...args);
+        } else if (type === 'warn') {
+            console.warn(message, ...args);
+        } else {
+            console.log(message, ...args);
+        }
+    }
+}
+
 /**
  * Zeigt eine Benachrichtigung im Meldefeld an.
  * @param {string} message - Die anzuzeigende Nachricht.
@@ -7,12 +31,15 @@
  * @param {number} duration - Anzeigedauer in Millisekunden, 0 für dauerhafte Anzeige (optional).
  */
 function showNotification(message, type = 'info', duration = 5000) {
-    // Logging der Nachricht für Debugging-Zwecke
-    if (window.logMessage) {
-        window.logMessage(`Benachrichtigung (${type}): ${message}`, type === 'error' ? 'error' : 'info');
-    } else {
-        console.log(`Benachrichtigung (${type}): ${message}`);
+    // Prüfen auf rekursive Aufrufe und bereits benachrichtigte Fehler
+    if (message && typeof message === 'string' && 
+        (message.startsWith('Benachrichtigung (') || message.includes('Rekursive Logging-Kette'))) {
+        console.warn('Vermeidung von rekursiver Benachrichtigung:', message.substring(0, 50) + '...');
+        return;
     }
+    
+    // Logging der Nachricht für Debugging-Zwecke, aber nur bei normalen Nachrichten
+    log(`Benachrichtigung (${type}): ${message}`, type === 'error' ? 'error' : 'info');
 
     // Bestehenden Container finden oder neuen erstellen
     let container = document.getElementById('notification-container');
@@ -148,27 +175,15 @@ window.testNotifications = function() {
 // Fehlermanagement für unbehandelte Fehler
 window.addEventListener('error', function(event) {
     const errorMessage = `JavaScript-Fehler: ${event.message} in ${event.filename} (Zeile ${event.lineno}, Spalte ${event.colno})`;
+    // showError ruft intern bereits log() auf
     showError(errorMessage);
-    
-    // Logging
-    if (window.logMessage) {
-        window.logMessage(`Unbehandelter Fehler: ${errorMessage}`, 'error');
-    } else {
-        console.error(`Unbehandelter Fehler: ${errorMessage}`);
-    }
 });
 
 // Fehlermanagement für Promise-Fehler
 window.addEventListener('unhandledrejection', function(event) {
     const errorMessage = `Unbehandelter Promise-Fehler: ${event.reason}`;
+    // showError ruft intern bereits log() auf
     showError(errorMessage);
-    
-    // Logging
-    if (window.logMessage) {
-        window.logMessage(`Unbehandelter Promise-Fehler: ${event.reason}`, 'error');
-    } else {
-        console.error(`Unbehandelter Promise-Fehler: ${event.reason}`);
-    }
 });
 
 // Zeige eine Test-Nachricht beim Laden der Datei (nur im Entwicklungsmodus)

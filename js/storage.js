@@ -1,9 +1,75 @@
-// storage.js - Verwaltung des Datenbank-Speicherorts für die LernApp
+// storage.js - Verwaltung des Datenbank-Speicherorts für d/**
+ * Gibt den konfigurierten Speicherpfad zurück.
+ * @param {string} [username] - Optional: Der Benutzername, für den der Pfad zurückgegeben werden soll.
+ * @returns {string} Der konfigurierte Pfad oder der Standardpfad.
+ */
+function getStoragePath(username) {
+    const currentUser = username || localStorage.getItem('username');
+    if (!currentUser) {
+        return localStorage.getItem('storagePath') || DEFAULT_STORAGE_PATH;
+    }
+    return localStorage.getItem(`storagePath_${currentUser}`) || DEFAULT_STORAGE_PATH;
+}
 
+/**
+ * Gibt einen benutzerfreundlichen Anzeigenamen für den Speicherort zurück
+ * @param {string} [username] - Optional: Der Benutzername, für den der Pfad angezeigt werden soll
+ * @returns {string} Ein benutzerfreundlicher Name des Speicherorts
+ */
+function getStorageDisplayName(username) {
+    const path = getStoragePath(username);
+    
+    // Wenn der Pfad der Standardpfad ist, zeigen wir "Standard" an
+    if (path === DEFAULT_STORAGE_PATH) {
+        return "Standard";
+    }
+    
+    // Versuchen, einen benutzerfreundlichen Namen zu erstellen
+    if (typeof path === 'object') {
+        // Wenn es ein Objekt ist, versuche sinnvolle Informationen zu extrahieren
+        if (path.path) {
+            return path.path;
+        } else if (path.name) {
+            return path.name;
+        } else {
+            return "Benutzerdefinierter Speicherort";
+        }
+    }
+    
+    // Pfadnamen aufbereiten (z.B. letzten Teil extrahieren)
+    if (typeof path === 'string' && path.includes('/')) {
+        const parts = path.split('/');
+        return parts[parts.length - 1] || path;
+    }
+    
+    return String(path);
+}
 /**
  * Verwaltet den Speicherort für die Daten der LernApp.
  * Unterstützt lokale Speicherung, Cloud-Speicherorte (z.B. Dropbox) und native Dateisystemzugriffe.
  */
+
+// Hilfsfunktion für einheitliches Logging
+function log(message, type = 'info', ...args) {
+    // Erkennen von rekursiven Nachrichten (Benachrichtigung über Benachrichtigung)
+    if (message && typeof message === 'string' && message.includes('Benachrichtigung (')) {
+        // Rekursive Logs unterbrechen
+        console.warn('Rekursive Logging-Kette erkannt und unterbrochen:', message.substring(0, 50) + '...');
+        return;
+    }
+    
+    if (window.logger) {
+        window.logger.log(message, type, ...args);
+    } else if (window.logMessage) {
+        window.logMessage(message, type, ...args);
+    } else if (type === 'error') {
+        console.error(message, ...args);
+    } else if (type === 'warn') {
+        console.warn(message, ...args);
+    } else {
+        console.log(message, ...args);
+    }
+}
 
 // Standardpfad für Daten (wenn kein benutzerdefinierter Pfad angegeben wurde)
 const DEFAULT_STORAGE_PATH = 'lernapp_data';
@@ -78,10 +144,10 @@ async function openDirectoryPicker() {
         };
     } catch (error) {
         if (error.name === 'AbortError') {
-            console.log('Benutzer hat den Ordnerauswahl-Dialog abgebrochen.');
+            log('Benutzer hat den Ordnerauswahl-Dialog abgebrochen.');
             return null;
         }
-        console.error('Fehler beim Öffnen des Ordnerauswahl-Dialogs:', error);
+        log('Fehler beim Öffnen des Ordnerauswahl-Dialogs:', 'error', error);
         showError(`Fehler bei der Ordnerauswahl: ${error.message}`);
         return null;
     }
@@ -96,7 +162,7 @@ async function getDirectoryHandle(username) {
     try {
         // Prüfen, ob die File System Access API unterstützt wird
         if (!isFileSystemAccessSupported()) {
-            console.log('Dateisystem-API wird nicht unterstützt.');
+            log('Dateisystem-API wird nicht unterstützt.');
             return null;
         }
         
@@ -109,16 +175,16 @@ async function getDirectoryHandle(username) {
                     return directoryHandle;
                 }
             } catch (error) {
-                console.warn('Fehler beim Zugriff auf den bestehenden Handle:', error);
+                log('Fehler beim Zugriff auf den bestehenden Handle:', 'warn', error);
             }
         }
         
         // Wir haben keinen Handle oder er ist nicht mehr gültig
         // In diesem Fall können wir ohne Dialog nicht weitermachen
-        console.log('Kein gültiger Handle vorhanden. Direkter Zugriff nicht möglich.');
+        log('Kein gültiger Handle vorhanden. Direkter Zugriff nicht möglich.');
         return null;
     } catch (error) {
-        console.error('Fehler beim Zugriff auf den Verzeichnis-Handle:', error);
+        log('Fehler beim Zugriff auf den Verzeichnis-Handle:', 'error', error);
         return null;
     }
 }
@@ -143,23 +209,28 @@ async function setStoragePath(path, username) {
             pathString = path.path;
             handle = path.handle;
             
-            // Handle für späteren Zugriff speichern
-            directoryHandle = handle;
-            
-            // Prüfen, ob wir auf das Verzeichnis schreiben können
-            if (handle) {
+            // Validiere das Handle - ist es ein gültiges DirectoryHandle-Objekt?
+            if (handle && typeof handle === 'object' && typeof handle.getFileHandle === 'function') {
+                // Handle für späteren Zugriff speichern
+                directoryHandle = handle;
+                
+                // Prüfen, ob wir auf das Verzeichnis schreiben können
                 try {
                     // Versuchen, eine Testdatei zu schreiben, um zu prüfen, ob wir Schreibrechte haben
                     const testResult = await saveTestFile(handle);
-                    console.log('Testdatei erfolgreich geschrieben:', testResult);
+                    log('Testdatei erfolgreich geschrieben:', 'info', testResult);
                     
                     // Serialisieren des Handles ist nicht möglich, aber wir merken uns, dass wir einen Handle haben
                     localStorage.setItem('hasDirectoryHandle', 'true');
                 } catch (error) {
-                    console.error('Fehler beim Schreiben der Testdatei:', error);
+                    log('Fehler beim Schreiben der Testdatei:', 'error', error);
                     showWarning('Der ausgewählte Ordner ist nicht beschreibbar. Bitte wählen Sie einen anderen Ordner aus.');
                     return false;
                 }
+            } else {
+                // Ungültiges Handle - wir setzen nur den Pfad ohne Handle
+                log('Ungültiges Directory Handle, verwende nur den Pfadnamen', 'warn');
+                localStorage.removeItem('hasDirectoryHandle');
             }
         } else {
             pathString = path;
@@ -192,7 +263,7 @@ async function setStoragePath(path, username) {
         throw new Error('Fehler beim Speichern des Pfads');
     } catch (error) {
         showError(`Fehler beim Setzen des Speicherorts: ${error.message}`);
-        console.error('Fehler beim Setzen des Speicherorts:', error);
+        log('Fehler beim Setzen des Speicherorts:', 'error', error);
         return false;
     }
 }
@@ -245,7 +316,7 @@ async function verifyStoragePath() {
                 const permission = await directoryHandle.requestPermission(opts);
                 return permission === 'granted';
             } catch (error) {
-                console.warn('Fehler beim Überprüfen des DirectoryHandle:', error);
+                log('Fehler beim Überprüfen des DirectoryHandle:', 'warn', error);
                 // Fallback auf localStorage
                 directoryHandle = null;
                 localStorage.removeItem('hasDirectoryHandle');
@@ -261,7 +332,7 @@ async function verifyStoragePath() {
         return result;
     } catch (error) {
         showError(`Fehler beim Überprüfen des Speicherorts: ${error.message}`);
-        console.error('Fehler beim Überprüfen des Speicherorts:', error);
+        log('Fehler beim Überprüfen des Speicherorts:', 'error', error);
         return false;
     }
 }
@@ -282,7 +353,7 @@ async function saveData(resourceName, data, username) {
         const jsonData = JSON.stringify(data);
         
         // Debug-Ausgabe: Zeigen, wo die Daten gespeichert werden
-        console.log(`Speichere ${resourceName}:`, {
+        log(`Speichere ${resourceName}:`, 'info', {
             inFileSystem: !!directoryHandle,
             directoryHandleName: directoryHandle ? directoryHandle.name : 'keiner',
             fallbackToLocalStorage: !directoryHandle
@@ -309,27 +380,82 @@ async function saveData(resourceName, data, username) {
                 // Stream schließen
                 await writable.close();
                 
-                console.log(`Datei ${resourceName} erfolgreich im Dateisystem gespeichert`);
+                log(`Datei ${resourceName} erfolgreich im Dateisystem gespeichert`);
                 
                 return true;
             } catch (error) {
-                console.error(`Fehler beim Speichern von ${resourceName} im Dateisystem:`, error);
+                log(`Fehler beim Speichern von ${resourceName} im Dateisystem:`, 'error', error);
                 
-                // Fallback auf localStorage
-                localStorage.setItem(getResourcePath(resourceName, username), jsonData);
-                console.log(`Datei ${resourceName} als Fallback im localStorage gespeichert`);
-                return true;
+                // Fallback auf localStorage mit Größenprüfung
+                if (jsonData.length > 2000000) { // ~2MB Grenze
+                    log(`Datei ${resourceName} ist zu groß für localStorage (${jsonData.length} Bytes)`, 'error');
+                    if (window.showError) {
+                        window.showError(`Die Datei ${resourceName} ist zu groß für den Browser-Speicher. Bitte verwenden Sie den Dateisystemzugriff.`);
+                    }
+                    return false;
+                }
+                
+                try {
+                    localStorage.setItem(getResourcePath(resourceName, username), jsonData);
+                    log(`Datei ${resourceName} als Fallback im localStorage gespeichert`);
+                    return true;
+                } catch (storageError) {
+                    if (storageError.name === 'QuotaExceededError') {
+                        log(`Speicherplatz im Browser erschöpft für ${resourceName}`, 'error');
+                        if (window.showError) {
+                            window.showError(`Nicht genügend Speicherplatz im Browser. Bitte löschen Sie nicht benötigte Daten oder verwenden Sie den Dateisystemzugriff.`);
+                        }
+                    } else {
+                        log(`Fehler beim Speichern im localStorage: ${storageError.message}`, 'error');
+                        if (window.showError) {
+                            window.showError(`Fehler beim Speichern: ${storageError.message}`);
+                        }
+                    }
+                    return false;
+                }
             }
         } else {
             // Fallback: In einer reinen Browser-Umgebung speichern wir im localStorage
-            localStorage.setItem(getResourcePath(resourceName, username), jsonData);
-            return true;
+            // Größenprüfung für localStorage
+            if (jsonData.length > 2000000) { // ~2MB Grenze
+                log(`Datei ${resourceName} ist zu groß für localStorage (${jsonData.length} Bytes)`, 'error');
+                if (window.showError) {
+                    window.showError(`Die Datei ${resourceName} ist zu groß für den Browser-Speicher. Bitte aktivieren Sie den Dateisystemzugriff.`);
+                }
+                return false;
+            }
+            
+            try {
+                localStorage.setItem(getResourcePath(resourceName, username), jsonData);
+                return true;
+            } catch (storageError) {
+                if (storageError.name === 'QuotaExceededError') {
+                    log(`Speicherplatz im Browser erschöpft für ${resourceName}`, 'error');
+                    if (window.showError) {
+                        window.showError(`Nicht genügend Speicherplatz im Browser. Bitte löschen Sie nicht benötigte Daten oder aktivieren Sie den Dateisystemzugriff.`);
+                    }
+                } else {
+                    log(`Fehler beim Speichern im localStorage: ${storageError.message}`, 'error');
+                    if (window.showError) {
+                        window.showError(`Fehler beim Speichern: ${storageError.message}`);
+                    }
+                }
+                return false;
+            }
         }
     } catch (error) {
-        if (window.showError) {
-            window.showError(`Fehler beim Speichern der Daten: ${error.message}`);
+        // Vermeiden von Doppelmeldungen und Rekursionen
+        if (error.name === 'QuotaExceededError') {
+            log(`Speicherplatz im Browser erschöpft beim Speichern von ${resourceName}`, 'error');
+            if (window.showError) {
+                window.showError(`Nicht genügend Speicherplatz im Browser. Bitte löschen Sie nicht benötigte Daten oder aktivieren Sie den Dateisystemzugriff.`);
+            }
+        } else {
+            log(`Fehler beim Speichern von ${resourceName}:`, 'error', error);
+            if (window.showError) {
+                window.showError(`Fehler beim Speichern der Daten: ${error.message}`);
+            }
         }
-        console.error(`Fehler beim Speichern von ${resourceName}:`, error);
         return false;
     }
 }
@@ -371,7 +497,7 @@ async function loadData(resourceName, defaultValue = null, username) {
                     throw fileError;
                 }
             } catch (error) {
-                console.error(`Fehler beim Laden von ${resourceName} aus dem Dateisystem:`, error);
+                log(`Fehler beim Laden von ${resourceName} aus dem Dateisystem:`, 'error', error);
                 
                 // Fallback auf localStorage
             }
@@ -561,15 +687,36 @@ async function getCustomDirectoryHandle(username) {
         }
         
         // In diesem Fall muss der Benutzer den Ordner auswählen
-        // Die showDirectoryPicker-Methode kümmert sich um die Berechtigungsanfrage
+        // Die showDirectoryPicker-Methode muss als Reaktion auf eine Benutzeraktion aufgerufen werden
         console.log('Benutzer muss Ordner auswählen');
-        try {
-            const result = await openDirectoryPicker();
-            if (result && result.handle) {
-                return result.handle;
+        
+        // Prüfen, ob diese Funktion explizit durch Benutzeraktion aufgerufen wurde
+        // oder ob wir in einem expliziten Kontext zum Öffnen des Pickers aufgerufen wurden (z.B. durch Button-Klick)
+        const isExplicitUserAction = window._userInteractionActive || 
+                                     (window._lastInteractionTime && (Date.now() - window._lastInteractionTime < 1000)) ||
+                                     window._forceDirectoryPicker === true;
+        
+        if (isExplicitUserAction) {
+            try {
+                const result = await openDirectoryPicker();
+                if (result && result.handle) {
+                    return result.handle;
+                }
+            } catch (error) {
+                // Wenn der Fehler "Must be handling a user gesture" ist, zeigen wir eine bessere Fehlermeldung
+                if (error.name === 'SecurityError' && error.message.includes('user gesture')) {
+                    if (window.showNotification) {
+                        window.showNotification('Bitte klicke auf "Ordner wählen", um deinen Datenordner auszuwählen', 'info');
+                    }
+                    console.warn('Die Ordnerauswahl benötigt eine direkte Benutzeraktion');
+                } else {
+                    console.error('Fehler bei der Ordnerauswahl:', error);
+                }
             }
-        } catch (error) {
-            console.error('Fehler bei der Ordnerauswahl:', error);
+        } else {
+            // Wir öffnen den Directory Picker NICHT automatisch
+            // Stattdessen verwenden wir den Standard-Speicherort
+            console.log('Verwende Standard-Speicherort, kein automatisches Öffnen des Ordnerdialogs');
         }
         
         return null;
@@ -657,10 +804,21 @@ window.debugDirectoryHandleStatus = debugDirectoryHandleStatus;
  */
 async function saveTestFile(dirHandle) {
     try {
-        // Berechtigung prüfen/erneuern
-        const permission = await dirHandle.requestPermission({ mode: 'readwrite' });
-        if (permission !== 'granted') {
-            throw new Error('Keine Schreibberechtigung für das Verzeichnis');
+        // Überprüfen, ob es sich um ein gültiges DirectoryHandle-Objekt handelt
+        if (!dirHandle || typeof dirHandle !== 'object' || typeof dirHandle.getFileHandle !== 'function') {
+            throw new Error('Ungültiges Directory Handle - Es werden keine Dateioperationen unterstützt');
+        }
+
+        // Berechtigung prüfen/erneuern, falls die Methode existiert
+        if (typeof dirHandle.requestPermission === 'function') {
+            const permission = await dirHandle.requestPermission({ mode: 'readwrite' });
+            if (permission !== 'granted') {
+                throw new Error('Keine Schreibberechtigung für das Verzeichnis');
+            }
+        } else {
+            console.log('Keine requestPermission-Methode im Directory Handle - fahre ohne Berechtigungsprüfung fort');
+            // Wenn requestPermission nicht unterstützt wird, versuchen wir trotzdem, eine Datei zu schreiben
+            // Der Fehler wird dann beim Versuch, die Datei zu schreiben, auftreten, falls keine Berechtigung vorliegt
         }
         
         // Testdatei erstellen/öffnen
@@ -796,6 +954,40 @@ async function migrateStorage(newDirectoryHandle, username) {
     }
 }
 
+/**
+ * Gibt einen benutzerfreundlichen Anzeigenamen für den Speicherort zurück
+ * @param {string} [username] - Optional: Der Benutzername, für den der Pfad angezeigt werden soll
+ * @returns {string} Ein benutzerfreundlicher Name des Speicherorts
+ */
+function getStorageDisplayName(username) {
+    const path = getStoragePath(username);
+    
+    // Wenn der Pfad der Standardpfad ist, zeigen wir "Standard" an
+    if (path === DEFAULT_STORAGE_PATH) {
+        return "Standard";
+    }
+    
+    // Versuchen, einen benutzerfreundlichen Namen zu erstellen
+    if (typeof path === 'object') {
+        // Wenn es ein Objekt ist, versuche sinnvolle Informationen zu extrahieren
+        if (path.path) {
+            return path.path;
+        } else if (path.name) {
+            return path.name;
+        } else {
+            return "Benutzerdefinierter Speicherort";
+        }
+    }
+    
+    // Pfadnamen aufbereiten (z.B. letzten Teil extrahieren)
+    if (typeof path === 'string' && path.includes('/')) {
+        const parts = path.split('/');
+        return parts[parts.length - 1] || path;
+    }
+    
+    return String(path);
+}
+
 window.shouldAskForStoragePath = shouldAskForStoragePath;
 window.markFirstLoginCompleted = markFirstLoginCompleted;
 window.saveData = saveData;
@@ -803,6 +995,26 @@ window.loadData = loadData;
 window.deleteData = deleteData;
 window.listResources = listResources;
 window.needsStorageConfiguration = needsStorageConfiguration;
+window.getStorageDisplayName = getStorageDisplayName;
+// Track user interactions to enable directory picker
+document.addEventListener('mousedown', function() {
+    window._userInteractionActive = true;
+    window._lastInteractionTime = Date.now();
+    setTimeout(() => { window._userInteractionActive = false; }, 1000);
+});
+
+document.addEventListener('touchstart', function() {
+    window._userInteractionActive = true;
+    window._lastInteractionTime = Date.now();
+    setTimeout(() => { window._userInteractionActive = false; }, 1000);
+});
+
+document.addEventListener('keydown', function() {
+    window._userInteractionActive = true;
+    window._lastInteractionTime = Date.now();
+    setTimeout(() => { window._userInteractionActive = false; }, 1000);
+});
+
 window.isDefaultPath = isDefaultPath;
 window.getCustomDirectoryHandle = getCustomDirectoryHandle;
 window.checkStorage = checkStorage;
@@ -821,23 +1033,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         const path = getStoragePath(currentUsername);
         console.log('Konfigurierter Speicherort gefunden');
         
-        // Wenn ein Verzeichnis-Handle zuvor verwendet wurde, initialisieren wir es wieder
+        // Wenn ein Verzeichnis-Handle zuvor verwendet wurde, setzen wir eine Flag
+        // Aber öffnen NICHT automatisch den Ordner-Dialog
         if (localStorage.getItem('hasDirectoryHandle') === 'true') {
-            console.log('Ein Verzeichnis-Handle wurde zuvor verwendet, versuche es zu initialisieren');
+            console.log('Ein Verzeichnis-Handle wurde zuvor verwendet');
             
-            // Versuchen, den DirectoryHandle bei Seitenstart zu initialisieren
-            try {
-                // Versuchen, das Handle wiederherzustellen durch Auswahl des Ordners
-                const handle = await getCustomDirectoryHandle(currentUsername);
-                if (handle) {
-                    directoryHandle = handle;
-                    console.log('DirectoryHandle erfolgreich initialisiert');
-                } else {
-                    console.log('DirectoryHandle konnte nicht automatisch initialisiert werden, wird bei nächstem Zugriff angefragt');
-                }
-            } catch (error) {
-                console.warn('Fehler bei der Initialisierung des DirectoryHandles:', error);
-            }
+            // Wir setzen eine Variable, die beim EXPLIZITEN Aufruf von getCustomDirectoryHandle
+            // verwendet werden kann, aber starten KEINEN automatischen Dialog
+            window.hadDirectoryHandle = true;
         }
     }
 });

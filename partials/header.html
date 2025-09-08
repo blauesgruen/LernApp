@@ -135,8 +135,18 @@
         // Logs persistent machen, auch nach Logout
         window.handleLogout = function() {
             try {
-                // Zentrale Logging-Funktion verwenden
-                const logger = window.logger || { log: console.log };
+                // Wir stellen eine globale log-Funktion für Legacy-Code bereit (falls noch nicht definiert)
+                if (!window.log) {
+                    window.log = function(message, type) {
+                        if (window.logger) {
+                            window.logger.log(message, type || 'info');
+                        } else if (window.logMessage) {
+                            window.logMessage(message, type || 'info');
+                        } else {
+                            console.log(message);
+                        }
+                    };
+                }
                 
                 // Nur relevante Daten aus localStorage entfernen, Logs bleiben erhalten
                 const logs = localStorage.getItem('persistentLogs');
@@ -144,7 +154,7 @@
                 if (logs) {
                     localStorage.setItem('persistentLogs', logs);
                 }
-                logger.log('localStorage nach Logout: ' + JSON.stringify(localStorage));
+                log('localStorage nach Logout: ' + JSON.stringify(localStorage));
                 // Weiterleitung zur Startseite
                 window.location.href = 'index.html';
             } catch (error) {
@@ -152,28 +162,50 @@
             }
         };
 
+        // Variable zum Tracken des letzten Aufrufs
+        let lastNavigationUpdateTime = 0;
+        
         // Funktion zur Aktualisierung der Navigation basierend auf Login-Status
         window.updateNavigation = function() {
-            // Zentrale Logging-Funktion verwenden
-            const logger = window.logger || { log: console.log };
+            // Throttling: Verhindere zu häufige Aufrufe (max. einmal alle 500ms)
+            const now = Date.now();
+            if (now - lastNavigationUpdateTime < 500) {
+                // Zu schneller wiederholter Aufruf - abbrechen
+                return;
+            }
+            lastNavigationUpdateTime = now;
             
-            logger.log('Navigation wird aktualisiert.');
+            // Zentrale Logging-Funktion verwenden - mit Fallbacks für alle Varianten
+            const logger = window.logger || { log: console.log, error: console.error };
+            
+            // Wir stellen auch eine globale log-Funktion für Legacy-Code bereit
+            window.log = function(message, type) {
+                if (window.logger) {
+                    window.logger.log(message, type || 'info');
+                } else if (window.logMessage) {
+                    window.logMessage(message, type || 'info');
+                } else {
+                    console.log(message);
+                }
+            };
+            
+            log('Navigation wird aktualisiert.');
 
             const adminButton = document.getElementById('admin-button');
             const userButtons = document.getElementById('user-buttons');
             const appLogoButton = document.getElementById('app-logo-button');
             const isLoggedIn = localStorage.getItem('loggedIn') === 'true';
 
-            logger.log('Überprüfe, ob adminButton existiert: ' + !!adminButton);
-            logger.log('Überprüfe, ob userButtons existiert: ' + !!userButtons);
-            logger.log('Login-Status: ' + isLoggedIn);
+            log('Überprüfe, ob adminButton existiert: ' + !!adminButton);
+            log('Überprüfe, ob userButtons existiert: ' + !!userButtons);
+            log('Login-Status: ' + isLoggedIn);
 
             if (adminButton) {
                 // Log deaktiviert: Admin-Button gefunden. Setze Sichtbarkeit.
                 adminButton.style.display = isLoggedIn ? 'none' : 'block';
                 // Log deaktiviert: Admin-Button Sichtbarkeit nach Änderung
             } else {
-                logger.error('Admin-Button nicht gefunden.');
+                log('Admin-Button nicht gefunden.', 'error');
             }
 
             if (userButtons) {
@@ -181,7 +213,7 @@
                 userButtons.style.display = isLoggedIn ? 'block' : 'none';
                 // Log deaktiviert: User-Buttons Sichtbarkeit nach Änderung
             } else {
-                logger.error('User-Buttons Gruppe nicht gefunden.');
+                log('User-Buttons Gruppe nicht gefunden.', 'error');
             }
 
             if (appLogoButton) {
@@ -204,11 +236,9 @@
             log('Navigation aktualisiert.');
         }
 
-        // Führe updateNavigation sofort aus, wenn das Skript geladen wird
-        window.updateNavigation();
-
-        // Zusätzlich beim DOMContentLoaded-Event ausführen
-        document.addEventListener('DOMContentLoaded', window.updateNavigation);
+        // Wir führen updateNavigation nicht sofort aus und auch nicht bei DOMContentLoaded
+        // Es wird später explizit aufgerufen, wenn der Header in die Seite geladen wurde
+        // Dies vermeidet doppelte Aufrufe und damit doppelte Log-Einträge
 
         // Breadcrumb-Funktionen
         window.breadcrumbs = {
