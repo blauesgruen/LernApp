@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mein Profil - LernApp</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="css/backup-styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.1/css/all.min.css">
     <!-- Zentrales Logging-System laden -->
     <script src="js/logger.js"></script>
@@ -79,6 +80,24 @@
                                 </form>
                             </div>
 
+                            <div class="profile-group">
+                                <h2>Datensicherung</h2>
+                                <form id="backup-form">
+                                    <div class="form-group">
+                                        <button type="button" id="create-backup-btn" class="btn-primary" style="margin-top: 10px; width: 100%;">
+                                            <i class="fas fa-save"></i> Vollständiges Backup erstellen
+                                        </button>
+                                        <button type="button" id="list-backups-btn" class="btn-secondary" style="margin-top: 10px; width: 100%;">
+                                            <i class="fas fa-list"></i> Vorhandene Backups anzeigen
+                                        </button>
+                                    </div>
+                                    <div class="form-info">
+                                        <p>Erstelle regelmäßige Sicherungen deiner Daten, um Verluste zu vermeiden. 
+                                        Backups werden im Unterordner "backups" gespeichert.</p>
+                                    </div>
+                                </form>
+                            </div>
+
                             <div class="profile-group danger-zone">
                                 <h2>Gefahrenzone</h2>
                                 
@@ -87,6 +106,20 @@
                                         <i class="fas fa-trash-alt"></i> Alle meine Fragen löschen
                                     </button>
                                     <p class="danger-description">Löscht alle deine erstellten Fragen und Antworten. Diese Aktion kann nicht rückgängig gemacht werden!</p>
+                                </div>
+                                
+                                <div class="danger-action">
+                                    <button type="button" id="delete-categories-btn" class="btn-warning">
+                                        <i class="fas fa-trash-alt"></i> Alle meine Kategorien löschen
+                                    </button>
+                                    <p class="danger-description">Löscht alle deine erstellten Kategorien. Diese Aktion kann nicht rückgängig gemacht werden!</p>
+                                </div>
+                                
+                                <div class="danger-action">
+                                    <button type="button" id="delete-groups-btn" class="btn-warning">
+                                        <i class="fas fa-trash-alt"></i> Alle meine Gruppen löschen
+                                    </button>
+                                    <p class="danger-description">Löscht alle deine erstellten Gruppen. Diese Aktion kann nicht rückgängig gemacht werden!</p>
                                 </div>
                                 
                                 <div class="danger-action">
@@ -130,6 +163,30 @@
         </div>
     </div>
     
+    <div id="delete-categories-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h2>Kategorien löschen</h2>
+            <p>Bist du sicher, dass du alle deine Kategorien löschen möchtest? Diese Aktion kann nicht rückgängig gemacht werden!</p>
+            <div class="modal-buttons">
+                <button id="cancel-delete-categories" class="btn-secondary">Abbrechen</button>
+                <button id="confirm-delete-categories" class="btn-danger">Ja, alle Kategorien löschen</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="delete-groups-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h2>Gruppen löschen</h2>
+            <p>Bist du sicher, dass du alle deine Gruppen löschen möchtest? Diese Aktion kann nicht rückgängig gemacht werden!</p>
+            <div class="modal-buttons">
+                <button id="cancel-delete-groups" class="btn-secondary">Abbrechen</button>
+                <button id="confirm-delete-groups" class="btn-danger">Ja, alle Gruppen löschen</button>
+            </div>
+        </div>
+    </div>
+    
     <div id="migrate-storage-modal" class="modal">
         <div class="modal-content">
             <span class="close-modal">&times;</span>
@@ -148,12 +205,46 @@
             </div>
         </div>
     </div>
+    
+    <div id="backup-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h2>Datensicherung</h2>
+            <p>Ein vollständiges Backup aller deiner Daten wird erstellt. Dies kann einen Moment dauern.</p>
+            <div id="backup-progress" style="display: none;">
+                <h3>Backup wird erstellt...</h3>
+                <div class="progress-bar-container">
+                    <div id="backup-progress-bar" class="progress-bar"></div>
+                </div>
+                <p id="backup-status">Vorbereitung...</p>
+            </div>
+            <div class="modal-buttons">
+                <button id="cancel-backup" class="btn-secondary">Abbrechen</button>
+                <button id="confirm-backup" class="btn-primary">Backup erstellen</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="backups-list-modal" class="modal">
+        <div class="modal-content modal-large">
+            <span class="close-modal">&times;</span>
+            <h2>Vorhandene Backups</h2>
+            <div id="backups-list-container">
+                <p>Lade Backups...</p>
+            </div>
+            <div class="modal-buttons">
+                <button id="close-backups-list" class="btn-secondary">Schließen</button>
+                <button id="cleanup-old-backups" class="btn-warning">Alte Backups bereinigen</button>
+            </div>
+        </div>
+    </div>
 
     <script src="js/auth.js"></script>
     <script src="js/notification.js"></script>
     <script src="js/storage.js"></script>
     <script src="js/persistent-file-system.js"></script>
     <script src="js/storage-handler.js"></script>
+    <script src="js/backup-manager.js"></script>
     <script>
         // Header und Footer dynamisch laden
         async function loadHeaderAndFooter() {

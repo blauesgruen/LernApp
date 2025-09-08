@@ -33,26 +33,53 @@ document.addEventListener('DOMContentLoaded', function() {
     const currentStoragePathSpan = document.getElementById('current-storage-path');
     const browseStoragePathBtn = document.getElementById('browse-storage-path-btn');
     const resetStoragePathBtn = document.getElementById('reset-storage-path-btn');
+    const migrateStorageBtn = document.getElementById('migrate-storage-btn');
+
+    // Elemente für Backup
+    const createBackupBtn = document.getElementById('create-backup-btn');
+    const listBackupsBtn = document.getElementById('list-backups-btn');
 
     // Elemente für Löschaktionen
     const deleteQuestionsBtn = document.getElementById('delete-questions-btn');
     const deleteAccountBtn = document.getElementById('delete-account-btn');
+    const deleteCategoriesBtn = document.getElementById('delete-categories-btn');
+    const deleteGroupsBtn = document.getElementById('delete-groups-btn');
 
     // Elemente für Modals
     const deleteQuestionsModal = document.getElementById('delete-questions-modal');
     const deleteAccountModal = document.getElementById('delete-account-modal');
+    const deleteCategoriesModal = document.getElementById('delete-categories-modal');
+    const deleteGroupsModal = document.getElementById('delete-groups-modal');
     const migrateStorageModal = document.getElementById('migrate-storage-modal');
+    const backupModal = document.getElementById('backup-modal');
+    const backupsListModal = document.getElementById('backups-list-modal');
+    
     const closeModalButtons = document.querySelectorAll('.close-modal');
+    
+    // Buttons für Modals
     const cancelDeleteQuestions = document.getElementById('cancel-delete-questions');
     const confirmDeleteQuestions = document.getElementById('confirm-delete-questions');
     const cancelDeleteAccount = document.getElementById('cancel-delete-account');
     const confirmDeleteAccount = document.getElementById('confirm-delete-account');
+    const cancelDeleteCategories = document.getElementById('cancel-delete-categories');
+    const confirmDeleteCategories = document.getElementById('confirm-delete-categories');
+    const cancelDeleteGroups = document.getElementById('cancel-delete-groups');
+    const confirmDeleteGroups = document.getElementById('confirm-delete-groups');
     const cancelMigrateStorage = document.getElementById('cancel-migrate-storage');
     const confirmMigrateStorage = document.getElementById('confirm-migrate-storage');
-    const migrateStorageBtn = document.getElementById('migrate-storage-btn');
+    const cancelBackup = document.getElementById('cancel-backup');
+    const confirmBackup = document.getElementById('confirm-backup');
+    const closeBackupsList = document.getElementById('close-backups-list');
+    const cleanupOldBackups = document.getElementById('cleanup-old-backups');
+    
+    // Fortschrittsanzeigen
     const migrationProgress = document.getElementById('migration-progress');
     const migrationProgressBar = document.getElementById('migration-progress-bar');
     const migrationStatus = document.getElementById('migration-status');
+    const backupProgress = document.getElementById('backup-progress');
+    const backupProgressBar = document.getElementById('backup-progress-bar');
+    const backupStatus = document.getElementById('backup-status');
+    const backupsListContainer = document.getElementById('backups-list-container');
 
     // Aktuelle Benutzerdaten laden
     const currentUsername = localStorage.getItem('username');
@@ -519,6 +546,20 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // Modal für Kategorien löschen öffnen
+    if (deleteCategoriesBtn) {
+        deleteCategoriesBtn.addEventListener('click', function() {
+            deleteCategoriesModal.style.display = 'block';
+        });
+    }
+    
+    // Modal für Gruppen löschen öffnen
+    if (deleteGroupsBtn) {
+        deleteGroupsBtn.addEventListener('click', function() {
+            deleteGroupsModal.style.display = 'block';
+        });
+    }
+
     // Modal für Kontolöschung öffnen
     if (deleteAccountBtn) {
         deleteAccountBtn.addEventListener('click', function() {
@@ -531,7 +572,11 @@ document.addEventListener('DOMContentLoaded', function() {
         button.addEventListener('click', function() {
             deleteQuestionsModal.style.display = 'none';
             deleteAccountModal.style.display = 'none';
+            deleteCategoriesModal.style.display = 'none';
+            deleteGroupsModal.style.display = 'none';
             migrateStorageModal.style.display = 'none';
+            backupModal.style.display = 'none';
+            backupsListModal.style.display = 'none';
             
             // Zurücksetzen des Migrations-Fortschrittsbalkens
             if (migrationProgress) {
@@ -541,6 +586,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 confirmMigrateStorage.disabled = false;
                 cancelMigrateStorage.disabled = false;
             }
+            
+            // Zurücksetzen des Backup-Fortschrittsbalkens
+            if (backupProgress) {
+                backupProgress.style.display = 'none';
+                backupProgressBar.style.width = '0%';
+                backupStatus.textContent = 'Vorbereitung...';
+            }
         });
     });
 
@@ -548,6 +600,20 @@ document.addEventListener('DOMContentLoaded', function() {
     if (cancelDeleteQuestions) {
         cancelDeleteQuestions.addEventListener('click', function() {
             deleteQuestionsModal.style.display = 'none';
+        });
+    }
+
+    // Kategorien löschen abbrechen
+    if (cancelDeleteCategories) {
+        cancelDeleteCategories.addEventListener('click', function() {
+            deleteCategoriesModal.style.display = 'none';
+        });
+    }
+    
+    // Gruppen löschen abbrechen
+    if (cancelDeleteGroups) {
+        cancelDeleteGroups.addEventListener('click', function() {
+            deleteGroupsModal.style.display = 'none';
         });
     }
 
@@ -562,6 +628,17 @@ document.addEventListener('DOMContentLoaded', function() {
     if (confirmDeleteQuestions) {
         confirmDeleteQuestions.addEventListener('click', async function() {
             try {
+                // Erst ein Backup erstellen bevor Daten gelöscht werden
+                if (window.directoryHandle && window.createFileBackup) {
+                    try {
+                        await window.createFileBackup(window.directoryHandle, 'questions.json', await window.loadData('questions.json', []));
+                        logMessage('Backup der Fragen vor dem Löschen erstellt', 'info');
+                    } catch (backupError) {
+                        logMessage(`Fehler beim Erstellen des Backups: ${backupError.message}`, 'warn');
+                        // Fehler beim Backup blockiert nicht das Löschen
+                    }
+                }
+                
                 // Alle Fragen über die Storage-API laden, um den konfigurierten Speicherort zu berücksichtigen
                 const questions = await window.loadData('questions.json', []);
                 
@@ -582,6 +659,84 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Fehler anzeigen (wird automatisch auch geloggt)
                 showError(`Fehler beim Löschen der Fragen: ${error.message}`);
                 deleteQuestionsModal.style.display = 'none';
+            }
+        });
+    }
+    
+    // Kategorien löschen bestätigen
+    if (confirmDeleteCategories) {
+        confirmDeleteCategories.addEventListener('click', async function() {
+            try {
+                // Erst ein Backup erstellen bevor Daten gelöscht werden
+                if (window.directoryHandle && window.createFileBackup) {
+                    try {
+                        await window.createFileBackup(window.directoryHandle, 'categories.json', await window.loadData('categories.json', []));
+                        logMessage('Backup der Kategorien vor dem Löschen erstellt', 'info');
+                    } catch (backupError) {
+                        logMessage(`Fehler beim Erstellen des Backups: ${backupError.message}`, 'warn');
+                        // Fehler beim Backup blockiert nicht das Löschen
+                    }
+                }
+                
+                // Alle Kategorien über die Storage-API laden
+                const categories = await window.loadData('categories.json', []);
+                
+                // Nur die Kategorien behalten, die nicht von diesem Benutzer erstellt wurden
+                const updatedCategories = categories.filter(c => c.createdBy !== currentUsername);
+                
+                // Aktualisierte Kategorieliste über die Storage-API speichern
+                const success = await window.saveData('categories.json', updatedCategories);
+                
+                deleteCategoriesModal.style.display = 'none';
+                
+                if (success) {
+                    showSuccess('Alle deine Kategorien wurden erfolgreich gelöscht!');
+                } else {
+                    showError('Beim Löschen der Kategorien ist ein Fehler aufgetreten.');
+                }
+            } catch (error) {
+                // Fehler anzeigen (wird automatisch auch geloggt)
+                showError(`Fehler beim Löschen der Kategorien: ${error.message}`);
+                deleteCategoriesModal.style.display = 'none';
+            }
+        });
+    }
+    
+    // Gruppen löschen bestätigen
+    if (confirmDeleteGroups) {
+        confirmDeleteGroups.addEventListener('click', async function() {
+            try {
+                // Erst ein Backup erstellen bevor Daten gelöscht werden
+                if (window.directoryHandle && window.createFileBackup) {
+                    try {
+                        await window.createFileBackup(window.directoryHandle, 'groups.json', await window.loadData('groups.json', []));
+                        logMessage('Backup der Gruppen vor dem Löschen erstellt', 'info');
+                    } catch (backupError) {
+                        logMessage(`Fehler beim Erstellen des Backups: ${backupError.message}`, 'warn');
+                        // Fehler beim Backup blockiert nicht das Löschen
+                    }
+                }
+                
+                // Alle Gruppen über die Storage-API laden
+                const groups = await window.loadData('groups.json', []);
+                
+                // Nur die Gruppen behalten, die nicht von diesem Benutzer erstellt wurden
+                const updatedGroups = groups.filter(g => g.createdBy !== currentUsername);
+                
+                // Aktualisierte Gruppenliste über die Storage-API speichern
+                const success = await window.saveData('groups.json', updatedGroups);
+                
+                deleteGroupsModal.style.display = 'none';
+                
+                if (success) {
+                    showSuccess('Alle deine Gruppen wurden erfolgreich gelöscht!');
+                } else {
+                    showError('Beim Löschen der Gruppen ist ein Fehler aufgetreten.');
+                }
+            } catch (error) {
+                // Fehler anzeigen (wird automatisch auch geloggt)
+                showError(`Fehler beim Löschen der Gruppen: ${error.message}`);
+                deleteGroupsModal.style.display = 'none';
             }
         });
     }
@@ -634,5 +789,249 @@ document.addEventListener('DOMContentLoaded', function() {
         if (event.target === deleteAccountModal) {
             deleteAccountModal.style.display = 'none';
         }
+        if (event.target === deleteCategoriesModal) {
+            deleteCategoriesModal.style.display = 'none';
+        }
+        if (event.target === deleteGroupsModal) {
+            deleteGroupsModal.style.display = 'none';
+        }
+        if (event.target === migrateStorageModal) {
+            migrateStorageModal.style.display = 'none';
+        }
+        if (event.target === backupModal) {
+            backupModal.style.display = 'none';
+        }
+        if (event.target === backupsListModal) {
+            backupsListModal.style.display = 'none';
+        }
     });
+    
+    // Backup-Funktionalität
+    if (createBackupBtn) {
+        createBackupBtn.addEventListener('click', function() {
+            // Modal anzeigen
+            backupModal.style.display = 'block';
+            
+            // Zurücksetzen der Fortschrittsanzeige
+            backupProgress.style.display = 'none';
+            backupProgressBar.style.width = '0%';
+            backupStatus.textContent = 'Vorbereitung...';
+            
+            // Buttons einblenden
+            confirmBackup.style.display = 'inline-block';
+            cancelBackup.style.display = 'inline-block';
+        });
+    }
+    
+    // Backup-Bestätigung
+    if (confirmBackup) {
+        confirmBackup.addEventListener('click', async function() {
+            try {
+                // Fortschrittsanzeige einblenden
+                backupProgress.style.display = 'block';
+                
+                // Buttons ausblenden während des Backups
+                confirmBackup.style.display = 'none';
+                cancelBackup.style.display = 'none';
+                
+                // Fortschritt anzeigen
+                backupProgressBar.style.width = '10%';
+                backupStatus.textContent = 'Prüfe Dateisystem-Zugriff...';
+                
+                // DirectoryHandle prüfen
+                let directoryHandle = window.directoryHandle;
+                
+                if (!directoryHandle) {
+                    if (window.getDirectoryHandle) {
+                        directoryHandle = await window.getDirectoryHandle();
+                    }
+                }
+                
+                if (!directoryHandle) {
+                    throw new Error('Kein Dateisystem-Zugriff verfügbar. Bitte wähle zuerst einen Speicherort aus.');
+                }
+                
+                // Fortschritt aktualisieren
+                backupProgressBar.style.width = '30%';
+                backupStatus.textContent = 'Erstelle Backup-Verzeichnis...';
+                
+                // Backup-Verzeichnis erstellen (über den Backup-Manager)
+                if (!window.backupManager) {
+                    throw new Error('Backup-Manager nicht verfügbar.');
+                }
+                
+                // Fortschritt aktualisieren
+                backupProgressBar.style.width = '50%';
+                backupStatus.textContent = 'Erstelle vollständiges Backup...';
+                
+                // Vollständiges Backup erstellen
+                const currentUsername = localStorage.getItem('username');
+                const backupResult = await window.backupManager.createFullBackup(directoryHandle, currentUsername);
+                
+                // Fortschritt abschließen
+                backupProgressBar.style.width = '100%';
+                backupStatus.textContent = `Backup abgeschlossen: ${backupResult.backupName} (${backupResult.backedUpFiles.length} Dateien)`;
+                
+                // Erfolgsmeldung anzeigen
+                if (window.showSuccess) {
+                    window.showSuccess(`Backup erfolgreich erstellt: ${backupResult.backupName}`);
+                }
+                
+                // Nach 2 Sekunden Modal schließen
+                setTimeout(() => {
+                    backupModal.style.display = 'none';
+                }, 2000);
+                
+            } catch (error) {
+                logMessage(`Fehler beim Erstellen des Backups: ${error.message}`, 'error');
+                
+                // Fehlermeldung im Modal anzeigen
+                backupStatus.textContent = `Fehler: ${error.message}`;
+                backupProgressBar.style.width = '0%';
+                
+                // Fehlermeldung anzeigen
+                if (window.showError) {
+                    window.showError(`Backup fehlgeschlagen: ${error.message}`);
+                }
+                
+                // Abbrechen-Button wieder einblenden
+                cancelBackup.style.display = 'inline-block';
+            }
+        });
+    }
+    
+    // Backup abbrechen
+    if (cancelBackup) {
+        cancelBackup.addEventListener('click', function() {
+            backupModal.style.display = 'none';
+        });
+    }
+    
+    // Backup-Liste anzeigen
+    if (listBackupsBtn) {
+        listBackupsBtn.addEventListener('click', async function() {
+            try {
+                // Container zurücksetzen
+                backupsListContainer.innerHTML = '<p>Lade Backups...</p>';
+                
+                // Modal anzeigen
+                backupsListModal.style.display = 'block';
+                
+                // DirectoryHandle prüfen
+                let directoryHandle = window.directoryHandle;
+                
+                if (!directoryHandle) {
+                    if (window.getDirectoryHandle) {
+                        directoryHandle = await window.getDirectoryHandle();
+                    }
+                }
+                
+                if (!directoryHandle) {
+                    backupsListContainer.innerHTML = '<p class="error-message">Kein Dateisystem-Zugriff verfügbar. Bitte wähle zuerst einen Speicherort aus.</p>';
+                    return;
+                }
+                
+                // Backup-Manager prüfen
+                if (!window.backupManager) {
+                    backupsListContainer.innerHTML = '<p class="error-message">Backup-Manager nicht verfügbar.</p>';
+                    return;
+                }
+                
+                // Backups auflisten
+                const backups = await window.backupManager.listBackups(directoryHandle);
+                
+                if (backups.length === 0) {
+                    backupsListContainer.innerHTML = '<p>Keine Backups gefunden.</p>';
+                    return;
+                }
+                
+                // HTML für die Backup-Liste erstellen
+                let backupsHTML = '<div class="backups-list">';
+                backupsHTML += '<table class="backup-table">';
+                backupsHTML += '<thead><tr><th>Datum</th><th>Name</th><th>Dateien</th><th>Benutzer</th><th>Status</th></tr></thead>';
+                backupsHTML += '<tbody>';
+                
+                for (const backup of backups) {
+                    const date = new Date(backup.timestamp);
+                    const formattedDate = date.toLocaleString();
+                    
+                    backupsHTML += `<tr>
+                        <td>${formattedDate}</td>
+                        <td>${backup.name}</td>
+                        <td>${backup.files}</td>
+                        <td>${backup.username}</td>
+                        <td>${backup.status}</td>
+                    </tr>`;
+                }
+                
+                backupsHTML += '</tbody></table></div>';
+                
+                // HTML in den Container einfügen
+                backupsListContainer.innerHTML = backupsHTML;
+                
+            } catch (error) {
+                logMessage(`Fehler beim Auflisten der Backups: ${error.message}`, 'error');
+                backupsListContainer.innerHTML = `<p class="error-message">Fehler: ${error.message}</p>`;
+                
+                if (window.showError) {
+                    window.showError(`Fehler beim Auflisten der Backups: ${error.message}`);
+                }
+            }
+        });
+    }
+    
+    // Backups-Liste schließen
+    if (closeBackupsList) {
+        closeBackupsList.addEventListener('click', function() {
+            backupsListModal.style.display = 'none';
+        });
+    }
+    
+    // Alte Backups bereinigen
+    if (cleanupOldBackups) {
+        cleanupOldBackups.addEventListener('click', async function() {
+            try {
+                // Bestätigungsdialog anzeigen
+                if (!confirm('Möchtest du alte Backups (älter als 30 Tage) wirklich löschen? Es werden mindestens 5 neuere Backups behalten.')) {
+                    return;
+                }
+                
+                // DirectoryHandle prüfen
+                let directoryHandle = window.directoryHandle;
+                
+                if (!directoryHandle) {
+                    if (window.getDirectoryHandle) {
+                        directoryHandle = await window.getDirectoryHandle();
+                    }
+                }
+                
+                if (!directoryHandle) {
+                    throw new Error('Kein Dateisystem-Zugriff verfügbar.');
+                }
+                
+                // Backup-Manager prüfen
+                if (!window.backupManager) {
+                    throw new Error('Backup-Manager nicht verfügbar.');
+                }
+                
+                // Alte Backups bereinigen
+                const deletedBackups = await window.backupManager.cleanupOldBackups(directoryHandle, 30, 5);
+                
+                // Erfolgsmeldung anzeigen
+                if (window.showSuccess) {
+                    window.showSuccess(`${deletedBackups.length} alte Backups wurden gelöscht.`);
+                }
+                
+                // Backup-Liste aktualisieren
+                await listBackupsBtn.click();
+                
+            } catch (error) {
+                logMessage(`Fehler bei der Backup-Bereinigung: ${error.message}`, 'error');
+                
+                if (window.showError) {
+                    window.showError(`Backup-Bereinigung fehlgeschlagen: ${error.message}`);
+                }
+            }
+        });
+    }
 });

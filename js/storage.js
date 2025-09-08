@@ -485,6 +485,8 @@ async function saveData(resourceName, data, username) {
         }
         
         const jsonData = JSON.stringify(data);
+        let fileSystemSuccess = false;
+        let localStorageSuccess = false;
         
         // Wenn das direkte DirectoryHandle nicht verfügbar ist, versuche das globale Handle zu nutzen
         if (!directoryHandle && window.directoryHandle) {
@@ -492,7 +494,7 @@ async function saveData(resourceName, data, username) {
             directoryHandle = window.directoryHandle;
         }
         
-        // Wenn wir einen DirectoryHandle haben, versuchen wir die Datei dort zu speichern
+        // 1. Versuch: Im Dateisystem speichern (wenn verfügbar)
         if (directoryHandle) {
             try {
                 // Datei erstellen/öffnen - der Browser kümmert sich selbst um die Berechtigungsanfrage
@@ -509,107 +511,99 @@ async function saveData(resourceName, data, username) {
                 
                 // Meldung nach erfolgreichem Speichern
                 log(`✓ Dateisystem-Speicherung erfolgreich: ${new Date().toLocaleTimeString()}`);
-                showSuccess(`Datei ${resourceName} im Dateisystem gespeichert`);
                 log(`Datei ${resourceName} erfolgreich im Dateisystem gespeichert`);
-                return true;
+                fileSystemSuccess = true;
             } catch (error) {
                 log(`✗ Fehler beim Speichern im Dateisystem: ${error.message}`, 'error');
                 log(`Fehler beim Speichern von ${resourceName} im Dateisystem:`, 'error', error);
-                
-                // Fallback auf localStorage
-                try {
-                    localStorage.setItem(getResourcePath(resourceName, username), jsonData);
-                    log(`ℹ Fallback auf localStorage: ${getResourcePath(resourceName, username)}`);
-                    log(`Datei ${resourceName} als Fallback im localStorage gespeichert`);
-                    return true;
-                } catch (storageError) {
-                    // Verwende console.log direkt, um rekursive Aufrufe zu vermeiden
-                    console.log(`Fehler beim Speichern im localStorage: ${storageError.message}`);
-                    if (window.showError) {
-                        window.showError(`Fehler beim Speichern: ${storageError.message}`);
-                    }
-                    return false;
-                }
             }
-        } else {
-            // Fallback: Im localStorage speichern
-            try {
-                // Überprüfen, ob die Daten das Quota überschreiten könnten
-                const dataSize = new Blob([jsonData]).size;
-                // Typische localStorage-Quota liegt bei 5-10MB, wir verwenden 4MB als sicheren Wert
-                const estimatedAvailableSpace = 4 * 1024 * 1024; 
+        }
+        
+        // 2. Immer auch im localStorage/IndexedDB speichern (als Backup)
+        try {
+            // Überprüfen, ob die Daten das Quota überschreiten könnten
+            const dataSize = new Blob([jsonData]).size;
+            // Typische localStorage-Quota liegt bei 5-10MB, wir verwenden 4MB als sicheren Wert
+            const estimatedAvailableSpace = 4 * 1024 * 1024; 
+            
+            if (dataSize > estimatedAvailableSpace) {
+                console.log(`Warnung: Daten sind sehr groß (${(dataSize/1024/1024).toFixed(2)}MB), könnte Quota überschreiten`);
                 
-                if (dataSize > estimatedAvailableSpace) {
-                    console.log(`Warnung: Daten sind sehr groß (${(dataSize/1024/1024).toFixed(2)}MB), könnte Quota überschreiten`);
-                    
-                    // Versuch, die Daten zu komprimieren
-                    if (window.compressData) {
-                        try {
-                            const compressedData = await window.compressData(jsonData);
-                            localStorage.setItem(getResourcePath(resourceName, username), compressedData);
-                            log(`Datei ${resourceName} komprimiert im localStorage gespeichert`, 'info');
-                            return true;
-                        } catch (compressError) {
-                            console.log(`Komprimierung fehlgeschlagen: ${compressError.message}`);
-                        }
+                // Versuch, die Daten zu komprimieren
+                if (window.compressData) {
+                    try {
+                        const compressedData = await window.compressData(jsonData);
+                        localStorage.setItem(getResourcePath(resourceName, username), compressedData);
+                        log(`Datei ${resourceName} komprimiert im localStorage gespeichert (Backup)`, 'info');
+                        localStorageSuccess = true;
+                    } catch (compressError) {
+                        console.log(`Komprimierung fehlgeschlagen: ${compressError.message}`);
                     }
-                    
-                    // Alternativ: Speichere im IndexedDB als Fallback für große Daten
-                    if (window.saveToIndexedDB) {
-                        try {
-                            await window.saveToIndexedDB(resourceName, jsonData, username);
-                            // Speichere einen Hinweis im localStorage, dass die Daten in IndexedDB sind
-                            localStorage.setItem(getResourcePath(resourceName, username), `indexeddb:${Date.now()}`);
-                            log(`Datei ${resourceName} in IndexedDB gespeichert (localStorage-Quota überschritten)`, 'info');
-                            return true;
-                        } catch (idbError) {
-                            console.log(`IndexedDB-Speicherung fehlgeschlagen: ${idbError.message}`);
-                        }
-                    }
-                    
-                    // Wenn keine Fallback-Lösung funktioniert hat, gib einen spezifischeren Fehler zurück
-                    log(`Daten zu groß für localStorage (${(dataSize/1024/1024).toFixed(2)}MB)`, 'error');
-                    if (window.showError) {
-                        window.showError(`Die Daten sind zu groß für den Browser-Speicher. Bitte verwende einen benutzerdefinierten Speicherort.`);
-                    }
-                    return false;
                 }
                 
+                // Alternativ: Speichere im IndexedDB als Fallback für große Daten
+                if (!localStorageSuccess && window.saveToIndexedDB) {
+                    try {
+                        await window.saveToIndexedDB(resourceName, jsonData, username);
+                        // Speichere einen Hinweis im localStorage, dass die Daten in IndexedDB sind
+                        localStorage.setItem(getResourcePath(resourceName, username), `indexeddb:${Date.now()}`);
+                        log(`Datei ${resourceName} in IndexedDB gespeichert (Backup)`, 'info');
+                        localStorageSuccess = true;
+                    } catch (idbError) {
+                        console.log(`IndexedDB-Speicherung fehlgeschlagen: ${idbError.message}`);
+                    }
+                }
+            } else {
                 // Normaler Speichervorgang für kleinere Daten
                 localStorage.setItem(getResourcePath(resourceName, username), jsonData);
-                log(`Datei ${resourceName} im localStorage gespeichert`, 'info');
-                return true;
-            } catch (storageError) {
-                // Prüfen, ob es sich um eine Quota-Überschreitung handelt
-                if (storageError.name === 'QuotaExceededError' || 
-                    storageError.message.includes('quota') || 
-                    storageError.message.includes('Storage')) {
-                    
-                    console.log(`localStorage-Quota überschritten. Versuche Fallback-Lösung...`);
-                    
-                    // Versuche es mit IndexedDB als Fallback
-                    if (window.saveToIndexedDB) {
-                        try {
-                            await window.saveToIndexedDB(resourceName, jsonData, username);
-                            log(`Datei ${resourceName} in IndexedDB gespeichert (localStorage-Quota überschritten)`, 'info');
-                            return true;
-                        } catch (idbError) {
-                            console.log(`IndexedDB-Speicherung fehlgeschlagen: ${idbError.message}`);
-                        }
-                    }
-                    
-                    log(`Speicherquota überschritten. Bitte verwende einen benutzerdefinierten Speicherort.`, 'error');
-                    if (window.showError) {
-                        window.showError(`Der Browser-Speicher ist voll. Bitte lösche einige Daten oder verwende einen benutzerdefinierten Speicherort.`);
-                    }
-                } else {
-                    log(`Fehler beim Speichern im localStorage: ${storageError.message}`, 'error');
-                    if (window.showError) {
-                        window.showError(`Fehler beim Speichern: ${storageError.message}`);
+                log(`Datei ${resourceName} im localStorage gespeichert (Backup)`, 'info');
+                localStorageSuccess = true;
+            }
+        } catch (storageError) {
+            // Prüfen, ob es sich um eine Quota-Überschreitung handelt
+            if (storageError.name === 'QuotaExceededError' || 
+                storageError.message.includes('quota') || 
+                storageError.message.includes('Storage')) {
+                
+                console.log(`localStorage-Quota überschritten. Versuche Fallback-Lösung...`);
+                
+                // Versuche es mit IndexedDB als Fallback
+                if (window.saveToIndexedDB) {
+                    try {
+                        await window.saveToIndexedDB(resourceName, jsonData, username);
+                        log(`Datei ${resourceName} in IndexedDB gespeichert (Backup)`, 'info');
+                        localStorageSuccess = true;
+                    } catch (idbError) {
+                        console.log(`IndexedDB-Speicherung fehlgeschlagen: ${idbError.message}`);
                     }
                 }
-                return false;
+                
+                if (!localStorageSuccess) {
+                    log(`Speicherquota überschritten. Backup konnte nicht erstellt werden.`, 'warn');
+                }
+            } else {
+                log(`Fehler beim Speichern im localStorage: ${storageError.message}`, 'error');
             }
+        }
+        
+        // Zeige Erfolgs- oder Fehlermeldung basierend auf den Ergebnissen
+        if (fileSystemSuccess && localStorageSuccess) {
+            showSuccess(`Datei ${resourceName} wurde erfolgreich gespeichert und gesichert`);
+            return true;
+        } else if (fileSystemSuccess) {
+            showSuccess(`Datei ${resourceName} im Dateisystem gespeichert`);
+            log(`Warnung: Backup konnte nicht erstellt werden`, 'warn');
+            return true;
+        } else if (localStorageSuccess) {
+            showSuccess(`Datei ${resourceName} im Browser-Speicher gespeichert`);
+            log(`Warnung: Speicherung im Dateisystem fehlgeschlagen`, 'warn');
+            return true;
+        } else {
+            // Beide Speicherversuche sind fehlgeschlagen
+            if (window.showError) {
+                window.showError(`Fehler beim Speichern von ${resourceName}. Keine Speichermethode verfügbar.`);
+            }
+            return false;
         }
     } catch (error) {
         log(`Fehler beim Speichern von ${resourceName}:`, 'error', error);
@@ -633,13 +627,17 @@ async function loadData(resourceName, defaultValue = null, username) {
             throw new Error('Kein Ressourcenname angegeben');
         }
         
+        let fileSystemData = null;
+        let localStorageData = null;
+        let dataSource = null;
+        
         // Wenn das direkte DirectoryHandle nicht verfügbar ist, versuche das globale Handle zu nutzen
         if (!directoryHandle && window.directoryHandle) {
             console.log('Lokales DirectoryHandle nicht verfügbar, verwende globales Handle');
             directoryHandle = window.directoryHandle;
         }
         
-        // Wenn wir einen DirectoryHandle haben, versuchen wir die Datei dort zu laden
+        // 1. Versuch: Aus dem Dateisystem laden (wenn verfügbar)
         if (directoryHandle) {
             try {
                 // Versuchen, die Datei zu öffnen - der Browser kümmert sich selbst um die Berechtigungsanfrage
@@ -647,71 +645,154 @@ async function loadData(resourceName, defaultValue = null, username) {
                 const file = await fileHandle.getFile();
                 const text = await file.text();
                 
-                return JSON.parse(text);
+                fileSystemData = JSON.parse(text);
+                log(`Datei ${resourceName} erfolgreich aus dem Dateisystem geladen`, 'info');
+                dataSource = 'filesystem';
             } catch (error) {
-                // Fallback auf localStorage oder IndexedDB
                 if (error.name === 'NotFoundError') {
-                    console.log(`Datei ${resourceName} nicht im Dateisystem gefunden, versuche Browser-Speicher...`);
+                    log(`Datei ${resourceName} nicht im Dateisystem gefunden, versuche Browser-Speicher...`, 'info');
+                } else {
+                    log(`Fehler beim Laden aus dem Dateisystem: ${error.message}`, 'warn');
                 }
             }
         }
         
-        // Aus dem localStorage laden
-        const jsonData = localStorage.getItem(getResourcePath(resourceName, username));
-        if (jsonData !== null) {
-            // Prüfen, ob die Daten komprimiert sind
-            if (window.decompressData && jsonData.startsWith('compressedData:')) {
-                try {
-                    const compressedData = jsonData.substring(15); // "compressedData:".length = 15
-                    const decompressedData = await window.decompressData(compressedData);
-                    return JSON.parse(decompressedData);
-                } catch (decompressError) {
-                    console.log(`Fehler beim Dekomprimieren: ${decompressError.message}`);
-                    // Fallback: Versuche, es als normalen JSON zu parsen
-                    return JSON.parse(jsonData);
-                }
-            }
+        // 2. Versuch: Aus dem Browser-Speicher laden (als Backup oder primär, wenn kein Dateisystem)
+        try {
+            const jsonData = localStorage.getItem(getResourcePath(resourceName, username));
             
-            // Prüfen, ob die Daten in IndexedDB gespeichert sind
-            if (jsonData.startsWith('indexeddb:')) {
-                console.log(`Hinweis gefunden: Daten für ${resourceName} sind in IndexedDB gespeichert`);
-                if (window.loadFromIndexedDB) {
+            if (jsonData !== null) {
+                // Prüfen, ob die Daten komprimiert sind
+                if (window.decompressData && jsonData.startsWith('compressedData:')) {
                     try {
-                        const idbData = await window.loadFromIndexedDB(resourceName, username);
-                        if (idbData !== null) {
-                            console.log(`Daten für ${resourceName} erfolgreich aus IndexedDB geladen`);
-                            return JSON.parse(idbData);
-                        }
-                    } catch (idbError) {
-                        console.log(`Fehler beim Laden aus IndexedDB: ${idbError.message}`);
-                        // Wenn das Laden aus IndexedDB fehlschlägt, versuchen wir den Standardwert
-                        return defaultValue;
+                        const compressedData = jsonData.substring(15); // "compressedData:".length = 15
+                        const decompressedData = await window.decompressData(compressedData);
+                        localStorageData = JSON.parse(decompressedData);
+                        log(`Datei ${resourceName} (komprimiert) aus dem Browser-Speicher geladen`, 'info');
+                        if (!dataSource) dataSource = 'localstorage-compressed';
+                    } catch (decompressError) {
+                        log(`Fehler beim Dekomprimieren: ${decompressError.message}`, 'warn');
+                        // Fallback: Versuche, es als normalen JSON zu parsen
+                        localStorageData = JSON.parse(jsonData);
+                        if (!dataSource) dataSource = 'localstorage';
                     }
                 }
-                return defaultValue;
+                // Prüfen, ob die Daten in IndexedDB gespeichert sind
+                else if (jsonData.startsWith('indexeddb:')) {
+                    log(`Hinweis gefunden: Daten für ${resourceName} sind in IndexedDB gespeichert`, 'info');
+                    if (window.loadFromIndexedDB) {
+                        try {
+                            const idbData = await window.loadFromIndexedDB(resourceName, username);
+                            if (idbData !== null) {
+                                localStorageData = JSON.parse(idbData);
+                                log(`Daten für ${resourceName} erfolgreich aus IndexedDB geladen`, 'info');
+                                if (!dataSource) dataSource = 'indexeddb';
+                            }
+                        } catch (idbError) {
+                            log(`Fehler beim Laden aus IndexedDB: ${idbError.message}`, 'warn');
+                        }
+                    }
+                }
+                // Normale JSON-Daten
+                else {
+                    localStorageData = JSON.parse(jsonData);
+                    log(`Datei ${resourceName} aus dem Browser-Speicher geladen`, 'info');
+                    if (!dataSource) dataSource = 'localstorage';
+                }
+            }
+            // Wenn nichts im localStorage gefunden wurde, versuche es mit IndexedDB
+            else if (window.loadFromIndexedDB) {
+                try {
+                    log(`Versuche, ${resourceName} aus IndexedDB zu laden...`, 'info');
+                    const idbData = await window.loadFromIndexedDB(resourceName, username);
+                    if (idbData !== null) {
+                        localStorageData = JSON.parse(idbData);
+                        log(`Daten für ${resourceName} aus IndexedDB geladen`, 'info');
+                        if (!dataSource) dataSource = 'indexeddb';
+                    }
+                } catch (idbError) {
+                    log(`Fehler beim Laden aus IndexedDB: ${idbError.message}`, 'warn');
+                }
+            }
+        } catch (error) {
+            log(`Fehler beim Laden aus dem Browser-Speicher: ${error.message}`, 'warn');
+        }
+        
+        // Entscheiden, welche Daten zurückgegeben werden sollen
+        // Priorität: 1. Dateisystem, 2. Browser-Speicher, 3. Standardwert
+        if (fileSystemData !== null) {
+            log(`Verwende Daten aus dem Dateisystem für ${resourceName}`, 'info');
+            
+            // Wenn wir auch Daten aus dem Browser-Speicher haben, prüfen wir auf Unterschiede
+            if (localStorageData !== null) {
+                try {
+                    // Tiefe Gleichheitsprüfung für Objekte
+                    const isEqual = JSON.stringify(fileSystemData) === JSON.stringify(localStorageData);
+                    if (!isEqual) {
+                        log(`Unterschiede zwischen Dateisystem- und Browser-Daten für ${resourceName} gefunden`, 'warn');
+                        
+                        // Automatisches Backup der Browser-Version erstellen
+                        try {
+                            if (window.backupManager) {
+                                // Neue Backup-Manager-Methode verwenden
+                                await window.backupManager.createFileBackup(directoryHandle, resourceName, localStorageData);
+                            } else {
+                                // Fallback: Direktes Speichern im Hauptverzeichnis
+                                const timestamp = new Date().toISOString().replace(/:/g, '-');
+                                const backupName = `${resourceName}.backup.${timestamp}.json`;
+                                
+                                const backupHandle = await directoryHandle.getFileHandle(backupName, { create: true });
+                                const writable = await backupHandle.createWritable();
+                                await writable.write(JSON.stringify(localStorageData));
+                                await writable.close();
+                                log(`Backup der Browser-Version als ${backupName} erstellt`, 'info');
+                            }
+                            
+                            // Synchronisiere die Browser-Version mit dem Dateisystem
+                            try {
+                                localStorage.setItem(getResourcePath(resourceName, username), JSON.stringify(fileSystemData));
+                                log(`Browser-Daten für ${resourceName} mit Dateisystem synchronisiert`, 'info');
+                            } catch (syncError) {
+                                log(`Fehler bei der Synchronisierung mit dem Browser-Speicher: ${syncError.message}`, 'warn');
+                            }
+                        } catch (backupError) {
+                            log(`Fehler beim Erstellen des Backups: ${backupError.message}`, 'warn');
+                        }
+                    }
+                } catch (compareError) {
+                    log(`Fehler beim Vergleichen der Daten: ${compareError.message}`, 'warn');
+                }
             }
             
-            return JSON.parse(jsonData);
-        }
-        
-        // Wenn nichts im localStorage gefunden wurde, versuche es mit IndexedDB
-        if (window.loadFromIndexedDB) {
-            try {
-                console.log(`Versuche, ${resourceName} aus IndexedDB zu laden...`);
-                const idbData = await window.loadFromIndexedDB(resourceName, username);
-                if (idbData !== null) {
-                    console.log(`Daten für ${resourceName} aus IndexedDB geladen`);
-                    return JSON.parse(idbData);
+            return fileSystemData;
+        } else if (localStorageData !== null) {
+            log(`Verwende Daten aus dem Browser-Speicher für ${resourceName}`, 'info');
+            
+            // Wenn wir ein DirectoryHandle haben, aber keine Dateisystem-Daten, synchronisiere sie
+            if (directoryHandle) {
+                try {
+                    log(`Synchronisiere Browser-Daten für ${resourceName} mit dem Dateisystem...`, 'info');
+                    
+                    // Speichere die Daten im Dateisystem
+                    const fileHandle = await directoryHandle.getFileHandle(resourceName, { create: true });
+                    const writable = await fileHandle.createWritable();
+                    await writable.write(JSON.stringify(localStorageData));
+                    await writable.close();
+                    
+                    log(`Daten für ${resourceName} erfolgreich mit dem Dateisystem synchronisiert`, 'info');
+                } catch (syncError) {
+                    log(`Fehler bei der Synchronisierung mit dem Dateisystem: ${syncError.message}`, 'warn');
                 }
-            } catch (idbError) {
-                console.log(`Fehler beim Laden aus IndexedDB: ${idbError.message}`);
             }
+            
+            return localStorageData;
+        } else {
+            // Wenn keine Daten gefunden wurden, Standardwert zurückgeben
+            log(`Keine Daten für ${resourceName} gefunden, verwende Standardwert`, 'info');
+            return defaultValue;
         }
-        
-        // Wenn keine Daten gefunden wurden, Standardwert zurückgeben
-        return defaultValue;
     } catch (error) {
-        console.error(`Fehler beim Laden von ${resourceName}:`, error);
+        log(`Fehler beim Laden von ${resourceName}: ${error.message}`, 'error');
         return defaultValue;
     }
 }
@@ -728,9 +809,16 @@ async function deleteData(resourceName, username) {
             throw new Error('Kein Ressourcenname angegeben');
         }
         
-        let success = true;
+        let fileSystemSuccess = true;
+        let localStorageSuccess = true;
         
-        // Wenn wir einen DirectoryHandle haben, versuchen wir die Datei dort zu löschen
+        // Wenn das direkte DirectoryHandle nicht verfügbar ist, versuche das globale Handle zu nutzen
+        if (!directoryHandle && window.directoryHandle) {
+            console.log('Lokales DirectoryHandle nicht verfügbar, verwende globales Handle');
+            directoryHandle = window.directoryHandle;
+        }
+        
+        // 1. Aus dem Dateisystem löschen (wenn verfügbar)
         if (directoryHandle) {
             try {
                 // Berechtigung prüfen/erneuern
@@ -739,40 +827,94 @@ async function deleteData(resourceName, username) {
                     throw new Error('Keine Schreibberechtigung für das Verzeichnis');
                 }
                 
+                // Bevor wir löschen, erstellen wir ein Backup
+                try {
+                    const fileHandle = await directoryHandle.getFileHandle(resourceName);
+                    const file = await fileHandle.getFile();
+                    const content = await file.text();
+                    
+                    if (window.backupManager) {
+                        // Neue Backup-Manager-Methode verwenden
+                        await window.backupManager.createFileBackup(directoryHandle, resourceName, content);
+                    } else {
+                        // Fallback: Direktes Speichern im Hauptverzeichnis
+                        const timestamp = new Date().toISOString().replace(/:/g, '-');
+                        const backupName = `${resourceName}.backup.${timestamp}.json`;
+                        
+                        const backupHandle = await directoryHandle.getFileHandle(backupName, { create: true });
+                        const writable = await backupHandle.createWritable();
+                        await writable.write(content);
+                        await writable.close();
+                        
+                        log(`Backup von ${resourceName} erstellt als ${backupName}`, 'info');
+                    }
+                } catch (backupError) {
+                    if (backupError.name !== 'NotFoundError') {
+                        log(`Fehler beim Erstellen des Backups vor dem Löschen: ${backupError.message}`, 'warn');
+                    }
+                }
+                
+                // Jetzt die Datei löschen
                 await directoryHandle.removeEntry(resourceName);
-                console.log(`Datei ${resourceName} erfolgreich aus Dateisystem gelöscht`);
+                log(`Datei ${resourceName} erfolgreich aus dem Dateisystem gelöscht`, 'info');
             } catch (error) {
                 if (error.name !== 'NotFoundError') {
-                    console.error(`Fehler beim Löschen von ${resourceName} aus dem Dateisystem:`, error);
-                    success = false;
+                    log(`Fehler beim Löschen von ${resourceName} aus dem Dateisystem: ${error.message}`, 'error');
+                    fileSystemSuccess = false;
                 }
             }
         }
         
-        // Aus localStorage entfernen
+        // 2. Aus dem Browser-Speicher löschen
         try {
+            // Backup in localStorage erstellen, falls Daten vorhanden sind
+            const jsonData = localStorage.getItem(getResourcePath(resourceName, username));
+            if (jsonData !== null && jsonData !== '') {
+                try {
+                    const timestamp = new Date().toISOString().replace(/:/g, '-');
+                    localStorage.setItem(`${getResourcePath(resourceName, username)}.backup.${timestamp}`, jsonData);
+                    log(`Browser-Backup von ${resourceName} erstellt`, 'info');
+                } catch (backupError) {
+                    log(`Fehler beim Erstellen des Browser-Backups: ${backupError.message}`, 'warn');
+                }
+            }
+            
+            // Aus localStorage entfernen
             localStorage.removeItem(getResourcePath(resourceName, username));
-            console.log(`Datei ${resourceName} erfolgreich aus localStorage gelöscht`);
+            log(`Datei ${resourceName} aus dem Browser-Speicher gelöscht`, 'info');
         } catch (localStorageError) {
-            console.error(`Fehler beim Löschen aus localStorage:`, localStorageError);
-            success = false;
+            log(`Fehler beim Löschen aus dem Browser-Speicher: ${localStorageError.message}`, 'error');
+            localStorageSuccess = false;
         }
         
-        // Aus IndexedDB entfernen, falls vorhanden
+        // 3. Aus IndexedDB entfernen, falls vorhanden
         if (window.deleteFromIndexedDB) {
             try {
                 await window.deleteFromIndexedDB(resourceName, username);
-                console.log(`Datei ${resourceName} erfolgreich aus IndexedDB gelöscht`);
+                log(`Datei ${resourceName} aus IndexedDB gelöscht`, 'info');
             } catch (idbError) {
-                console.error(`Fehler beim Löschen aus IndexedDB:`, idbError);
+                log(`Fehler beim Löschen aus IndexedDB: ${idbError.message}`, 'warn');
                 // Fehler hier sind nicht kritisch, da die Daten möglicherweise nicht in IndexedDB waren
             }
         }
         
-        return success;
+        // Zusammenfassung des Löschvorgangs
+        if (fileSystemSuccess && localStorageSuccess) {
+            showSuccess(`Datei ${resourceName} wurde vollständig gelöscht`);
+            return true;
+        } else if (fileSystemSuccess) {
+            showWarning(`Datei ${resourceName} wurde aus dem Dateisystem gelöscht, aber es gab Probleme beim Löschen aus dem Browser-Speicher`);
+            return true;
+        } else if (localStorageSuccess) {
+            showWarning(`Datei ${resourceName} wurde aus dem Browser-Speicher gelöscht, aber es gab Probleme beim Löschen aus dem Dateisystem`);
+            return true;
+        } else {
+            showError(`Fehler beim Löschen von ${resourceName}. Keine Speichermethode konnte die Datei löschen.`);
+            return false;
+        }
     } catch (error) {
         showError(`Fehler beim Löschen der Daten: ${error.message}`);
-        console.error(`Fehler beim Löschen von ${resourceName}:`, error);
+        log(`Fehler beim Löschen von ${resourceName}: ${error.message}`, 'error');
         return false;
     }
 }
@@ -780,13 +922,21 @@ async function deleteData(resourceName, username) {
 /**
  * Listet alle verfügbaren Ressourcen im konfigurierten Speicherort auf.
  * @param {string} [username] - Optional: Der Benutzername, für den die Ressourcen aufgelistet werden sollen.
- * @returns {Promise<Array<string>>} Promise, das zu einem Array von Ressourcennamen aufgelöst wird.
+ * @returns {Promise<Array<Object>>} Promise, das zu einem Array von Ressourcenobjekten aufgelöst wird.
+ * Jedes Objekt enthält: {name, locations, size, lastModified}
  */
 async function listResources(username) {
     try {
-        const resources = [];
+        // Map für eindeutige Ressourcen (basierend auf Namen)
+        const resourceMap = new Map();
         
-        // Wenn wir einen DirectoryHandle haben, versuchen wir die Dateien dort aufzulisten
+        // Wenn das direkte DirectoryHandle nicht verfügbar ist, versuche das globale Handle zu nutzen
+        if (!directoryHandle && window.directoryHandle) {
+            console.log('Lokales DirectoryHandle nicht verfügbar, verwende globales Handle');
+            directoryHandle = window.directoryHandle;
+        }
+        
+        // 1. Ressourcen aus dem Dateisystem auflisten (wenn verfügbar)
         if (directoryHandle) {
             try {
                 // Berechtigung prüfen/erneuern
@@ -798,31 +948,123 @@ async function listResources(username) {
                 // Alle Einträge durchgehen
                 for await (const [name, entry] of directoryHandle.entries()) {
                     if (entry.kind === 'file') {
-                        resources.push(name);
+                        try {
+                            // Backup-Dateien ignorieren
+                            if (name.includes('.backup.')) {
+                                continue;
+                            }
+                            
+                            const file = await entry.getFile();
+                            resourceMap.set(name, {
+                                name: name,
+                                locations: ['filesystem'],
+                                size: file.size,
+                                lastModified: new Date(file.lastModified)
+                            });
+                        } catch (fileError) {
+                            log(`Fehler beim Zugriff auf Datei ${name}: ${fileError.message}`, 'warn');
+                        }
                     }
                 }
                 
-                return resources;
+                log(`${resourceMap.size} Ressourcen im Dateisystem gefunden`, 'info');
             } catch (error) {
-                console.error('Fehler beim Auflisten der Ressourcen aus dem Dateisystem:', error);
-                // Fallback auf localStorage
+                log(`Fehler beim Auflisten von Dateisystem-Ressourcen: ${error.message}`, 'error');
             }
         }
         
-        // Fallback: In einer reinen Browser-Umgebung durchsuchen wir den localStorage
-        const path = getStoragePath(username);
-        for (let i = 0; i < localStorage.length; i++) {
-            const key = localStorage.key(i);
-            if (key.startsWith(`${path}/`)) {
-                // Ressourcenname ohne Pfadpräfix extrahieren
-                resources.push(key.substring(path.length + 1));
+        // 2. Ressourcen aus dem localStorage auflisten
+        try {
+            const path = getStoragePath(username);
+            
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                
+                // Backup-Einträge ignorieren
+                if (key.includes('.backup.')) {
+                    continue;
+                }
+                
+                // Nur Einträge, die zum aktuellen Pfad gehören
+                if (key.startsWith(`${path}/`)) {
+                    // Ressourcenname ohne Pfadpräfix extrahieren
+                    const resourceName = key.substring(path.length + 1);
+                    
+                    // Indexdb-Verweise separat behandeln
+                    const value = localStorage.getItem(key);
+                    if (value && value.startsWith('indexeddb:')) {
+                        continue; // Diese werden beim IndexedDB-Durchlauf behandelt
+                    }
+                    
+                    // Wenn diese Ressource bereits im Map ist, füge 'browser' zu den locations hinzu
+                    if (resourceMap.has(resourceName)) {
+                        const resource = resourceMap.get(resourceName);
+                        resource.locations.push('browser');
+                        // Aktualisiere die Größe, wenn sie noch nicht gesetzt ist
+                        if (!resource.size) {
+                            resource.size = value ? new Blob([value]).size : 0;
+                        }
+                    } else {
+                        // Neue Ressource hinzufügen
+                        resourceMap.set(resourceName, {
+                            name: resourceName,
+                            locations: ['browser'],
+                            size: value ? new Blob([value]).size : 0,
+                            lastModified: null // localStorage hat keine Zeitstempel
+                        });
+                    }
+                }
+            }
+            
+            log(`${resourceMap.size} Ressourcen insgesamt gefunden (Dateisystem + Browser)`, 'info');
+        } catch (localStorageError) {
+            log(`Fehler beim Auflisten von Browser-Ressourcen: ${localStorageError.message}`, 'warn');
+        }
+        
+        // 3. Ressourcen aus IndexedDB auflisten (falls verfügbar)
+        if (window.listIndexedDBResources) {
+            try {
+                const idbResources = await window.listIndexedDBResources(username);
+                
+                for (const resource of idbResources) {
+                    // Backup-Einträge ignorieren
+                    if (resource.name.includes('.backup.')) {
+                        continue;
+                    }
+                    
+                    // Wenn diese Ressource bereits im Map ist, füge 'indexeddb' zu den locations hinzu
+                    if (resourceMap.has(resource.name)) {
+                        const existingResource = resourceMap.get(resource.name);
+                        existingResource.locations.push('indexeddb');
+                        // Aktualisiere die Größe, wenn sie noch nicht gesetzt ist
+                        if (!existingResource.size && resource.size) {
+                            existingResource.size = resource.size;
+                        }
+                        // Aktualisiere das Änderungsdatum, wenn es noch nicht gesetzt ist
+                        if (!existingResource.lastModified && resource.lastModified) {
+                            existingResource.lastModified = resource.lastModified;
+                        }
+                    } else {
+                        // Neue Ressource hinzufügen
+                        resourceMap.set(resource.name, {
+                            name: resource.name,
+                            locations: ['indexeddb'],
+                            size: resource.size || 0,
+                            lastModified: resource.lastModified || null
+                        });
+                    }
+                }
+                
+                log(`${resourceMap.size} Ressourcen insgesamt gefunden (inkl. IndexedDB)`, 'info');
+            } catch (idbError) {
+                log(`Fehler beim Auflisten von IndexedDB-Ressourcen: ${idbError.message}`, 'warn');
             }
         }
         
-        return resources;
+        // Map in Array umwandeln und zurückgeben
+        return Array.from(resourceMap.values());
     } catch (error) {
-        showError(`Fehler beim Auflisten der Ressourcen: ${error.message}`);
-        console.error('Fehler beim Auflisten der Ressourcen:', error);
+        log(`Fehler beim Auflisten von Ressourcen: ${error.message}`, 'error');
         return [];
     }
 }
