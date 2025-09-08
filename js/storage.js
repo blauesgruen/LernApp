@@ -121,6 +121,11 @@ function getStoragePath(username) {
  */
 async function openDirectoryPicker() {
     try {
+        // Wenn die verbesserte Version der Funktion existiert, verwenden wir diese
+        if (window.openAndPersistDirectoryPicker) {
+            return await window.openAndPersistDirectoryPicker();
+        }
+        
         if (!isFileSystemAccessSupported()) {
             showWarning('Dein Browser unterstützt die Dateiauswahl nicht. Verwende bitte Chrome, Edge oder einen anderen modernen Browser.');
             return null;
@@ -136,7 +141,16 @@ async function openDirectoryPicker() {
         // Speichere den Handle für späteren Zugriff
         directoryHandle = handle;
         
-        // Pfad des ausgewählten Ordners (nur der Name ist verfügbar)
+                // Wenn möglich, den Handle in IndexedDB speichern für Persistenz
+                if (window.storeDirectoryHandle) {
+                    try {
+                        await window.storeDirectoryHandle(handle);
+                        log('Verzeichnis-Handle wurde für spätere Verwendung gespeichert');
+                    } catch (storeError) {
+                        warn('Handle konnte nicht gespeichert werden:', storeError);
+                        // Fortfahren, auch wenn das Speichern fehlgeschlagen ist
+                    }
+                }        // Pfad des ausgewählten Ordners (nur der Name ist verfügbar)
         const path = handle.name || 'LernAppDatenbank';
         
         log('Verzeichnis ausgewählt:', 'info', {
@@ -174,46 +188,37 @@ async function openDirectoryPicker() {
 }
 
 /**
- * Versucht, einen bereits konfigurierten Verzeichnis-Handle zu öffnen, ohne einen Dialog zu zeigen.
+ * Versucht, auf den konfigurierten Ordner zuzugreifen, ohne einen Dialog anzuzeigen.
  * @param {string} [username] - Optional: Der Benutzername, für den der Verzeichnis-Handle geöffnet werden soll.
  * @returns {Promise<Object|null>} Promise mit dem Verzeichnis-Handle oder null bei Fehler.
  */
 async function getDirectoryHandle(username) {
-    try {
-        // Prüfen, ob die File System Access API unterstützt wird
-        if (!isFileSystemAccessSupported()) {
-            log('Dateisystem-API wird nicht unterstützt.');
-            return null;
-        }
-        
-        // Prüfen, ob wir bereits einen Handle haben
-        if (directoryHandle) {
-            try {
-                // Versuchen, die Berechtigung zu erneuern
-                const permission = await directoryHandle.requestPermission({ mode: 'readwrite' });
-                if (permission === 'granted') {
-                    return directoryHandle;
-                }
-            } catch (error) {
-                log('Fehler beim Zugriff auf den bestehenden Handle:', 'warn', error);
-            }
-        }
-        
-        // Prüfen, ob der Benutzer bereits explizit auf die Schaltfläche zur Wiederherstellung geklickt hat
-        if (window._forceDirectoryPicker === true) {
-            log('Verzeichnis-Auswahl wurde explizit angefordert');
-            // In diesem Fall lassen wir openDirectoryPicker den Dialog öffnen
-            return null;
-        }
-        
-        // Wir haben keinen Handle oder er ist nicht mehr gültig
-        // Wir könnten einen Hinweis anzeigen, aber öffnen NICHT automatisch den Dialog
-        log('Kein gültiger Handle vorhanden. Direkter Zugriff nicht möglich.');
-        return null;
-    } catch (error) {
-        log('Fehler beim Zugriff auf den Verzeichnis-Handle:', 'error', error);
-        return null;
+    // Wenn wir einen Handle haben, einfach zurückgeben
+    if (directoryHandle) {
+        return directoryHandle;
     }
+    
+            // Versuchen, ein gespeichertes Handle aus der IndexedDB zu laden, falls die Funktion existiert
+            if (window.loadDirectoryHandle) {
+                try {
+                    const savedHandle = await window.loadDirectoryHandle();
+                    if (savedHandle) {
+                        // Prüfen, ob wir Berechtigung haben
+                        if (window.verifyPermission) {
+                            const permission = await window.verifyPermission(savedHandle);
+                            if (permission === 'granted') {
+                                // Handle global setzen
+                                directoryHandle = savedHandle;
+                                log('Gespeichertes Verzeichnis-Handle wiederhergestellt');
+                                return directoryHandle;
+                            }
+                        }
+                    }
+                } catch (error) {
+                    warn('Fehler beim Laden des gespeicherten Handles:', error);
+                }
+            }    // Kein Handle vorhanden - das ist normal und kein Fehler
+    return null;
 }
 
 /**
@@ -303,11 +308,11 @@ async function setStoragePath(path, username) {
                 // Serialisieren des Handles ist nicht möglich, aber wir merken uns, dass wir einen Handle haben
                 localStorage.setItem('hasDirectoryHandle', 'true');
                 
-                // Auch sofort die Datenbankdateien erstellen
+                // Datenbankdateien initialisieren oder vorhandene verwenden
                 await createInitialDatabaseFiles(handle);
                 
-                // Debug-Nachricht über erstellte Dateien anzeigen
-                log('Datenbankdateien sollten jetzt im Verzeichnis erstellt worden sein:', 'info', pathString);
+                // Debug-Nachricht anzeigen - Wir vermeiden "erstellt", da Dateien auch nur geprüft werden könnten
+                log('Datenbankdateien wurden im Verzeichnis überprüft/initialisiert:', 'info', pathString);
             } catch (error) {
                 log('Fehler beim Schreiben der Testdatei:', 'error', error);
                 showWarning('Der ausgewählte Ordner ist nicht beschreibbar. Bitte wählen Sie einen anderen Ordner aus.');
@@ -450,134 +455,62 @@ async function saveData(resourceName, data, username) {
         
         const jsonData = JSON.stringify(data);
         
-        // Debug-Ausgabe: Zeigen, wo die Daten gespeichert werden
-        log(`Speichere ${resourceName}:`, 'info', {
-            inFileSystem: !!directoryHandle,
-            directoryHandleName: directoryHandle ? directoryHandle.name : 'keiner',
-            fallbackToLocalStorage: !directoryHandle
-        });
-        
         // Wenn wir einen DirectoryHandle haben, versuchen wir die Datei dort zu speichern
         if (directoryHandle) {
             try {
-                // Berechtigung prüfen/erneuern
-                try {
-                    const permission = await directoryHandle.requestPermission({ mode: 'readwrite' });
-                    if (permission !== 'granted') {
-                        throw new Error('Keine Schreibberechtigung für das Verzeichnis');
-                    }
-                } catch (permissionError) {
-                    log(`Fehler bei der Berechtigungsprüfung für ${resourceName}:`, 'warn', permissionError);
-                    // Weiter versuchen, falls requestPermission nicht unterstützt wird
-                }
+                // Datei erstellen/öffnen - der Browser kümmert sich selbst um die Berechtigungsanfrage
+                const fileHandle = await directoryHandle.getFileHandle(resourceName, { create: true });
+                const writable = await fileHandle.createWritable();
                 
-                // Datei erstellen/öffnen
-                try {
-                    const fileHandle = await directoryHandle.getFileHandle(resourceName, { create: true });
-                    
-                    // Schreibbaren Stream holen
-                    const writable = await fileHandle.createWritable();
-                    
-                    // Daten schreiben
-                    await writable.write(jsonData);
-                    
-                    // Stream schließen
-                    await writable.close();
-                    
-                    log(`Datei ${resourceName} erfolgreich im Dateisystem gespeichert`);
-                    
-                    return true;
-                } catch (fileError) {
-                    log(`Fehler beim Speichern der Datei ${resourceName}:`, 'error', fileError);
-                    throw fileError; // Weitergeben für Fallback
-                }
+                // Debug-Information zur Speicherung
+                log(`Speichere ${resourceName} im Dateisystem: ${new Date().toLocaleTimeString()}`);
+                log(`Pfad: ${directoryHandle.name}/${resourceName}`);
+                log(`Datengröße: ${jsonData.length} Bytes`);
+                
+                await writable.write(jsonData);
+                await writable.close();
+                
+                // Meldung nach erfolgreichem Speichern
+                log(`✓ Dateisystem-Speicherung erfolgreich: ${new Date().toLocaleTimeString()}`);
+                showSuccess(`Datei ${resourceName} im Dateisystem gespeichert`);
+                log(`Datei ${resourceName} erfolgreich im Dateisystem gespeichert`);
+                return true;
             } catch (error) {
+                log(`✗ Fehler beim Speichern im Dateisystem: ${error.message}`, 'error');
                 log(`Fehler beim Speichern von ${resourceName} im Dateisystem:`, 'error', error);
                 
-                // Prüfen, ob es sich um einen Berechtigungsfehler handelt
-                if (error.name === 'NotAllowedError' || 
-                    (error.message && error.message.includes('permission'))) {
-                    
-                    // Hinweis anzeigen, dass der Zugriff auf den Speicherort erneut benötigt wird
-                    if (window.showWarning) {
-                        window.showWarning(
-                            'Der Zugriff auf den Speicherort wurde nicht gewährt. ' +
-                            'Bitte stellen Sie den Zugriff über die Schaltfläche "Speicherort wiederherstellen" wieder her.',
-                            8000
-                        );
-                    }
-                }
-                
-                // Fallback auf localStorage mit Größenprüfung
-                if (jsonData.length > 2000000) { // ~2MB Grenze
-                    log(`Datei ${resourceName} ist zu groß für localStorage (${jsonData.length} Bytes)`, 'error');
-                    if (window.showError) {
-                        window.showError(`Die Datei ${resourceName} ist zu groß für den Browser-Speicher. Bitte verwenden Sie den Dateisystemzugriff.`);
-                    }
-                    return false;
-                }
-                
+                // Fallback auf localStorage
                 try {
                     localStorage.setItem(getResourcePath(resourceName, username), jsonData);
+                    log(`ℹ Fallback auf localStorage: ${getResourcePath(resourceName, username)}`);
                     log(`Datei ${resourceName} als Fallback im localStorage gespeichert`);
                     return true;
                 } catch (storageError) {
-                    if (storageError.name === 'QuotaExceededError') {
-                        log(`Speicherplatz im Browser erschöpft für ${resourceName}`, 'error');
-                        if (window.showError) {
-                            window.showError(`Nicht genügend Speicherplatz im Browser. Bitte löschen Sie nicht benötigte Daten oder verwenden Sie den Dateisystemzugriff.`);
-                        }
-                    } else {
-                        log(`Fehler beim Speichern im localStorage: ${storageError.message}`, 'error');
-                        if (window.showError) {
-                            window.showError(`Fehler beim Speichern: ${storageError.message}`);
-                        }
+                    error(`Fehler beim Speichern im localStorage: ${storageError.message}`);
+                    if (window.showError) {
+                        window.showError(`Fehler beim Speichern: ${storageError.message}`);
                     }
                     return false;
                 }
             }
         } else {
-            // Fallback: In einer reinen Browser-Umgebung speichern wir im localStorage
-            // Größenprüfung für localStorage
-            if (jsonData.length > 2000000) { // ~2MB Grenze
-                log(`Datei ${resourceName} ist zu groß für localStorage (${jsonData.length} Bytes)`, 'error');
-                if (window.showError) {
-                    window.showError(`Die Datei ${resourceName} ist zu groß für den Browser-Speicher. Bitte aktivieren Sie den Dateisystemzugriff.`);
-                }
-                return false;
-            }
-            
+            // Fallback: Im localStorage speichern
             try {
                 localStorage.setItem(getResourcePath(resourceName, username), jsonData);
-                log(`Datei ${resourceName} im localStorage gespeichert (kein Dateisystemzugriff verfügbar)`, 'info');
+                log(`Datei ${resourceName} im localStorage gespeichert`, 'info');
                 return true;
             } catch (storageError) {
-                if (storageError.name === 'QuotaExceededError') {
-                    log(`Speicherplatz im Browser erschöpft für ${resourceName}`, 'error');
-                    if (window.showError) {
-                        window.showError(`Nicht genügend Speicherplatz im Browser. Bitte löschen Sie nicht benötigte Daten oder aktivieren Sie den Dateisystemzugriff.`);
-                    }
-                } else {
-                    log(`Fehler beim Speichern im localStorage: ${storageError.message}`, 'error');
-                    if (window.showError) {
-                        window.showError(`Fehler beim Speichern: ${storageError.message}`);
-                    }
+                log(`Fehler beim Speichern im localStorage: ${storageError.message}`, 'error');
+                if (window.showError) {
+                    window.showError(`Fehler beim Speichern: ${storageError.message}`);
                 }
                 return false;
             }
         }
     } catch (error) {
-        // Vermeiden von Doppelmeldungen und Rekursionen
-        if (error.name === 'QuotaExceededError') {
-            log(`Speicherplatz im Browser erschöpft beim Speichern von ${resourceName}`, 'error');
-            if (window.showError) {
-                window.showError(`Nicht genügend Speicherplatz im Browser. Bitte löschen Sie nicht benötigte Daten oder aktivieren Sie den Dateisystemzugriff.`);
-            }
-        } else {
-            log(`Fehler beim Speichern von ${resourceName}:`, 'error', error);
-            if (window.showError) {
-                window.showError(`Fehler beim Speichern der Daten: ${error.message}`);
-            }
+        log(`Fehler beim Speichern von ${resourceName}:`, 'error', error);
+        if (window.showError) {
+            window.showError(`Fehler beim Speichern der Daten: ${error.message}`);
         }
         return false;
     }
@@ -599,36 +532,27 @@ async function loadData(resourceName, defaultValue = null, username) {
         // Wenn wir einen DirectoryHandle haben, versuchen wir die Datei dort zu laden
         if (directoryHandle) {
             try {
-                // Berechtigung prüfen/erneuern
-                const permission = await directoryHandle.requestPermission({ mode: 'read' });
-                if (permission !== 'granted') {
-                    throw new Error('Keine Leseberechtigung für das Verzeichnis');
-                }
+                // Versuchen, die Datei zu öffnen - der Browser kümmert sich selbst um die Berechtigungsanfrage
+                const fileHandle = await directoryHandle.getFileHandle(resourceName);
+                const file = await fileHandle.getFile();
+                const text = await file.text();
                 
-                // Versuchen, die Datei zu öffnen
-                try {
-                    const fileHandle = await directoryHandle.getFileHandle(resourceName);
-                    const file = await fileHandle.getFile();
-                    const text = await file.text();
-                    
-                    return JSON.parse(text);
-                } catch (fileError) {
-                    if (fileError.name === 'NotFoundError') {
-                        // Die Datei existiert noch nicht
+                return JSON.parse(text);
+            } catch (error) {
+                // Fallback auf localStorage
+                if (error.name === 'NotFoundError') {
+                    // Wenn die Datei nicht gefunden wurde, versuchen wir localStorage
+                    const jsonData = localStorage.getItem(getResourcePath(resourceName, username));
+                    if (jsonData === null) {
                         return defaultValue;
                     }
-                    throw fileError;
+                    return JSON.parse(jsonData);
                 }
-            } catch (error) {
-                log(`Fehler beim Laden von ${resourceName} aus dem Dateisystem:`, 'error', error);
-                
-                // Fallback auf localStorage
             }
         }
         
-        // Fallback: In einer reinen Browser-Umgebung laden wir aus dem localStorage
+        // Aus dem localStorage laden
         const jsonData = localStorage.getItem(getResourcePath(resourceName, username));
-        
         if (jsonData === null) {
             return defaultValue;
         }
@@ -795,6 +719,7 @@ async function getCustomDirectoryHandle(username) {
         // Prüfen, ob ein benutzerdefinierter Pfad verwendet wird
         if (isDefaultPath(currentUsername)) {
             // Für den Standardpfad benötigen wir kein Handle
+            console.log('Standard-Speicherort wird verwendet, kein Handle nötig');
             return null;
         }
         
@@ -802,49 +727,45 @@ async function getCustomDirectoryHandle(username) {
         if (directoryHandle) {
             try {
                 // Die Berechtigung wird automatisch angefragt, wenn nötig
-                await directoryHandle.requestPermission({ mode: 'readwrite' });
-                return directoryHandle;
-            } catch (error) {
-                console.log('Vorhandenes Handle konnte nicht verwendet werden:', error);
-            }
-        }
-        
-        // In diesem Fall muss der Benutzer den Ordner auswählen
-        // Die showDirectoryPicker-Methode muss als Reaktion auf eine Benutzeraktion aufgerufen werden
-        console.log('Benutzer muss Ordner auswählen');
-        
-        // Prüfen, ob diese Funktion explizit durch Benutzeraktion aufgerufen wurde
-        // oder ob wir in einem expliziten Kontext zum Öffnen des Pickers aufgerufen wurden (z.B. durch Button-Klick)
-        const isExplicitUserAction = window._userInteractionActive || 
-                                     (window._lastInteractionTime && (Date.now() - window._lastInteractionTime < 1000)) ||
-                                     window._forceDirectoryPicker === true;
-        
-        if (isExplicitUserAction) {
-            try {
-                const result = await openDirectoryPicker();
-                if (result && result.handle) {
-                    return result.handle;
-                }
-            } catch (error) {
-                // Wenn der Fehler "Must be handling a user gesture" ist, zeigen wir eine bessere Fehlermeldung
-                if (error.name === 'SecurityError' && error.message.includes('user gesture')) {
-                    if (window.showNotification) {
-                        window.showNotification('Bitte klicke auf "Ordner wählen", um deinen Datenordner auszuwählen', 'info');
-                    }
-                    console.warn('Die Ordnerauswahl benötigt eine direkte Benutzeraktion');
+                const permission = await directoryHandle.requestPermission({ mode: 'readwrite' });
+                if (permission === 'granted') {
+                    log('Vorhandenes DirectoryHandle erfolgreich verwendet');
+                    return directoryHandle;
                 } else {
-                    console.error('Fehler bei der Ordnerauswahl:', error);
+                    log('Vorhandenes DirectoryHandle kann nicht verwendet werden: Keine Berechtigung', 'warn');
+                    return null;
                 }
+            } catch (error) {
+                log('Vorhandenes Handle konnte nicht verwendet werden:', 'error', error);
+                return null;
             }
         } else {
-            // Wir öffnen den Directory Picker NICHT automatisch
-            // Stattdessen verwenden wir den Standard-Speicherort
-            console.log('Verwende Standard-Speicherort, kein automatisches Öffnen des Ordnerdialogs');
+            // Versuchen, ein Handle aus der IndexedDB zu laden
+            if (window.loadDirectoryHandle) {
+                try {
+                    const savedHandle = await window.loadDirectoryHandle();
+                    if (savedHandle) {
+                        // Prüfen, ob wir Berechtigung haben
+                        if (window.verifyPermission) {
+                            const permission = await window.verifyPermission(savedHandle);
+                            if (permission === 'granted') {
+                                // Handle global setzen
+                                directoryHandle = savedHandle;
+                                log('Gespeichertes Verzeichnis-Handle wiederhergestellt');
+                                return directoryHandle;
+                            }
+                        }
+                    }
+                } catch (error) {
+                    warn('Fehler beim Laden des gespeicherten Handles:', error);
+                }
+            }
+            
+            log('Kein DirectoryHandle vorhanden, kann nicht automatisch wiederhergestellt werden', 'warn');
+            return null;
         }
-        
-        return null;
     } catch (error) {
-        console.error('Fehler beim Zugriff auf benutzerdefinierten Speicherort:', error);
+        error('Fehler beim Zugriff auf benutzerdefinierten Speicherort:', error);
         return null;
     }
 }
@@ -857,27 +778,27 @@ async function getCustomDirectoryHandle(username) {
 async function testFileAccess() {
     try {
         if (!directoryHandle) {
-            console.error('Kein DirectoryHandle vorhanden. Bitte wählen Sie zuerst einen Speicherort aus.');
+            log('Kein DirectoryHandle vorhanden. Bitte wählen Sie zuerst einen Speicherort aus.', 'warn');
             return false;
         }
         
         // Testdatei erstellen
         const testResult = await saveTestFile(directoryHandle);
-        console.log('Testdatei erfolgreich erstellt:', testResult);
+        log('Testdatei erfolgreich erstellt:', 'info', testResult);
         
         // Jetzt versuchen, die Datei zu lesen
         try {
             const fileHandle = await directoryHandle.getFileHandle('lernapp_test.txt');
             const file = await fileHandle.getFile();
             const text = await file.text();
-            console.log('Testdatei Inhalt:', text);
+            log('Testdatei Inhalt:', 'info', text);
             return true;
         } catch (readError) {
-            console.error('Fehler beim Lesen der Testdatei:', readError);
+            error('Fehler beim Lesen der Testdatei:', readError);
             return false;
         }
     } catch (error) {
-        console.error('Fehler beim Testen des Dateizugriffs:', error);
+        error('Fehler beim Testen des Dateizugriffs:', error);
         return false;
     }
 }
@@ -923,49 +844,39 @@ window.debugDirectoryHandleStatus = debugDirectoryHandleStatus;
 /**
  * Erstellt eine Testdatei im angegebenen Verzeichnis, um zu prüfen, ob der Zugriff funktioniert.
  * @param {Object} dirHandle - Das Verzeichnis-Handle.
- * @returns {Promise<void>} Promise, das aufgelöst wird, wenn die Testdatei erstellt wurde.
+ * @returns {Promise<boolean>} Promise, das aufgelöst wird, wenn die Testdatei erstellt wurde.
  */
 async function saveTestFile(dirHandle) {
     try {
-        // Überprüfen, ob es sich um ein gültiges DirectoryHandle-Objekt handelt
-        if (!dirHandle || typeof dirHandle !== 'object' || typeof dirHandle.getFileHandle !== 'function') {
-            throw new Error('Ungültiges Directory Handle - Es werden keine Dateioperationen unterstützt');
+        if (!dirHandle) {
+            log('Kein Verzeichnis-Handle vorhanden.', 'error');
+            return false;
         }
 
-        // Berechtigung prüfen/erneuern, falls die Methode existiert
-        if (typeof dirHandle.requestPermission === 'function') {
-            const permission = await dirHandle.requestPermission({ mode: 'readwrite' });
-            if (permission !== 'granted') {
-                throw new Error('Keine Schreibberechtigung für das Verzeichnis');
-            }
-        } else {
-            console.log('Keine requestPermission-Methode im Directory Handle - fahre ohne Berechtigungsprüfung fort');
-            // Wenn requestPermission nicht unterstützt wird, versuchen wir trotzdem, eine Datei zu schreiben
-            // Der Fehler wird dann beim Versuch, die Datei zu schreiben, auftreten, falls keine Berechtigung vorliegt
+        // Überprüfen, ob es sich um ein gültiges DirectoryHandle-Objekt handelt
+        if (!dirHandle || typeof dirHandle !== 'object' || typeof dirHandle.getFileHandle !== 'function') {
+            throw new Error('Ungültiges Directory Handle');
         }
-        
-        // Testdatei erstellen/öffnen
+
+        // Testdatei erstellen/öffnen - der Browser kümmert sich selbst um Berechtigungen
         const fileHandle = await dirHandle.getFileHandle('lernapp_test.txt', { create: true });
-        
-        // Schreibbaren Stream holen
         const writable = await fileHandle.createWritable();
         
         // Testdaten schreiben
         const testData = `LernApp Testzugriff - ${new Date().toISOString()}`;
         await writable.write(testData);
-        
-        // Stream schließen
         await writable.close();
         
         return true;
     } catch (error) {
-        console.error('Fehler beim Erstellen der Testdatei:', error);
+        error('Fehler beim Erstellen der Testdatei:', error);
         throw error;
     }
 }
 
 /**
- * Erstellt die initialen Datenbankdateien im angegebenen Verzeichnis.
+ * Erstellt die initialen Datenbankdateien im angegebenen Verzeichnis
+ * oder verwendet die bereits vorhandenen Dateien, wenn sie gültig sind.
  * @param {Object} dirHandle - Das Verzeichnis-Handle.
  */
 async function createInitialDatabaseFiles(dirHandle) {
@@ -975,46 +886,102 @@ async function createInitialDatabaseFiles(dirHandle) {
             return false;
         }
 
-        // Liste der Datenbankdateien, die erstellt werden sollen
+        // Liste der Datenbankdateien
         const dbFiles = [
-            { name: 'questions.json', defaultContent: '[]' },
-            { name: 'categories.json', defaultContent: '[]' },
-            { name: 'groups.json', defaultContent: '[]' },
-            { name: 'statistics.json', defaultContent: '{}' }
+            { name: 'questions.json', defaultContent: '[]', type: 'array' },
+            { name: 'categories.json', defaultContent: '[]', type: 'array' },
+            { name: 'groups.json', defaultContent: '[]', type: 'array' },
+            { name: 'statistics.json', defaultContent: '{}', type: 'object' }
         ];
         
-        // Für jede Datei prüfen, ob sie existiert, und wenn nicht, erstellen
+        // Für jede Datei prüfen, ob sie existiert und gültig ist
         for (const file of dbFiles) {
             try {
-                // Versuchen, die Datei zu öffnen (prüfen, ob sie existiert)
+                // Prüfen, ob Datei existiert
+                let fileHandle;
                 let fileExists = false;
+                let createNewFile = false;
+                
                 try {
-                    await dirHandle.getFileHandle(file.name);
+                    fileHandle = await dirHandle.getFileHandle(file.name);
                     fileExists = true;
                 } catch (fileError) {
-                    // Datei existiert nicht, was wir erwarten
+                    // Datei existiert nicht
                     fileExists = false;
+                    createNewFile = true;
                 }
 
-                if (!fileExists) {
-                    log(`Datei ${file.name} wird erstellt`, 'info');
-                    
-                    // Datei erstellen
-                    const fileHandle = await dirHandle.getFileHandle(file.name, { create: true });
-                    const writable = await fileHandle.createWritable();
+                if (fileExists) {
+                    // Datei existiert - prüfen, ob der Inhalt gültig ist
+                    try {
+                        const fileObject = await fileHandle.getFile();
+                        const content = await fileObject.text();
+                        
+                        // Versuchen, den Inhalt als JSON zu parsen
+                        const parsedContent = JSON.parse(content);
+                        
+                        // Prüfen, ob der Inhalt dem erwarteten Typ entspricht
+                        const isValid = (file.type === 'array' && Array.isArray(parsedContent)) || 
+                                       (file.type === 'object' && typeof parsedContent === 'object' && !Array.isArray(parsedContent));
+                        
+                        if (isValid) {
+                            // Datei ist gültig, keine Aktion erforderlich
+                            log(`Vorhandene Datei ${file.name} wird verwendet.`, 'info');
+                            // Wichtig: hier nichts weiter tun, gültige Datei behalten
+                            continue;
+                        } else {
+                            // Datei hat ungültigen Typ - sichern und überschreiben
+                            log(`Datei ${file.name} hat ungültigen Typ. Erstelle Sicherungskopie.`, 'warn');
+                            
+                            // Sicherungskopie erstellen
+                            const backupName = `${file.name}.backup-${Date.now()}`;
+                            const backupHandle = await dirHandle.getFileHandle(backupName, { create: true });
+                            const backupWritable = await backupHandle.createWritable();
+                            await backupWritable.write(content);
+                            await backupWritable.close();
+                            
+                            // Neue Datei erstellen
+                            createNewFile = true;
+                        }
+                    } catch (parseError) {
+                        // Datei ist beschädigt - sichern und überschreiben
+                        log(`Datei ${file.name} ist beschädigt. Erstelle Sicherungskopie.`, 'warn');
+                        
+                        try {
+                            // Original-Inhalt auslesen
+                            const fileObject = await fileHandle.getFile();
+                            const content = await fileObject.text();
+                            
+                            // Sicherungskopie erstellen
+                            const backupName = `${file.name}.backup-${Date.now()}`;
+                            const backupHandle = await dirHandle.getFileHandle(backupName, { create: true });
+                            const backupWritable = await backupHandle.createWritable();
+                            await backupWritable.write(content);
+                            await backupWritable.close();
+                            
+                            // Neue Datei erstellen
+                            createNewFile = true;
+                        } catch (backupError) {
+                            log(`Fehler beim Erstellen der Sicherungskopie von ${file.name}:`, 'error', backupError);
+                            createNewFile = true;
+                        }
+                    }
+                }
+                
+                // Nur neue Datei erstellen, wenn nötig (nicht existierend oder ungültig)
+                if (createNewFile) {
+                    log(`Erstelle neue Datei ${file.name}`, 'info');
+                    const newFileHandle = await dirHandle.getFileHandle(file.name, { create: true });
+                    const writable = await newFileHandle.createWritable();
                     await writable.write(file.defaultContent);
                     await writable.close();
-                    
-                    log(`Datei ${file.name} wurde erfolgreich erstellt`, 'info');
-                } else {
-                    log(`Datei ${file.name} existiert bereits`, 'info');
                 }
+                
             } catch (error) {
-                log(`Fehler beim Erstellen der Datei ${file.name}:`, 'error', error);
+                log(`Fehler beim Verarbeiten der Datei ${file.name}:`, 'error', error);
             }
         }
         
-        log('Alle Datenbankdateien wurden überprüft/erstellt', 'info');
         return true;
     } catch (error) {
         log('Fehler beim Erstellen der Datenbankdateien:', 'error', error);
@@ -1029,8 +996,11 @@ async function createInitialDatabaseFiles(dirHandle) {
  */
 async function checkStorage() {
     try {
-        const username = localStorage.getItem('username');
-        if (!username) return false; // Nicht eingeloggt
+        const currentUsername = username || localStorage.getItem('username');
+        if (!currentUsername) {
+            log('Kein eingeloggter Benutzer gefunden.', 'warn');
+            return false; // Nicht eingeloggt
+        }
         
         // Prüfen, ob ein benutzerdefinierter Speicherort verwendet wird
         if (isDefaultPath(username)) {
@@ -1054,7 +1024,7 @@ async function checkStorage() {
         
         return true;
     } catch (error) {
-        console.error('Fehler bei der Speicherort-Überprüfung:', error);
+        error('Fehler bei der Speicherort-Überprüfung:', error);
         return false;
     }
 }
@@ -1078,7 +1048,7 @@ async function migrateStorage(newDirectoryHandle, username) {
         
         // Auflisten aller Ressourcen am aktuellen Speicherort
         const resources = await listResources(currentUsername);
-        console.log(`${resources.length} Ressourcen werden migriert:`, resources);
+        log(`${resources.length} Ressourcen werden migriert:`, 'info', resources);
         
         // Ergebnisstatistik initialisieren
         const result = {
@@ -1115,7 +1085,7 @@ async function migrateStorage(newDirectoryHandle, username) {
                     }
                 }
             } catch (error) {
-                console.error(`Fehler beim Migrieren von ${resourceName}:`, error);
+                error(`Fehler beim Migrieren von ${resourceName}:`, error);
                 result.failed++;
                 result.failedResources.push(resourceName);
             }
@@ -1130,7 +1100,7 @@ async function migrateStorage(newDirectoryHandle, username) {
         
         return result;
     } catch (error) {
-        console.error('Fehler bei der Speicherort-Migration:', error);
+        error('Fehler bei der Speicherort-Migration:', error);
         throw error;
     }
 }
@@ -1209,98 +1179,67 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     if (!isStoragePathConfigured(currentUsername)) {
         // Standard-Speicherort festlegen, wenn noch keiner gesetzt ist (ohne Benachrichtigung)
-        console.log('Initialisiere Standard-Speicherort');
+        log('Initialisiere Standard-Speicherort');
         await setStoragePath(DEFAULT_STORAGE_PATH, currentUsername);
     } else {
-        const path = getStoragePath(currentUsername);
-        console.log('Konfigurierter Speicherort gefunden');
+        // Zentrales Logging verwenden, wenn verfügbar
+        const log = window.logger ? window.logger.info.bind(window.logger) : console.log;
+        const warn = window.logger ? window.logger.warn.bind(window.logger) : console.warn;
+        const error = window.logger ? window.logger.error.bind(window.logger) : console.error;
         
-        // Wenn ein Verzeichnis-Handle zuvor verwendet wurde, versuchen wir ihn wiederherzustellen
-        if (localStorage.getItem('hasDirectoryHandle') === 'true') {
-            console.log('Ein Verzeichnis-Handle wurde zuvor verwendet - versuche Wiederherstellung');
-            
-            // Wir zeigen einen Hinweis an, dass der Benutzer das Verzeichnis wieder auswählen muss
-            if (window.showNotification) {
-                window.showNotification(
-                    'Bitte wählen Sie den Speicherort erneut aus, um Dateien direkt zu speichern',
-                    'info',
-                    6000
-                );
-            }
-            
-            // Wir setzen eine Variable, die beim EXPLIZITEN Aufruf von getCustomDirectoryHandle
-            // verwendet werden kann
-            window.hadDirectoryHandle = true;
-            
-            // Wir warten kurz und zeigen dann einen Button an, um den Speicherort zu wählen
-            setTimeout(() => {
-                const createRestoreButton = () => {
-                    // Prüfen, ob der Button bereits existiert
-                    if (document.getElementById('restore-storage-button')) return;
-                    
-                    // Button für die Wiederherstellung des Speicherorts erstellen
-                    const button = document.createElement('button');
-                    button.id = 'restore-storage-button';
-                    button.className = 'btn btn-primary btn-sm';
-                    button.innerHTML = '<i class="fas fa-folder-open"></i> Speicherort wiederherstellen';
-                    button.style.position = 'fixed';
-                    button.style.bottom = '20px';
-                    button.style.right = '20px';
-                    button.style.zIndex = '1000';
-                    
-                    // Event-Listener für den Button
-                    button.addEventListener('click', async () => {
-                        // Flag setzen, damit der Directory Picker geöffnet werden kann
-                        window._forceDirectoryPicker = true;
-                        
-                        try {
-                            // Verzeichnis auswählen
-                            const result = await openDirectoryPicker();
-                            if (result && result.handle) {
-                                // Speicherort setzen
-                                await setStoragePath({
-                                    path: result.path,
-                                    handle: result.handle
-                                }, currentUsername);
-                                
-                                // Button entfernen
-                                button.remove();
-                                
-                                // Erfolgshinweis anzeigen
-                                if (window.showSuccess) {
-                                    window.showSuccess('Speicherort wurde wiederhergestellt!');
-                                }
-                                
-                                // Testdatei schreiben, um zu prüfen, ob alles funktioniert
-                                await testFileAccess();
-                                
-                                // Seite neu laden, um sicherzustellen, dass alle Daten neu geladen werden
-                                setTimeout(() => {
-                                    window.location.reload();
-                                }, 1500);
-                            }
-                        } catch (error) {
-                            console.error('Fehler beim Wiederherstellen des Speicherorts:', error);
-                            if (window.showError) {
-                                window.showError('Fehler beim Wiederherstellen des Speicherorts');
-                            }
-                        } finally {
-                            window._forceDirectoryPicker = false;
-                        }
-                    });
-                    
-                    // Button zum Body hinzufügen
-                    document.body.appendChild(button);
-                };
+        log('Konfigurierter Speicherort gefunden');
+        
+        // Versuchen, den DirectoryHandle zu verwenden, falls vorhanden
+        if (isFileSystemAccessSupported() && directoryHandle) {
+            log('Dateisystem-API wird unterstützt und DirectoryHandle vorhanden');
+            try {
+                // Versuchen, die Berechtigung vom Benutzer zu bekommen
+                const permission = await directoryHandle.requestPermission({ mode: 'readwrite' });
+                log(`Berechtigung für Verzeichnis: ${permission}`);
                 
-                // Wenn das DOM bereits geladen ist, Button sofort erstellen
-                if (document.readyState === 'complete') {
-                    createRestoreButton();
-                } else {
-                    // Sonst warten, bis das DOM geladen ist
-                    window.addEventListener('load', createRestoreButton);
+                if (permission !== 'granted') {
+                    warn('Keine Schreibberechtigung für das Verzeichnis');
                 }
-            }, 2000);
+            } catch (permError) {
+                error(`Fehler beim Prüfen der Berechtigung: ${permError.message}`);
+            }
+        } else if (isFileSystemAccessSupported()) {
+            warn('Dateisystem-API wird unterstützt, aber kein DirectoryHandle vorhanden');
+            
+            // Umfassende Wiederherstellungsversuche
+            // 1. Versuchen, das DirectoryHandle aus IndexedDB zu laden mit standardmäßiger Methode
+            if (window.restoreDirectoryHandle) {
+                log('Versuche, gespeichertes DirectoryHandle wiederherzustellen...');
+                try {
+                    const restoredHandle = await window.restoreDirectoryHandle();
+                    if (restoredHandle) {
+                        log(`DirectoryHandle wiederhergestellt: ${restoredHandle.name}`);
+                        directoryHandle = restoredHandle;
+                    } else {
+                        warn('Kein gespeichertes DirectoryHandle gefunden');
+                        
+                        // 2. Wenn das fehlschlägt, erweiterte Wiederherstellungsmethode versuchen
+                        if (window.forceRestoreDirectoryHandle) {
+                            log('Versuche erweiterte Wiederherstellungsmethode...');
+                            try {
+                                const forcedHandle = await window.forceRestoreDirectoryHandle();
+                                if (forcedHandle) {
+                                    log(`DirectoryHandle durch erweiterte Methode wiederhergestellt: ${forcedHandle.name}`);
+                                    directoryHandle = forcedHandle;
+                                } else {
+                                    warn('Auch die erweiterte Wiederherstellungsmethode konnte kein Handle finden');
+                                }
+                            } catch (forceError) {
+                                error(`Fehler bei der erweiterten Wiederherstellungsmethode: ${forceError.message}`);
+                            }
+                        }
+                    }
+                } catch (restoreError) {
+                    error(`Fehler bei der Wiederherstellung des DirectoryHandle: ${restoreError.message}`);
+                }
+            }
+        } else {
+            log('Dateisystem-API wird nicht unterstützt, verwende localStorage');
         }
     }
 });

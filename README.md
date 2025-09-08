@@ -240,6 +240,68 @@ Die LernApp bietet eine flexible Speicherkonfiguration für die Fragendatenbank 
 - **resetStoragePath(username)**: Setzt den Speicherort für den angegebenen Benutzer auf den Standardpfad zurück.
 - **verifyStoragePath()**: Prüft, ob der konfigurierte Speicherort existiert und zugänglich ist.
 
+#### Persistenter Dateisystem-Zugriff
+Die LernApp verwendet eine erweiterte Technik, um DirectoryHandles über Seitenaufrufe hinweg zu persistieren:
+
+- **IndexedDB-Speicherung**: Verzeichnis-Handles werden in der IndexedDB gespeichert, um sie zwischen Seitenaufrufen und sogar nach Browser-Neustarts beizubehalten.
+- **Automatische Wiederherstellung**: Beim Laden der Seite werden gespeicherte Handles automatisch geladen und validiert.
+- **Berechtigungsmanagement**: Die App kümmert sich automatisch um die Anforderung und Erneuerung von Berechtigungen.
+- **Benutzerfreundliche Benachrichtigungen**: Statt automatischer Dialoge zeigt die App benutzerfreundliche Benachrichtigungen, wenn eine Benutzerinteraktion erforderlich ist.
+- **Erweiterte Wiederherstellungsversuche**: Die App implementiert mehrere Fallback-Mechanismen, um DirectoryHandles bei Seitenwechseln zu erhalten.
+
+#### Problembehandlung für DirectoryHandle-Persistenz
+
+Die LernApp verwaltet den Speicherort-Zugriff vollautomatisch. Sollte trotzdem einmal eine Meldung wie "Dateisystem-API wird unterstützt, aber kein DirectoryHandle vorhanden" erscheinen, bietet die App folgende benutzerfreundliche Lösungen:
+
+1. **Automatische Wiederherstellung**: Die App versucht automatisch, den Zugriff wiederherzustellen ohne Benutzerinteraktion.
+
+2. **Benutzerfreundliche Benachrichtigung**: Falls die automatische Wiederherstellung fehlschlägt, erscheint eine Benachrichtigung mit einem klaren "Speicherort neu auswählen"-Button, der den Zugriff mit einem Klick wiederherstellt.
+
+3. **Speicherort im Profil**: Im Benutzerprofil kann der Speicherort jederzeit über einen einfachen Dialog neu festgelegt werden.
+
+4. **Alternativer Standardspeicher**: Die Option "Standardspeicherort verwenden" im Profil stellt sicher, dass die Daten immer lokal im Browser gespeichert werden, ohne dass ein Dateisystemzugriff nötig ist.
+
+Diese Tools sind speziell dafür entwickelt, die persistente Speicherung von DirectoryHandles zu unterstützen und Probleme bei der Beibehaltung von Dateisystem-Berechtigungen zwischen Seitenaufrufen zu beheben.
+- **storeDirectoryHandle(handle)**: Speichert ein Verzeichnis-Handle in IndexedDB für spätere Verwendung.
+- **loadDirectoryHandle()**: Lädt ein gespeichertes Verzeichnis-Handle aus IndexedDB.
+- **verifyPermission(handle)**: Prüft und fordert Berechtigungen für ein Verzeichnis-Handle an.
+- **restoreDirectoryHandle()**: Stellt ein gespeichertes Verzeichnis-Handle wieder her und validiert die Berechtigungen.
+- **openAndPersistDirectoryPicker()**: Öffnet den Dateibrowser und speichert das ausgewählte Handle automatisch.
+- **forceRestoreDirectoryHandle()**: Erweiterte Wiederherstellungsmethode für DirectoryHandles mit zusätzlichen Fallback-Mechanismen.
+
+#### Debugging des Dateisystem-Zugriffs
+Die LernApp bietet spezielle Debugging-Tools für den Dateisystem-Zugriff:
+
+- **debugPersistentStorage()**: Führt eine vollständige Diagnose des Dateisystem-Zugriffs durch und zeigt den Status der DirectoryHandle-Persistenz.
+- **clearStoredDirectoryHandle()**: Löscht ein gespeichertes DirectoryHandle für einen Neustart der Speicherkonfiguration.
+- **testFileAccess()**: Testet den Dateisystem-Zugriff durch Schreiben einer Testdatei und zeigt das Ergebnis im Log.
+- **debugDirectoryHandleStatus()**: Zeigt den aktuellen Status des DirectoryHandle-Objekts und der zugehörigen Flags.
+
+Diese Tools können über die Browser-Konsole aufgerufen werden und sind besonders nützlich bei der Diagnose von Problemen mit der Dateisystem-Persistenz zwischen Seitenaufrufen. Die Tools verwenden das zentrale Logging-System, um konsistente und leicht verfolgbare Ausgaben zu erzeugen.
+
+### Zentrales Logging-System
+
+Die LernApp implementiert ein zentrales Logging-System, das in allen Modulen verwendet wird, um konsistente und leicht nachverfolgbare Log-Ausgaben zu ermöglichen:
+
+#### Funktionen des Logging-Systems
+- **Zentralisierte Logs**: Alle Logs werden über einen zentralen Logger ausgegeben, um eine einheitliche Formatierung zu gewährleisten.
+- **Log-Level**: Unterstützung verschiedener Log-Level (info, warn, error) mit entsprechender visueller Differenzierung.
+- **Zeitstempel**: Automatische Hinzufügung von Zeitstempeln zu allen Log-Einträgen.
+- **Persistente Logs**: Optionale Speicherung wichtiger Logs für spätere Diagnose.
+- **Rekursionsschutz**: Verhinderung von rekursiven Logging-Ketten, die zu Endlosschleifen führen könnten.
+
+#### Verwendung in Modulen
+Jedes Modul verwendet das zentrale Logging-System mit einem einheitlichen Adapter-Pattern:
+
+```javascript
+// Adapter für zentrales Logging
+const log = window.logger ? window.logger.info.bind(window.logger) : console.log;
+const warn = window.logger ? window.logger.warn.bind(window.logger) : console.warn;
+const error = window.logger ? window.logger.error.bind(window.logger) : console.error;
+```
+
+Dies erlaubt eine konsistente Logging-Ausgabe über alle Module hinweg, auch wenn der zentrale Logger nicht verfügbar ist (Fallback auf console-Methoden).
+
 ### Breadcrumb-Navigation
 
 Die LernApp verfügt über eine intuitive Breadcrumb-Navigation, die es den Benutzern ermöglicht, ihren aktuellen Standort in der Anwendung zu erkennen und einfach zu vorherigen Ebenen zurückzukehren:

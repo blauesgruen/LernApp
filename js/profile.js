@@ -87,31 +87,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 
                 currentStoragePathSpan.textContent = displayPath;
-                
-                // Prüfen, ob wir einen Hinweis anzeigen sollen, dass der Ordner neu ausgewählt werden muss
-                if (localStorage.getItem('hasDirectoryHandle') === 'true' && 
-                    localStorage.getItem('needsHandleRenewal') === 'true') {
-                    // Wir benötigen den Handle, aber er ist nicht verfügbar - Hinweis hinzufügen
-                    const hintSpan = document.createElement('span');
-                    hintSpan.textContent = ' (Bitte neu auswählen für vollen Dateizugriff)';
-                    hintSpan.style.color = '#ff9800';
-                    hintSpan.style.fontStyle = 'italic';
-                    hintSpan.style.fontSize = '0.8em';
-                    
-                    // Alten Hinweis entfernen, falls vorhanden
-                    const oldHint = currentStoragePathSpan.querySelector('span');
-                    if (oldHint) {
-                        oldHint.remove();
-                    }
-                    
-                    currentStoragePathSpan.appendChild(hintSpan);
-                }
             } else {
                 currentStoragePathSpan.textContent = 'Standard';
             }
         } else {
-            // Fehlermeldung anzeigen und in den Log schreiben (showError loggt automatisch)
-            showError("Speicherpfad-Funktionen nicht verfügbar. Bitte aktualisiere die Seite.");
+            // Fehlermeldung anzeigen und in den Log schreiben
+            console.error("Speicherpfad-Funktionen nicht verfügbar.");
             currentStoragePathSpan.textContent = 'Nicht verfügbar';
         }
     }
@@ -318,6 +299,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (success) {
                         // Handle wurde erfolgreich aktualisiert, alle Flags zurücksetzen
                         localStorage.removeItem('needsHandleRenewal');
+                        // Zurücksetzen des Benachrichtigungszählers
+                        localStorage.setItem('directoryNotificationCount', '0');
                         
                         // UI aktualisieren
                         updateStoragePathDisplay();
@@ -326,16 +309,9 @@ document.addEventListener('DOMContentLoaded', function() {
                         const gespeicherterPfad = window.getStoragePath(currentUsername);
                         showSuccess(`Speicherort "${gespeicherterPfad}" wurde erfolgreich konfiguriert und der Dateizugriff ist jetzt vollständig hergestellt.`);
                         
-                        // Jetzt explizit die Datenbankdateien im gewählten Verzeichnis erstellen
-                        if (window.directoryHandle) {
-                            try {
-                                // Die Funktion zum Erstellen der Datenbank aufrufen - diese ist in storage.js definiert
-                                await window.createInitialDatabaseFiles(window.directoryHandle);
-                                logMessage('Datenbankdateien im gewählten Verzeichnis erstellt.', 'info');
-                            } catch (dbError) {
-                                logMessage('Fehler beim Erstellen der Datenbankdateien: ' + dbError.message, 'error');
-                            }
-                        }
+                        // Die Datenbankdateien wurden bereits in der setStoragePath-Funktion initialisiert
+                        // Kein weiterer Aufruf von createInitialDatabaseFiles nötig
+                        logMessage('Speicherort wurde erfolgreich konfiguriert.', 'info');
                     } else {
                         showError('Der Speicherort konnte nicht gesetzt werden. Bitte wählen Sie einen anderen Ordner.');
                     }
@@ -352,6 +328,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Fehler anzeigen (wird automatisch auch geloggt)
                     showError(`Fehler beim Öffnen des Ordner-Auswahl-Dialogs: ${error.message}`);
                 }
+            } finally {
+                // Immer das Flag zurücksetzen
+                window._forceDirectoryPicker = false;
             }
         });
     }

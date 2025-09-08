@@ -1,0 +1,96 @@
+/* Feste Positionierung für Header und Footer */
+
+/* Header fixieren */
+nav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    z-index: 100;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+/* Breadcrumb-Container anpassen, damit er unter dem festen Header erscheint */
+.breadcrumb-container {
+    margin-top: calc(var(--bar-height) + 10px);
+}
+
+/* Abstand zum Body hinzufügen, damit der Inhalt unter dem festen Header beginnt */
+body {
+    padding-top: var(--bar-height);
+}
+
+/* Für Mobile Geräte (Tablets und kleiner) */
+@media (max-width: 768px) {
+    /* Header und Footer nicht fixieren bei kleineren Bildschirmen */
+    nav, footer {
+        position: relative;
+        box-shadow: none;
+    }
+    
+    /* Padding entfernen, da Header nicht mehr fixiert ist */
+    body {
+        padding-top: 0;
+    }
+    
+    /* Breadcrumb-Container ohne zusätzlichen Abstand */
+    .breadcrumb-container {
+        margin-top: 10px;
+    }
+    
+    /* Footer-Anpassung für mobile Geräte */
+    footer {
+        position: relative;
+        bottom: auto;
+        left: auto;
+    }
+    
+    /* Anpassung der Hauptinhaltsbereich-Margin */
+    main {
+        margin-bottom: 0;
+    }
+    
+    /* Inhaltselemente, die sonst mit dem Footer überlappen würden */
+    .quiz-container, 
+    .quiz-setup-card, 
+    .quiz-results-card, 
+    .question-creator-card,
+    .recent-questions-section,
+    .category-layout {
+        margin-bottom: 20px;
+    }
+}
+
+/* Für größere Tablets und Desktop-Geräte */
+@media (min-width: 769px) {
+    /* Header und Footer fixiert */
+    nav {
+        position: fixed;
+        top: 0;
+        left: 0;
+        z-index: 100;
+    }
+    
+    footer {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        z-index: 100;
+    }
+    
+    /* Body padding für Header */
+    body {
+        padding-top: var(--bar-height);
+    }
+    
+    /* Abstand für Inhalte, um den Footer zu berücksichtigen */
+    .quiz-container, 
+    .quiz-setup-card, 
+    .quiz-results-card, 
+    .question-creator-card,
+    .recent-questions-section,
+    .category-layout,
+    main {
+        margin-bottom: var(--bar-height);
+    }
+}
