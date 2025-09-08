@@ -144,40 +144,86 @@ async function verifyPermission(handle) {
  * @returns {Promise<boolean>} True, wenn das Handle erfolgreich geladen und die Berechtigung erteilt wurde
  */
 async function restoreDirectoryHandle() {
+    const logFunc = window.logger ? window.logger.info.bind(window.logger) : console.log;
+    const warnFunc = window.logger ? window.logger.warn.bind(window.logger) : console.warn;
+    const errorFunc = window.logger ? window.logger.error.bind(window.logger) : console.error;
+    
     try {
+        // Prüfen, ob wir bereits ein funktionierendes Handle haben
+        if (window.directoryHandle) {
+            logFunc('DirectoryHandle bereits geladen, prüfe Berechtigung...');
+            try {
+                const permission = await verifyPermission(window.directoryHandle);
+                if (permission === 'granted') {
+                    logFunc('Bestehendes DirectoryHandle hat gültige Berechtigung');
+                    return true;
+                } else {
+                    warnFunc('Bestehendes DirectoryHandle hat keine Berechtigung mehr');
+                }
+            } catch (permError) {
+                warnFunc(`Fehler bei der Berechtigungsprüfung des bestehenden Handles: ${permError.message}`);
+            }
+        }
+        
         // Lade das gespeicherte Handle
+        logFunc('Lade gespeichertes DirectoryHandle aus IndexedDB...');
         const handle = await loadDirectoryHandle();
         if (!handle) {
-            console.log('Kein persistentes Verzeichnis-Handle gefunden');
+            warnFunc('Kein persistentes Verzeichnis-Handle in IndexedDB gefunden');
             return false;
         }
+        
+        logFunc(`DirectoryHandle aus IndexedDB geladen: ${handle.name}`);
         
         // Prüfe die Berechtigung
-        const permission = await verifyPermission(handle);
-        if (permission !== 'granted') {
-            console.warn('Keine Berechtigung für das gespeicherte Verzeichnis-Handle');
+        try {
+            logFunc('Prüfe Berechtigung für geladenes Handle...');
+            const permission = await verifyPermission(handle);
             
-            // Benachrichtigung anzeigen, ohne automatisch einen Dialog zu öffnen
-            createPermissionRequiredNotification(handle);
+            if (permission === 'granted') {
+                logFunc('Berechtigung für DirectoryHandle erteilt');
+                
+                // Setze das globale directoryHandle
+                window.directoryHandle = handle;
+                
+                // Flags setzen
+                localStorage.setItem('hasDirectoryHandle', 'true');
+                localStorage.setItem('hasStoredDirectoryHandle', 'true');
+                
+                // Optional: Testen, ob der Zugriff wirklich funktioniert
+                try {
+                    const testResult = await testFileAccess();
+                    logFunc(`Dateisystem-Zugriffstest: ${testResult ? 'Erfolgreich' : 'Fehlgeschlagen'}`);
+                    
+                    if (!testResult) {
+                        warnFunc('Warnung: Handle geladen, aber Dateizugriff fehlgeschlagen');
+                        // Wir geben trotzdem true zurück, da das Handle gültig ist
+                    }
+                } catch (testError) {
+                    warnFunc(`Warnung beim Testen des Dateisystem-Zugriffs: ${testError.message}`);
+                    // Wir brechen hier nicht ab, da die Berechtigung bereits bestätigt wurde
+                }
+                
+                return true;
+            } else {
+                warnFunc(`Keine Berechtigung für das gespeicherte Verzeichnis-Handle: ${permission}`);
+                
+                // Wir setzen trotzdem das Handle, da später eine Benachrichtigung angezeigt werden kann
+                window.directoryHandle = handle;
+                
+                // Benachrichtigung anzeigen, ohne automatisch einen Dialog zu öffnen
+                createPermissionRequiredNotification(handle);
+                return false;
+            }
+        } catch (permError) {
+            errorFunc(`Fehler bei der Berechtigungsprüfung: ${permError.message}`);
+            
+            // Trotzdem das Handle setzen für spätere Versuche
+            window.directoryHandle = handle;
             return false;
         }
-        
-        // Setze das globale directoryHandle
-        window.directoryHandle = handle;
-        console.log('Persistentes Verzeichnis-Handle erfolgreich wiederhergestellt');
-        
-        // Optional: Testen, ob der Zugriff wirklich funktioniert
-        try {
-            await testFileAccess();
-            console.log('Dateisystem-Zugriff erfolgreich getestet');
-        } catch (testError) {
-            console.warn('Warnung beim Testen des Dateisystem-Zugriffs:', testError);
-            // Wir brechen hier nicht ab, da die Berechtigung bereits bestätigt wurde
-        }
-        
-        return true;
     } catch (error) {
-        console.error('Fehler beim Wiederherstellen des Verzeichnis-Handles:', error);
+        errorFunc(`Fehler beim Wiederherstellen des Verzeichnis-Handles: ${error.message}`);
         return false;
     }
 }

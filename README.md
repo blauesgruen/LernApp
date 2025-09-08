@@ -251,15 +251,19 @@ Die LernApp verwendet eine erweiterte Technik, um DirectoryHandles über Seitena
 
 #### Problembehandlung für DirectoryHandle-Persistenz
 
+#### Problembehandlung für DirectoryHandle-Persistenz
+
 Die LernApp verwaltet den Speicherort-Zugriff vollautomatisch. Sollte trotzdem einmal eine Meldung wie "Dateisystem-API wird unterstützt, aber kein DirectoryHandle vorhanden" erscheinen, bietet die App folgende benutzerfreundliche Lösungen:
 
-1. **Automatische Wiederherstellung**: Die App versucht automatisch, den Zugriff wiederherzustellen ohne Benutzerinteraktion.
+1. **Verbesserte automatische Wiederherstellung**: Die App implementiert jetzt ein mehrstufiges Wiederherstellungssystem, das automatisch verschiedene Methoden versucht, um den Dateizugriff ohne Benutzerinteraktion wiederherzustellen.
 
-2. **Benutzerfreundliche Benachrichtigung**: Falls die automatische Wiederherstellung fehlschlägt, erscheint eine Benachrichtigung mit einem klaren "Speicherort neu auswählen"-Button, der den Zugriff mit einem Klick wiederherstellt.
+2. **Intelligente Fallback-Mechanismen**: Wenn eine Wiederherstellungsmethode fehlschlägt, versucht die App automatisch alternative Ansätze zur Wiedererlangung des Zugriffs.
 
-3. **Speicherort im Profil**: Im Benutzerprofil kann der Speicherort jederzeit über einen einfachen Dialog neu festgelegt werden.
+3. **Benutzerfreundliche Benachrichtigung**: Nur wenn alle automatischen Wiederherstellungsversuche fehlschlagen, erscheint eine Benachrichtigung mit einem klaren "Speicherort neu auswählen"-Button.
 
-4. **Alternativer Standardspeicher**: Die Option "Standardspeicherort verwenden" im Profil stellt sicher, dass die Daten immer lokal im Browser gespeichert werden, ohne dass ein Dateisystemzugriff nötig ist.
+4. **Speicherort im Profil**: Im Benutzerprofil kann der Speicherort jederzeit über einen einfachen Dialog neu festgelegt werden.
+
+5. **Alternativer Standardspeicher**: Die Option "Standardspeicherort verwenden" im Profil stellt sicher, dass die Daten immer lokal im Browser gespeichert werden, ohne dass ein Dateisystemzugriff nötig ist.
 
 Diese Tools sind speziell dafür entwickelt, die persistente Speicherung von DirectoryHandles zu unterstützen und Probleme bei der Beibehaltung von Dateisystem-Berechtigungen zwischen Seitenaufrufen zu beheben.
 - **storeDirectoryHandle(handle)**: Speichert ein Verzeichnis-Handle in IndexedDB für spätere Verwendung.
@@ -268,6 +272,7 @@ Diese Tools sind speziell dafür entwickelt, die persistente Speicherung von Dir
 - **restoreDirectoryHandle()**: Stellt ein gespeichertes Verzeichnis-Handle wieder her und validiert die Berechtigungen.
 - **openAndPersistDirectoryPicker()**: Öffnet den Dateibrowser und speichert das ausgewählte Handle automatisch.
 - **forceRestoreDirectoryHandle()**: Erweiterte Wiederherstellungsmethode für DirectoryHandles mit zusätzlichen Fallback-Mechanismen.
+- **autoRepairDirectoryHandle()**: Neue Funktion, die mehrere Wiederherstellungsmethoden automatisch nacheinander versucht.
 
 #### Debugging des Dateisystem-Zugriffs
 Die LernApp bietet spezielle Debugging-Tools für den Dateisystem-Zugriff:

@@ -37,21 +37,28 @@ document.addEventListener('DOMContentLoaded', async () => {
                 try {
                     const testResult = await window.testFileAccess();
                     log(`Dateisystem-Zugriffstest: ${testResult ? 'Erfolgreich' : 'Fehlgeschlagen'}`);
+                    
+                    // Wenn der Test fehlschlägt, versuchen wir eine Reparatur
+                    if (!testResult) {
+                        log('Schreibzugriffstest fehlgeschlagen. Versuche Reparatur...');
+                        await autoRepairDirectoryHandle();
+                    }
                 } catch (testError) {
                     warn(`Fehler beim Testen des Dateisystemzugriffs: ${testError.message}`);
+                    await autoRepairDirectoryHandle();
                 }
                 
                 return;
             }
             
-            // Wir haben keinen Handle - aber können nicht automatisch danach fragen
-            warn('Kein DirectoryHandle verfügbar');
+            // Wir haben keinen Handle - versuchen automatische Wiederherstellung
+            warn('Kein DirectoryHandle verfügbar - versuche automatische Wiederherstellung...');
             
-            // Statt den Ordnerdialog direkt zu zeigen, einen Button hinzufügen, der es dem Benutzer erlaubt,
-            // den Speicherort bei Bedarf neu auszuwählen
+            // Versuche die automatische Wiederherstellung
+            const restored = await autoRepairDirectoryHandle();
             
-            // Button nur einmal anzeigen
-            if (!document.getElementById('storage-path-fix-button')) {
+            // Falls die Wiederherstellung fehlgeschlagen ist, zeigen wir den Button an
+            if (!restored && !document.getElementById('storage-path-fix-button')) {
                 // Button erstellen
                 createStoragePathPrompt();
             }
@@ -61,6 +68,121 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }, 1000); // 1 Sekunde Verzögerung
 });
+
+/**
+ * Versucht automatisch, das DirectoryHandle wiederherzustellen mit mehreren Methoden
+ * @returns {Promise<boolean>} True, wenn die Wiederherstellung erfolgreich war
+ */
+async function autoRepairDirectoryHandle() {
+    // Zentrales Logging verwenden, wenn verfügbar
+    const log = window.logger ? window.logger.info.bind(window.logger) : console.log;
+    const warn = window.logger ? window.logger.warn.bind(window.logger) : console.warn;
+    const error = window.logger ? window.logger.error.bind(window.logger) : console.error;
+    
+    log('Starte automatische Wiederherstellung des DirectoryHandle...');
+    
+    // 1. Versuch: Direkte Wiederherstellung mit der Standardfunktion
+    if (window.restoreDirectoryHandle) {
+        try {
+            log('Methode 1: Versuche restoreDirectoryHandle...');
+            const success = await window.restoreDirectoryHandle();
+            if (success) {
+                log('DirectoryHandle erfolgreich wiederhergestellt mit restoreDirectoryHandle!');
+                return true;
+            }
+        } catch (e) {
+            warn(`Fehler bei Methode 1: ${e.message}`);
+        }
+    }
+    
+    // 2. Versuch: Erweiterte Wiederherstellung mit forceRestoreDirectoryHandle
+    if (window.forceRestoreDirectoryHandle) {
+        try {
+            log('Methode 2: Versuche forceRestoreDirectoryHandle...');
+            const handle = await window.forceRestoreDirectoryHandle();
+            if (handle) {
+                window.directoryHandle = handle;
+                log('DirectoryHandle erfolgreich wiederhergestellt mit forceRestoreDirectoryHandle!');
+                
+                // Testen, ob der Zugriff funktioniert
+                if (window.testFileAccess) {
+                    try {
+                        const testResult = await window.testFileAccess();
+                        if (testResult) {
+                            log('Dateisystem-Zugriffstest erfolgreich!');
+                            // Erfolgsmeldung anzeigen
+                            if (window.showSuccess) {
+                                window.showSuccess('Speicherortzugriff automatisch wiederhergestellt.');
+                            }
+                            return true;
+                        }
+                    } catch (testError) {
+                        warn(`Fehler beim Testen des Zugriffs: ${testError.message}`);
+                    }
+                }
+            }
+        } catch (e) {
+            warn(`Fehler bei Methode 2: ${e.message}`);
+        }
+    }
+    
+    // 3. Versuch: Versuche eine IndexedDB-Wiederherstellung ohne die Standard-Funktionen
+    try {
+        log('Methode 3: Versuche manuelle IndexedDB-Wiederherstellung...');
+        const dbName = 'LernAppDirectoryHandles';
+        const storeName = 'lernapp-directory-handles';
+        const keyName = 'main-directory-handle';
+        
+        const db = await new Promise((resolve, reject) => {
+            const request = indexedDB.open(dbName, 1);
+            request.onerror = reject;
+            request.onsuccess = (event) => resolve(event.target.result);
+        });
+        
+        const handle = await new Promise((resolve, reject) => {
+            const tx = db.transaction(storeName, 'readonly');
+            const store = tx.objectStore(storeName);
+            const request = store.get(keyName);
+            request.onerror = reject;
+            request.onsuccess = () => resolve(request.result);
+        });
+        
+        if (handle && typeof handle === 'object') {
+            try {
+                const permission = await handle.requestPermission({ mode: 'readwrite' });
+                if (permission === 'granted') {
+                    window.directoryHandle = handle;
+                    log('DirectoryHandle erfolgreich wiederhergestellt mit manueller IndexedDB-Wiederherstellung!');
+                    
+                    // Testen, ob der Zugriff funktioniert
+                    if (window.testFileAccess) {
+                        try {
+                            const testResult = await window.testFileAccess();
+                            if (testResult) {
+                                log('Dateisystem-Zugriffstest erfolgreich!');
+                                // Erfolgsmeldung anzeigen
+                                if (window.showSuccess) {
+                                    window.showSuccess('Speicherortzugriff automatisch wiederhergestellt.');
+                                }
+                                return true;
+                            }
+                        } catch (testError) {
+                            warn(`Fehler beim Testen des Zugriffs: ${testError.message}`);
+                        }
+                    }
+                }
+            } catch (permError) {
+                warn(`Fehler bei der Berechtigungsprüfung: ${permError.message}`);
+            }
+        }
+    } catch (e) {
+        warn(`Fehler bei Methode 3: ${e.message}`);
+    }
+    
+    // Alle Methoden fehlgeschlagen
+    warn('Automatische Wiederherstellung fehlgeschlagen. Benutzerinteraktion erforderlich.');
+    return false;
+}
 
 /**
  * Erstellt eine Benachrichtigung mit einem Button, der es dem Benutzer ermöglicht,
@@ -87,7 +209,7 @@ function createStoragePathPrompt() {
                 <i class="fas fa-exclamation-triangle"></i>
             </div>
             <div class="notification-text">
-                <p>Der Zugriff auf Ihren Speicherort konnte nicht wiederhergestellt werden.</p>
+                <p>Die automatische Wiederherstellung des Speicherorts war nicht erfolgreich.</p>
                 <p>Ihre Daten werden momentan nur im Browser gespeichert und nicht synchronisiert.</p>
             </div>
             <div class="notification-actions">

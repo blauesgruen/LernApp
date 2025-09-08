@@ -342,11 +342,13 @@ async function forceRestoreDirectoryHandle() {
     if (window.restoreDirectoryHandle) {
         try {
             logFunc('Versuche, DirectoryHandle über normale Methode wiederherzustellen...');
-            const handle = await window.restoreDirectoryHandle();
-            if (handle) {
+            const result = await window.restoreDirectoryHandle();
+            if (result === true) {
                 logFunc('✓ DirectoryHandle über normale Methode wiederhergestellt');
-                window.directoryHandle = handle;
-                return handle;
+                return window.directoryHandle;
+            } else if (window.directoryHandle) {
+                logFunc('✓ DirectoryHandle nach Aufruf von restoreDirectoryHandle verfügbar');
+                return window.directoryHandle;
             }
         } catch (error) {
             warnFunc(`Normale Wiederherstellungsmethode fehlgeschlagen: ${error.message}`);
@@ -388,7 +390,35 @@ async function forceRestoreDirectoryHandle() {
             // Versuchen, Berechtigung zu erhalten
             try {
                 logFunc('Prüfe Berechtigung für wiederhergestellten Handle...');
-                const permission = await handle.requestPermission({ mode: 'readwrite' });
+                
+                // Teste verschiedene Arten, die Berechtigungen zu prüfen und anzufordern
+                let permission;
+                
+                // Zuerst die Standard-Methode
+                try {
+                    permission = await handle.requestPermission({ mode: 'readwrite' });
+                    logFunc(`Berechtigungsstatus: ${permission}`);
+                } catch (permError1) {
+                    warnFunc(`Fehler bei Standard-Berechtigungsprüfung: ${permError1.message}`);
+                    
+                    // Fallback 1: Versuchen, queryPermission zu verwenden
+                    try {
+                        permission = await handle.queryPermission({ mode: 'readwrite' });
+                        logFunc(`Berechtigung durch queryPermission: ${permission}`);
+                        
+                        // Wenn wir noch keine Berechtigung haben, versuchen wir es erneut anzufordern
+                        if (permission !== 'granted') {
+                            try {
+                                permission = await handle.requestPermission({ mode: 'readwrite' });
+                                logFunc(`Berechtigung nach queryPermission erneut angefordert: ${permission}`);
+                            } catch (permError2) {
+                                warnFunc(`Fehler bei erneuter Berechtigungsanfrage: ${permError2.message}`);
+                            }
+                        }
+                    } catch (permError3) {
+                        warnFunc(`Fehler bei queryPermission: ${permError3.message}`);
+                    }
+                }
                 
                 if (permission === 'granted') {
                     logFunc('✓ Berechtigung für wiederhergestellten Handle erhalten');
@@ -399,14 +429,32 @@ async function forceRestoreDirectoryHandle() {
                     localStorage.setItem('hasDirectoryHandle', 'true');
                     localStorage.setItem('hasStoredDirectoryHandle', 'true');
                     
+                    // Testen, ob der Zugriff tatsächlich funktioniert
+                    try {
+                        if (window.testFileAccess) {
+                            const testResult = await window.testFileAccess();
+                            logFunc(`Dateisystem-Zugriffstest: ${testResult ? 'Erfolgreich' : 'Fehlgeschlagen'}`);
+                        }
+                    } catch (testError) {
+                        warnFunc(`Warnung beim Testen des Dateisystemzugriffs: ${testError.message}`);
+                    }
+                    
                     return handle;
                 } else {
                     warnFunc(`✗ Keine Berechtigung für wiederhergestellten Handle: ${permission}`);
-                    return null;
+                    
+                    // Trotzdem das Handle zurückgeben, da der Benutzer später die Berechtigung erteilen kann
+                    logFunc('Handle wird zurückgegeben, auch ohne Berechtigung');
+                    window.directoryHandle = handle;
+                    return handle;
                 }
             } catch (permError) {
                 errorFunc(`Fehler bei der Berechtigungsprüfung: ${permError.message}`);
-                return null;
+                
+                // Trotzdem das Handle zurückgeben, da wir es später noch einmal versuchen können
+                logFunc('Handle wird trotz Fehler zurückgegeben');
+                window.directoryHandle = handle;
+                return handle;
             }
         }
         
