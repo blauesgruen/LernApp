@@ -7,14 +7,25 @@ var user = users.find(u => u.username === 'test');
 // Zentrale Funktion zur Verwaltung des Login-Status
 function setLoginStatus(isLoggedIn) {
     localStorage.setItem('loggedIn', isLoggedIn ? 'true' : 'false');
+    // Zeitstempel für den Login setzen
+    if (isLoggedIn) {
+        localStorage.setItem('loginTimestamp', Date.now().toString());
+    } else {
+        localStorage.removeItem('loginTimestamp');
+    }
 }
 
 function getLoginStatus() {
-    return localStorage.getItem('loggedIn') === 'true';
+    // Prüfen, ob sowohl der Login-Status als auch ein Username vorhanden ist
+    const isLoggedIn = localStorage.getItem('loggedIn') === 'true';
+    const username = localStorage.getItem('username');
+    
+    return isLoggedIn && username;
 }
 
 function clearLoginStatus() {
     localStorage.removeItem('loggedIn');
+    localStorage.removeItem('loginTimestamp');
 }
 
 // Sichtbarkeit der Buttons basierend auf Login-Status und Seite
@@ -231,6 +242,14 @@ async function handleLogin(username, password) {
             try {
                 // Prüfen ob ein Speicherort für den aktuellen Benutzer konfiguriert ist
                 const currentUsername = localStorage.getItem('username');
+                
+                // Zuerst die persistenten Speichermodule laden, falls noch nicht geladen
+                if (window.loadPersistentStorageModules) {
+                    logMessage('Lade persistente Speichermodule nach Login für Benutzer: ' + currentUsername);
+                    await window.loadPersistentStorageModules();
+                } else {
+                    logMessage('Warnung: loadPersistentStorageModules-Funktion nicht verfügbar', 'warn');
+                }
                 
                 // Speicherort für den Benutzer initialisieren
                 if (window.initializeStorageForUser) {

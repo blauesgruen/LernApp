@@ -1,0 +1,65 @@
+[
+  {
+    "id": "muscle-group-01",
+    "name": "Rumpf",
+    "description": "Muskeln des Rumpfes, einschließlich Rücken- und Bauchmuskulatur",
+    "categoryId": "muscle-anatomy-01",
+    "createdBy": "system",
+    "createdAt": "2025-09-08T12:00:00.000Z",
+    "updatedAt": "2025-09-08T12:00:00.000Z"
+  },
+  {
+    "id": "muscle-group-02",
+    "name": "Schultergürtel / Schulter",
+    "description": "Muskeln des Schultergürtels und der Schulter",
+    "categoryId": "muscle-anatomy-01",
+    "createdBy": "system",
+    "createdAt": "2025-09-08T12:00:00.000Z",
+    "updatedAt": "2025-09-08T12:00:00.000Z"
+  },
+  {
+    "id": "muscle-group-03",
+    "name": "Arm",
+    "description": "Muskeln des Oberarms und Unterarms",
+    "categoryId": "muscle-anatomy-01",
+    "createdBy": "system",
+    "createdAt": "2025-09-08T12:00:00.000Z",
+    "updatedAt": "2025-09-08T12:00:00.000Z"
+  },
+  {
+    "id": "muscle-group-04",
+    "name": "Hand",
+    "description": "Muskeln der Hand und Finger",
+    "categoryId": "muscle-anatomy-01",
+    "createdBy": "system",
+    "createdAt": "2025-09-08T12:00:00.000Z",
+    "updatedAt": "2025-09-08T12:00:00.000Z"
+  },
+  {
+    "id": "muscle-group-05",
+    "name": "Hüfte / Oberschenkel",
+    "description": "Muskeln der Hüfte und des Oberschenkels",
+    "categoryId": "muscle-anatomy-01",
+    "createdBy": "system",
+    "createdAt": "2025-09-08T12:00:00.000Z",
+    "updatedAt": "2025-09-08T12:00:00.000Z"
+  },
+  {
+    "id": "muscle-group-06",
+    "name": "Knie / Unterschenkel",
+    "description": "Muskeln des Knies und Unterschenkels",
+    "categoryId": "muscle-anatomy-01",
+    "createdBy": "system",
+    "createdAt": "2025-09-08T12:00:00.000Z",
+    "updatedAt": "2025-09-08T12:00:00.000Z"
+  },
+  {
+    "id": "muscle-group-07",
+    "name": "Fuß",
+    "description": "Muskeln des Fußes und der Zehen",
+    "categoryId": "muscle-anatomy-01",
+    "createdBy": "system",
+    "createdAt": "2025-09-08T12:00:00.000Z",
+    "updatedAt": "2025-09-08T12:00:00.000Z"
+  }
+]

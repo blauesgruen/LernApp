@@ -85,7 +85,7 @@ function loadModule(url) {
 }
 
 /**
- * Initialisiert die Ladereihenfolge
+ * Initialisiert die Ladereihenfolge basierend auf dem Login-Status
  */
 async function init() {
     try {
@@ -97,26 +97,38 @@ async function init() {
             log('Debug-Tools geladen, fahre mit Hauptmodulen fort', 'debug');
         }
         
-        // Persistentes Dateisystem laden
-        await loadModule(config.modules.persistentFileSystem);
+        // Prüfen, ob der Benutzer eingeloggt ist
+        const isLoggedIn = localStorage.getItem('loggedIn') === 'true' && localStorage.getItem('username');
         
-        // IndexedDB Fallback-Speicher laden
-        await loadModule(config.modules.storageIndexedDB);
+        if (isLoggedIn) {
+            log('Benutzer ist eingeloggt, lade alle Speichermodule', 'info');
+            // Nur für eingeloggte Benutzer: Persistentes Dateisystem laden
+            await loadModule(config.modules.persistentFileSystem);
+            
+            // IndexedDB Fallback-Speicher laden
+            await loadModule(config.modules.storageIndexedDB);
+            
+            // Storage-Access-Module laden (für Zugriffsüberprüfung)
+            await loadModule(config.modules.storageAccess);
+        } else {
+            log('Benutzer ist nicht eingeloggt, lade nur grundlegende Speichermodule', 'info');
+        }
         
-        // Storage-Access-Module laden (für Zugriffsüberprüfung)
-        await loadModule(config.modules.storageAccess);
-        
-        // Hauptspeichermodul laden
+        // Hauptspeichermodul wird immer geladen
         await loadModule(config.modules.storage);
         
         // Storage-Fix-Modul laden (für automatische Reparatur)
-        await loadModule(config.modules.storageFix);
+        if (isLoggedIn) {
+            await loadModule(config.modules.storageFix);
+        }
         
         // Ladevorgang abgeschlossen
-        log('Alle Speichermodule erfolgreich geladen', 'success');
+        log('Speichermodule erfolgreich geladen', 'success');
         
         // Event auslösen, dass alle Module geladen wurden
-        window.dispatchEvent(new Event('storageModulesLoaded'));
+        window.dispatchEvent(new CustomEvent('storageModulesLoaded', { 
+            detail: { isFullyLoaded: isLoggedIn } 
+        }));
     } catch (error) {
         log(`Kritischer Fehler beim Laden der Module: ${error.message}`, 'error');
         console.error('Ladevorgang fehlgeschlagen:', error);
@@ -125,6 +137,42 @@ async function init() {
         window.dispatchEvent(new CustomEvent('storageModulesLoadError', { detail: error }));
     }
 }
+
+/**
+ * Lädt die persistenten Speichermodule nach, die nur für eingeloggte Benutzer benötigt werden
+ * Diese Funktion sollte nach erfolgreichem Login aufgerufen werden
+ */
+async function loadPersistentStorageModules() {
+    try {
+        log('Lade persistente Speichermodule nach erfolgreichem Login', 'info');
+        
+        // Persistentes Dateisystem laden
+        await loadModule(config.modules.persistentFileSystem);
+        
+        // IndexedDB Fallback-Speicher laden
+        await loadModule(config.modules.storageIndexedDB);
+        
+        // Storage-Access-Module laden
+        await loadModule(config.modules.storageAccess);
+        
+        // Storage-Fix-Modul laden
+        await loadModule(config.modules.storageFix);
+        
+        log('Persistente Speichermodule erfolgreich nachgeladen', 'success');
+        
+        // Event auslösen
+        window.dispatchEvent(new CustomEvent('persistentStorageModulesLoaded'));
+        
+        return true;
+    } catch (error) {
+        log(`Fehler beim Nachladen der persistenten Speichermodule: ${error.message}`, 'error');
+        console.error('Nachladevorgang fehlgeschlagen:', error);
+        return false;
+    }
+}
+
+// Funktion global verfügbar machen
+window.loadPersistentStorageModules = loadPersistentStorageModules;
 
 // Ladevorgang starten, wenn das DOM geladen ist
 if (document.readyState === 'loading') {

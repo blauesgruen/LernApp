@@ -44,7 +44,8 @@ async function initHandleDb() {
                 
                 // Überprüfe, ob der Object Store wirklich existiert
                 if (!db.objectStoreNames.contains(DIR_HANDLE_STORE_NAME)) {
-                    console.error('Object Store existiert nicht nach erfolgreicher Datenbankverbindung!');
+                    // Nur intern loggen, nicht als Fehler anzeigen
+                    console.log('Debug: Object Store nicht gefunden nach Datenbankverbindung, versuche Neuinitialisierung...');
                     
                     // Schließe die DB und öffne sie mit erhöhter Version
                     db.close();
@@ -308,8 +309,11 @@ async function restoreDirectoryHandle() {
                 // Wir setzen trotzdem das Handle, da später eine Benachrichtigung angezeigt werden kann
                 window.directoryHandle = handle;
                 
-                // Benachrichtigung anzeigen, ohne automatisch einen Dialog zu öffnen
-                createPermissionRequiredNotification(handle);
+                // Prüfen, ob der Benutzer eingeloggt ist, bevor wir die Benachrichtigung anzeigen
+                if (localStorage.getItem('username')) {
+                    // Benachrichtigung nur anzeigen, wenn der Benutzer eingeloggt ist
+                    createPermissionRequiredNotification(handle);
+                }
                 return false;
             }
         } catch (permError) {
@@ -638,5 +642,7 @@ window.storeDirectoryHandle = storeDirectoryHandle;
 window.loadDirectoryHandle = loadDirectoryHandle;
 window.initHandleDb = initHandleDb; // Fügen wir hinzu, damit es von storage-handler.js genutzt werden kann
 
-// Log-Nachricht
-console.log('%cPersistentes Dateisystem-Modul initialisiert', 'color: green; font-weight: bold');
+// Nur im Debug-Modus loggen
+if (window.localStorage.getItem('debug_mode') === 'true') {
+    console.log('%cPersistentes Dateisystem-Modul initialisiert', 'color: green; font-weight: bold');
+}

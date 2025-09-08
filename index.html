@@ -31,6 +31,19 @@
     <script src="js/auth.js"></script>
     <script src="js/notification.js"></script>
     <script>
+        // Prüft, ob ein Benutzer bereits eingeloggt ist und leitet ggf. zum Dashboard weiter
+        function checkLoginAndRedirect() {
+            const isLoggedIn = localStorage.getItem('loggedIn') === 'true';
+            const username = localStorage.getItem('username');
+            
+            if (isLoggedIn && username) {
+                console.log('Benutzer bereits eingeloggt. Weiterleitung zum Dashboard...');
+                window.location.href = 'dashboard.html';
+            } else {
+                console.log('Kein angemeldeter Benutzer gefunden, Startseite wird angezeigt.');
+            }
+        }
+        
         // Header und Footer dynamisch laden
         async function loadHeaderAndFooter() {
             try {
@@ -58,8 +71,15 @@
             }
         }
         
-        // Header und Footer laden
-        loadHeaderAndFooter();
+        // Zuerst Login-Status prüfen und ggf. weiterleiten
+        checkLoginAndRedirect();
+        
+        // Header und Footer nur laden, wenn keine Weiterleitung stattfindet
+        if (window.location.pathname.endsWith('index.html') || 
+            window.location.pathname === '/' || 
+            window.location.pathname === '/LernApp/') {
+            loadHeaderAndFooter();
+        }
     </script>
 </body>
 </html>
