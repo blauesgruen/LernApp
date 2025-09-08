@@ -52,6 +52,17 @@ document.addEventListener('DOMContentLoaded', async () => {
             const success = await window.restoreDirectoryHandle();
             if (success) {
                 logFunc('DirectoryHandle erfolgreich beim Seitenladen wiederhergestellt');
+                
+                // WICHTIG: Synchronisiere die lokale directoryHandle-Variable in storage.js
+                if (window.directoryHandle) {
+                    // Wir müssen ein benutzerdefiniertes Event auslösen, damit storage.js
+                    // die lokale Variable aktualisieren kann
+                    logFunc('Löse directoryHandleRestored-Event aus...');
+                    const event = new CustomEvent('directoryHandleRestored', {
+                        detail: { handle: window.directoryHandle }
+                    });
+                    document.dispatchEvent(event);
+                }
             } else {
                 warnFunc('DirectoryHandle konnte beim Seitenladen nicht wiederhergestellt werden');
                 
@@ -59,6 +70,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (window.autoRepairDirectoryHandle) {
                     logFunc('Starte automatische Reparatur beim Seitenladen...');
                     await window.autoRepairDirectoryHandle();
+                    
+                    // Nach der Reparatur erneut prüfen und Event auslösen
+                    if (window.directoryHandle) {
+                        logFunc('Nach Reparatur: Löse directoryHandleRestored-Event aus...');
+                        const event = new CustomEvent('directoryHandleRestored', {
+                            detail: { handle: window.directoryHandle }
+                        });
+                        document.dispatchEvent(event);
+                    }
                 }
             }
         } else {

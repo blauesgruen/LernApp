@@ -272,7 +272,22 @@ async function restoreDirectoryHandle() {
                 localStorage.setItem('hasDirectoryHandle', 'true');
                 localStorage.setItem('hasStoredDirectoryHandle', 'true');
                 
+                // Event auslösen, damit andere Module (insbesondere storage.js) 
+                // ihre lokalen Variablen aktualisieren können
+                try {
+                    logFunc('Löse directoryHandleRestored-Event aus...');
+                    const event = new CustomEvent('directoryHandleRestored', {
+                        detail: { handle: handle }
+                    });
+                    document.dispatchEvent(event);
+                } catch (eventError) {
+                    warnFunc('Fehler beim Auslösen des directoryHandleRestored-Events:', eventError);
+                }
+                
                 // Optional: Testen, ob der Zugriff wirklich funktioniert
+                // Kleiner Timeout, um dem System Zeit zu geben, das Handle zu stabilisieren
+                await new Promise(resolve => setTimeout(resolve, 100));
+                
                 try {
                     const testResult = await testFileAccess();
                     logFunc(`Dateisystem-Zugriffstest: ${testResult ? 'Erfolgreich' : 'Fehlgeschlagen'}`);

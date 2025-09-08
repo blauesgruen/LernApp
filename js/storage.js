@@ -486,6 +486,12 @@ async function saveData(resourceName, data, username) {
         
         const jsonData = JSON.stringify(data);
         
+        // Wenn das direkte DirectoryHandle nicht verfügbar ist, versuche das globale Handle zu nutzen
+        if (!directoryHandle && window.directoryHandle) {
+            console.log('Lokales DirectoryHandle nicht verfügbar, verwende globales Handle');
+            directoryHandle = window.directoryHandle;
+        }
+        
         // Wenn wir einen DirectoryHandle haben, versuchen wir die Datei dort zu speichern
         if (directoryHandle) {
             try {
@@ -625,6 +631,12 @@ async function loadData(resourceName, defaultValue = null, username) {
     try {
         if (!resourceName) {
             throw new Error('Kein Ressourcenname angegeben');
+        }
+        
+        // Wenn das direkte DirectoryHandle nicht verfügbar ist, versuche das globale Handle zu nutzen
+        if (!directoryHandle && window.directoryHandle) {
+            console.log('Lokales DirectoryHandle nicht verfügbar, verwende globales Handle');
+            directoryHandle = window.directoryHandle;
         }
         
         // Wenn wir einen DirectoryHandle haben, versuchen wir die Datei dort zu laden
@@ -1311,6 +1323,39 @@ document.addEventListener('mousedown', function() {
     setTimeout(() => { window._userInteractionActive = false; }, 1000);
 });
 
+// Reagiere auf DirectoryHandle-Aktualisierungen von storage-handler.js
+document.addEventListener('directoryHandleRestored', function(event) {
+    if (event.detail && event.detail.handle) {
+        console.log('Event erkannt: directoryHandleRestored');
+        directoryHandle = event.detail.handle;
+        console.log('Lokale DirectoryHandle-Variable aktualisiert durch Event');
+        
+        // Verifizierung, dass das Handle funktioniert
+        setTimeout(async () => {
+            try {
+                if (directoryHandle && typeof directoryHandle.getFileHandle === 'function') {
+                    console.log('DirectoryHandle in storage.js ist gültig und funktionsfähig');
+                    
+                    // Test: Versuche, eine Testdatei zu lesen oder zu erstellen
+                    try {
+                        const fileHandle = await directoryHandle.getFileHandle('storage-test.txt', { create: true });
+                        const writable = await fileHandle.createWritable();
+                        await writable.write(`Storage-Test: ${new Date().toISOString()}`);
+                        await writable.close();
+                        console.log('✓ Testdatei erfolgreich geschrieben - storage.js DirectoryHandle funktioniert');
+                    } catch (fileError) {
+                        console.error('Fehler beim Schreiben der Testdatei in storage.js:', fileError);
+                    }
+                } else {
+                    console.warn('⚠️ DirectoryHandle in storage.js ist NICHT gültig!');
+                }
+            } catch (error) {
+                console.error('Fehler bei der Überprüfung des DirectoryHandle in storage.js:', error);
+            }
+        }, 200);
+    }
+});
+
 document.addEventListener('touchstart', function() {
     window._userInteractionActive = true;
     window._lastInteractionTime = Date.now();
@@ -1355,6 +1400,28 @@ async function initializeStorageForUser(username) {
             const restored = await window.restoreDirectoryHandle();
             if (restored) {
                 console.log('DirectoryHandle erfolgreich wiederhergestellt');
+                
+                // Wichtig: Synchronisiere die lokale Variable mit dem globalen Handle
+                if (window.directoryHandle) {
+                    directoryHandle = window.directoryHandle;
+                    console.log('Lokale DirectoryHandle-Variable mit globalem Wert synchronisiert');
+                    
+                    // Teste, ob der DirectoryHandle wirklich funktioniert
+                    try {
+                        console.log('Teste DirectoryHandle Funktionalität...');
+                        // Versuche eine Testdatei zu erstellen/lesen
+                        const testHandle = await directoryHandle.getFileHandle('init-test.txt', { create: true });
+                        const writable = await testHandle.createWritable();
+                        await writable.write(`Init-Test: ${new Date().toISOString()}`);
+                        await writable.close();
+                        console.log('✓ DirectoryHandle-Test erfolgreich!');
+                    } catch (testError) {
+                        console.error('⚠️ DirectoryHandle-Test fehlgeschlagen:', testError);
+                    }
+                } else {
+                    console.warn('Globales DirectoryHandle ist nicht gesetzt!');
+                }
+                
                 return true;
             } else {
                 console.warn('DirectoryHandle konnte nicht wiederhergestellt werden');
