@@ -252,7 +252,16 @@ async function handleLogin(username, password) {
                             if (directoryResult) {
                                 // Speicherort erfolgreich ausgewählt
                                 logMessage('Benutzer hat Speicherort ausgewählt: ' + directoryResult.path);
-                                await window.setStoragePath(directoryResult, currentUsername);
+                                // Hier übergeben wir den Namen als String und das Handle separat
+                                const storagePathData = {
+                                    path: directoryResult.path,
+                                    handle: directoryResult.handle
+                                };
+                                // Stelle sicher, dass der Pfad ein String ist
+                                if (typeof storagePathData.path !== 'string') {
+                                    storagePathData.path = String(storagePathData.path);
+                                }
+                                await window.setStoragePath(storagePathData, currentUsername);
                             } else {
                                 // Benutzer hat abgebrochen, Standard verwenden
                                 logMessage('Benutzer hat die Speicherortwahl abgebrochen, verwende Standard');

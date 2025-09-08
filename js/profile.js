@@ -301,17 +301,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Pfad und Handle für den Speicherort vorbereiten
                 const directoryName = directoryHandle.name || 
                                       (directoryHandle.toString ? directoryHandle.toString() : 'LernAppDatenbank');
-                const storagePathData = {
-                    path: directoryName,
-                    handle: directoryHandle
-                };
                 
-                logMessage('Ausgewählter Speicherort: ' + storagePathData.path);
+                // Debug-Log für das DirectoryHandle-Objekt
+                logMessage('Verzeichnis ausgewählt: ' + JSON.stringify({
+                    name: directoryHandle.name,
+                    kind: directoryHandle.kind
+                }));
                 
                 try {
                     // Speicherpfad aktualisieren
                     const currentUsername = localStorage.getItem('username');
-                    const success = await window.setStoragePath(storagePathData, currentUsername);
+                    
+                    // Wir übergeben direkt das DirectoryHandle an setStoragePath
+                    const success = await window.setStoragePath(directoryHandle, currentUsername);
                     
                     if (success) {
                         // Handle wurde erfolgreich aktualisiert, alle Flags zurücksetzen
@@ -320,8 +322,20 @@ document.addEventListener('DOMContentLoaded', function() {
                         // UI aktualisieren
                         updateStoragePathDisplay();
                         
-                        // Zusätzliche Erfolgsmeldung
-                        showSuccess(`Speicherort "${storagePathData.path}" wurde erfolgreich konfiguriert und der Dateizugriff ist jetzt vollständig hergestellt.`);
+                        // Zusätzliche Erfolgsmeldung mit dem tatsächlich gespeicherten Pfad
+                        const gespeicherterPfad = window.getStoragePath(currentUsername);
+                        showSuccess(`Speicherort "${gespeicherterPfad}" wurde erfolgreich konfiguriert und der Dateizugriff ist jetzt vollständig hergestellt.`);
+                        
+                        // Jetzt explizit die Datenbankdateien im gewählten Verzeichnis erstellen
+                        if (window.directoryHandle) {
+                            try {
+                                // Die Funktion zum Erstellen der Datenbank aufrufen - diese ist in storage.js definiert
+                                await window.createInitialDatabaseFiles(window.directoryHandle);
+                                logMessage('Datenbankdateien im gewählten Verzeichnis erstellt.', 'info');
+                            } catch (dbError) {
+                                logMessage('Fehler beim Erstellen der Datenbankdateien: ' + dbError.message, 'error');
+                            }
+                        }
                     } else {
                         showError('Der Speicherort konnte nicht gesetzt werden. Bitte wählen Sie einen anderen Ordner.');
                     }

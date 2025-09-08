@@ -77,10 +77,18 @@ function showFirstLoginDialog() {
                     if (directoryResult) {
                         // Speicherpfad direkt setzen
                         if (window.setStoragePath) {
-                            const success = await window.setStoragePath(directoryResult);
+                            const storagePathData = {
+                                path: directoryResult.path,
+                                handle: directoryResult.handle
+                            };
+                            // Stelle sicher, dass der Pfad ein String ist
+                            if (typeof storagePathData.path !== 'string') {
+                                storagePathData.path = String(storagePathData.path);
+                            }
+                            const success = await window.setStoragePath(storagePathData);
                             
                             if (success) {
-                                showSuccess(`Speicherort wurde auf "${directoryResult.path}" gesetzt.`);
+                                showSuccess(`Speicherort wurde auf "${storagePathData.path}" gesetzt.`);
                                 markFirstLoginComplete();
                                 dialog.style.display = 'none';
                             } else {
