@@ -24,11 +24,18 @@ document.addEventListener('DOMContentLoaded', function() {
     // Elemente für Modals
     const deleteQuestionsModal = document.getElementById('delete-questions-modal');
     const deleteAccountModal = document.getElementById('delete-account-modal');
+    const migrateStorageModal = document.getElementById('migrate-storage-modal');
     const closeModalButtons = document.querySelectorAll('.close-modal');
     const cancelDeleteQuestions = document.getElementById('cancel-delete-questions');
     const confirmDeleteQuestions = document.getElementById('confirm-delete-questions');
     const cancelDeleteAccount = document.getElementById('cancel-delete-account');
     const confirmDeleteAccount = document.getElementById('confirm-delete-account');
+    const cancelMigrateStorage = document.getElementById('cancel-migrate-storage');
+    const confirmMigrateStorage = document.getElementById('confirm-migrate-storage');
+    const migrateStorageBtn = document.getElementById('migrate-storage-btn');
+    const migrationProgress = document.getElementById('migration-progress');
+    const migrationProgressBar = document.getElementById('migration-progress-bar');
+    const migrationStatus = document.getElementById('migration-status');
 
     // Aktuelle Benutzerdaten laden
     const currentUsername = localStorage.getItem('username');
@@ -335,6 +342,112 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // Daten in neuen Ordner verschieben
+    if (migrateStorageBtn && window.migrateStorage) {
+        migrateStorageBtn.addEventListener('click', function() {
+            migrateStorageModal.style.display = 'block';
+        });
+    }
+
+    // Daten-Migration abbrechen
+    if (cancelMigrateStorage) {
+        cancelMigrateStorage.addEventListener('click', function() {
+            migrateStorageModal.style.display = 'none';
+            // Zurücksetzen des Fortschrittsbalkens
+            migrationProgress.style.display = 'none';
+            migrationProgressBar.style.width = '0%';
+            migrationStatus.textContent = 'Vorbereitung...';
+        });
+    }
+
+    // Daten-Migration bestätigen und Zielordner auswählen
+    if (confirmMigrateStorage) {
+        confirmMigrateStorage.addEventListener('click', async function() {
+            try {
+                // Prüfen, ob die File System Access API unterstützt wird
+                if (!window.isFileSystemAccessSupported || !window.isFileSystemAccessSupported()) {
+                    showError('Dein Browser unterstützt leider nicht die Auswahl von Ordnern. Diese Funktion ist nicht verfügbar.');
+                    return;
+                }
+
+                // Ordner-Auswahl-Dialog öffnen
+                const result = await window.openDirectoryPicker();
+                
+                if (!result || !result.handle) {
+                    showError('Kein Zielordner ausgewählt.');
+                    return;
+                }
+                
+                const newDirectoryHandle = result.handle;
+                const currentUsername = localStorage.getItem('username');
+                
+                // UI für Fortschritt anzeigen
+                migrationProgress.style.display = 'block';
+                confirmMigrateStorage.disabled = true;
+                cancelMigrateStorage.disabled = true;
+                
+                // Migration starten
+                migrationStatus.textContent = 'Migration wird gestartet...';
+                migrationProgressBar.style.width = '10%';
+                
+                try {
+                    // Migrationsprozess durchführen
+                    const migrationResult = await window.migrateStorage(newDirectoryHandle, currentUsername);
+                    
+                    // Fortschrittsbalken aktualisieren
+                    migrationProgressBar.style.width = '100%';
+                    
+                    if (migrationResult.failed > 0) {
+                        migrationStatus.textContent = `Migration abgeschlossen: ${migrationResult.migrated} von ${migrationResult.total} Dateien erfolgreich migriert. ${migrationResult.failed} Dateien fehlgeschlagen.`;
+                        showWarning(`Daten wurden teilweise migriert. ${migrationResult.migrated} von ${migrationResult.total} Dateien wurden erfolgreich migriert.`);
+                    } else {
+                        migrationStatus.textContent = `Migration erfolgreich: Alle ${migrationResult.migrated} Dateien wurden migriert.`;
+                        showSuccess(`Alle Daten wurden erfolgreich in den neuen Ordner "${result.path}" verschoben.`);
+                    }
+                    
+                    // Anzeige des aktuellen Speicherorts aktualisieren
+                    updateStoragePathDisplay();
+                    
+                    // Modal nach kurzer Verzögerung schließen
+                    setTimeout(function() {
+                        migrateStorageModal.style.display = 'none';
+                        // Zurücksetzen des Fortschrittsbalkens
+                        migrationProgress.style.display = 'none';
+                        migrationProgressBar.style.width = '0%';
+                        migrationStatus.textContent = 'Vorbereitung...';
+                        confirmMigrateStorage.disabled = false;
+                        cancelMigrateStorage.disabled = false;
+                    }, 3000);
+                    
+                } catch (error) {
+                    console.error('Fehler bei der Migration:', error);
+                    migrationStatus.textContent = `Fehler bei der Migration: ${error.message}`;
+                    migrationProgressBar.style.width = '0%';
+                    showError(`Fehler bei der Migration: ${error.message}`);
+                    
+                    // Buttons wieder aktivieren
+                    confirmMigrateStorage.disabled = false;
+                    cancelMigrateStorage.disabled = false;
+                }
+                
+            } catch (error) {
+                // Benutzer hat den Dialog abgebrochen oder es ist ein Fehler aufgetreten
+                if (error.name === 'AbortError') {
+                    console.log('Benutzer hat den Ordner-Auswahl-Dialog abgebrochen.');
+                    showInfo('Ordnerauswahl wurde abgebrochen.');
+                } else {
+                    console.error('Fehler beim Öffnen des Ordner-Auswahl-Dialogs:', error);
+                    showError(`Fehler beim Öffnen des Ordner-Auswahl-Dialogs: ${error.message}`);
+                }
+                
+                // Fortschrittsanzeige zurücksetzen
+                migrationProgress.style.display = 'none';
+                migrationProgressBar.style.width = '0%';
+                migrationStatus.textContent = 'Vorbereitung...';
+            }
+        });
+    }
+
     // Modal für Fragenlöschung öffnen
     if (deleteQuestionsBtn) {
         deleteQuestionsBtn.addEventListener('click', function() {
@@ -354,6 +467,16 @@ document.addEventListener('DOMContentLoaded', function() {
         button.addEventListener('click', function() {
             deleteQuestionsModal.style.display = 'none';
             deleteAccountModal.style.display = 'none';
+            migrateStorageModal.style.display = 'none';
+            
+            // Zurücksetzen des Migrations-Fortschrittsbalkens
+            if (migrationProgress) {
+                migrationProgress.style.display = 'none';
+                migrationProgressBar.style.width = '0%';
+                migrationStatus.textContent = 'Vorbereitung...';
+                confirmMigrateStorage.disabled = false;
+                cancelMigrateStorage.disabled = false;
+            }
         });
     });
 

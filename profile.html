@@ -6,6 +6,8 @@
     <title>Mein Profil - LernApp</title>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.1/css/all.min.css">
+    <!-- Zentrales Logging-System laden -->
+    <script src="js/logger.js"></script>
 </head>
 <body>
     <div id="header-container"></div>
@@ -70,6 +72,9 @@
                                         <p>Ein gemeinsamer Pfad auf verschiedenen Geräten (z.B. in Dropbox) ermöglicht dir, 
                                         die gleichen Fragen auf all deinen Geräten zu verwenden.</p>
                                     </div>
+                                    <button type="button" id="migrate-storage-btn" class="btn-primary" style="margin-top: 10px; width: 100%;">
+                                        <i class="fas fa-exchange-alt"></i> Daten in neuen Ordner verschieben
+                                    </button>
                                     <button type="button" id="reset-storage-path-btn" class="btn-secondary" style="margin-top: 10px;">Auf Standard zurücksetzen</button>
                                 </form>
                             </div>
@@ -121,6 +126,25 @@
             <div class="modal-buttons">
                 <button id="cancel-delete-account" class="btn-secondary">Abbrechen</button>
                 <button id="confirm-delete-account" class="btn-danger">Ja, mein Konto löschen</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="migrate-storage-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h2>Daten verschieben</h2>
+            <p>Dies wird alle deine Daten vom aktuellen Speicherort in einen neuen Ordner verschieben. Dazu musst du einen neuen Zielordner auswählen.</p>
+            <div id="migration-progress" style="display: none;">
+                <h3>Migration läuft...</h3>
+                <div class="progress-bar-container">
+                    <div id="migration-progress-bar" class="progress-bar"></div>
+                </div>
+                <p id="migration-status">Vorbereitung...</p>
+            </div>
+            <div class="modal-buttons">
+                <button id="cancel-migrate-storage" class="btn-secondary">Abbrechen</button>
+                <button id="confirm-migrate-storage" class="btn-primary">Zielordner auswählen</button>
             </div>
         </div>
     </div>

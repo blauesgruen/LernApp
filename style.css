@@ -810,6 +810,35 @@ img.icon {
     gap: 15px;
 }
 
+/* Fortschrittsbalken für Migration */
+.progress-bar-container {
+    width: 100%;
+    background-color: #f1f1f1;
+    border-radius: 5px;
+    margin: 15px 0;
+    overflow: hidden;
+}
+
+.progress-bar {
+    height: 20px;
+    width: 0%;
+    background-color: #4CAF50;
+    border-radius: 5px;
+    transition: width 0.5s ease-in-out;
+}
+
+#migration-progress {
+    margin-top: 15px;
+    padding: 10px;
+    border-radius: 5px;
+    background-color: #f9f9f9;
+}
+
+#migration-status {
+    font-size: 14px;
+    margin-top: 10px;
+}
+
 /* Neue Stile für das Speicherort-Formular */
 .form-info {
     margin: 12px 0 18px 0;

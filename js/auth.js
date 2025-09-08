@@ -20,8 +20,7 @@ function clearLoginStatus() {
 // Sichtbarkeit der Buttons basierend auf Login-Status und Seite
 function updateButtonVisibility() {
     const isLoggedIn = getLoginStatus();
-    logMessage('updateButtonVisibility aufgerufen. Login-Status: ' + isLoggedIn);
-
+    
     const adminButton = document.querySelector('.admin-button');
     const profileButton = document.querySelector('.profile-button');
     const logoutButton = document.querySelector('.logout-button');
@@ -29,14 +28,12 @@ function updateButtonVisibility() {
 
     if (isLoggedIn) {
         // Eingeloggt: Alle Buttons außer Admin sichtbar
-        logMessage('Benutzer ist eingeloggt. Admin-Button wird ausgeblendet.');
         if (adminButton) adminButton.style.display = 'none';
         if (profileButton) profileButton.style.display = 'block';
         if (logoutButton) logoutButton.style.display = 'block';
         if (loginButton) loginButton.style.display = 'none';
     } else {
         // Nicht eingeloggt: Nur Admin sichtbar
-        logMessage('Benutzer ist nicht eingeloggt. Nur Admin-Button wird angezeigt.');
         if (adminButton) adminButton.style.display = 'block';
         if (profileButton) profileButton.style.display = 'none';
         if (logoutButton) logoutButton.style.display = 'none';
@@ -51,52 +48,25 @@ function updateButtonVisibility() {
     document.querySelectorAll('.user-only').forEach(el => {
         el.style.display = isLoggedIn ? 'block' : 'none';
     });
-
-    logMessage('updateButtonVisibility abgeschlossen.');
 }
 
-// Debug-Flag zur Steuerung von Logs
-const DEBUG_MODE = true;
-
-// Zentrale Logging-Funktion mit erzwungener Sichtbarkeit
+// Debug-Flag zur Steuerung von Logs (wird von der Logger-Klasse übernommen)
+// Die logMessage-Funktion bleibt für die Kompatibilität erhalten, nutzt aber den neuen Logger
 function logMessage(message, type = 'info') {
-    const timestamp = new Date().toISOString();
-    const logEntry = { timestamp, type, message };
-
-    try {
-        // Logs in localStorage abrufen und aktualisieren
-        const existingLogs = JSON.parse(localStorage.getItem('persistentLogs')) || [];
-
-        // Doppelte Einträge vermeiden (Berücksichtigung von Zeitstempel)
-        if (!existingLogs.some(log => log.message === message && log.type === type)) {
-            existingLogs.push(logEntry);
-
-            // Älteste Logs entfernen, wenn die maximale Kapazität erreicht wird
-            while (JSON.stringify(existingLogs).length > 5000) { // Beispielgröße: 5000 Bytes
-                existingLogs.shift();
-            }
-
-            localStorage.setItem('persistentLogs', JSON.stringify(existingLogs));
-        }
-
-        // Logs immer in der Konsole ausgeben
+    // Wenn der Logger existiert, diesen verwenden
+    if (window.logger) {
+        window.logger.log(message, type);
+    } else {
+        // Fallback, falls der Logger noch nicht geladen ist
+        const timestamp = new Date().toISOString();
         console[type](`[${timestamp}] ${type.toUpperCase()}: ${message}`);
-    } catch (error) {
-        if (error.name === 'QuotaExceededError') {
-            const existingLogs = JSON.parse(localStorage.getItem('persistentLogs')) || [];
-            existingLogs.shift(); // Entferne das älteste Log
-            localStorage.setItem('persistentLogs', JSON.stringify(existingLogs));
-            logMessage(message, type); // Erneut versuchen
-        } else {
-            console.error('Fehler beim Logging:', error);
-        }
     }
 }
 
-// Beispiel für die Verwendung der zentralen Logging-Funktion
-logMessage('Authentifizierungsstatus: ' + (getLoginStatus() ? 'Eingeloggt' : 'Nicht eingeloggt'));
-logMessage('Aktueller Benutzer: ' + (localStorage.getItem('username') || 'Kein Benutzer eingeloggt'));
-logMessage('Anzahl der Benutzer in der Datenbank: ' + (JSON.parse(localStorage.getItem('users')) || []).length);
+// Die folgenden Beispiel-Logs werden im normalen Betrieb nicht mehr angezeigt
+// logMessage('Authentifizierungsstatus: ' + (getLoginStatus() ? 'Eingeloggt' : 'Nicht eingeloggt'));
+// logMessage('Aktueller Benutzer: ' + (localStorage.getItem('username') || 'Kein Benutzer eingeloggt'));
+// logMessage('Anzahl der Benutzer in der Datenbank: ' + (JSON.parse(localStorage.getItem('users')) || []).length);
 
 // Aktualisiert die Header-Buttons
 function updateHeaderButtons() {
@@ -128,18 +98,18 @@ function updateHeaderVisibility() {
     const userButtons = document.getElementById('user-buttons');
     const isLoggedIn = getLoginStatus();
 
-    logMessage('updateHeaderVisibility aufgerufen. Login-Status: ' + isLoggedIn);
+    // Log über Header-Visibility entfernt
 
     if (adminButton) {
         adminButton.style.display = isLoggedIn ? 'none' : 'block';
-        logMessage('Admin-Button Sichtbarkeit: ' + adminButton.style.display);
+        // Button-Sichtbarkeits-Logs entfernt
     } else {
         logMessage('Admin-Button nicht gefunden.', 'error');
     }
 
     if (userButtons) {
         userButtons.style.display = isLoggedIn ? 'block' : 'none';
-        logMessage('User-Buttons Sichtbarkeit: ' + userButtons.style.display);
+        // Button-Sichtbarkeits-Logs entfernt
     } else {
         logMessage('User-Buttons Gruppe nicht gefunden.', 'error');
     }
@@ -249,11 +219,10 @@ async function handleLogin(username, password) {
         setLoginStatus(true);
         logMessage('Login-Status wurde auf "eingeloggt" gesetzt.');
         
-        // Überprüfen, ob es der erste Login dieses Benutzers ist
-        const userFirstLoginKey = `firstLogin_${user.username}`;
-        const isFirstLogin = localStorage.getItem(userFirstLoginKey) !== 'completed';
+        // Prüfen, ob es der erste Login dieses Benutzers ist und ob nach Speicherort gefragt werden soll
+        const isFirstTimeUser = window.shouldAskForStoragePath && window.shouldAskForStoragePath(user.username);
         
-        if (isFirstLogin) {
+        if (isFirstTimeUser) {
             logMessage('Erster Login des Benutzers erkannt: ' + user.username);
         }
         
@@ -266,7 +235,7 @@ async function handleLogin(username, password) {
                 const currentUsername = localStorage.getItem('username');
                 
                 // Nur beim ersten Login den Speicherort-Dialog anzeigen
-                if (isFirstLogin) {
+                if (isFirstTimeUser) {
                     logMessage('Erster Login: Frage nach Speicherort');
                     
                     // Standardpfad oder benutzerdefinierten Pfad wählen?
@@ -303,7 +272,9 @@ async function handleLogin(username, password) {
                     }
                     
                     // Ersten Login als abgeschlossen markieren
-                    localStorage.setItem(userFirstLoginKey, 'completed');
+                    if (window.markFirstLoginCompleted) {
+                        window.markFirstLoginCompleted(currentUsername);
+                    }
                 } else {
                     // Nicht erster Login: Prüfe ob ein benutzerdefinierter Speicherort konfiguriert ist
                     if (window.isStoragePathConfigured && window.isStoragePathConfigured(currentUsername)) {
@@ -331,7 +302,7 @@ async function handleLogin(username, password) {
             
             // In jedem Fall zum Dashboard weiterleiten
             window.location.href = 'dashboard.html';
-        }, 1000);about:blank#blocked
+        }, 1000);
     } else {
         logMessage('Kein passender Benutzer gefunden oder Passwort stimmt nicht überein.', 'error');
         showError('Benutzername oder Passwort falsch!');
@@ -347,42 +318,6 @@ function handleLogout() {
     logMessage('Benutzer wurde ausgeloggt.');
     refreshUIAfterAuthChange(); // UI aktualisieren
     window.location.href = 'index.html'; // Weiterleitung zur Login-Seite
-}
-
-// Überprüft, ob der Benutzer das erste Mal eingeloggt ist
-function isFirstLogin() {
-    return !localStorage.getItem('hasLoggedInBefore');
-}
-
-// Setzt den Status nach dem ersten Login
-function setFirstLoginStatus() {
-    localStorage.setItem('hasLoggedInBefore', 'true');
-}
-
-// Zeigt das Speicherort-Fenster nur beim ersten Login
-async function showStorageLocationPrompt() {
-    if (isFirstLogin()) {
-        const useCustomPath = confirm(
-            'Möchten Sie einen benutzerdefinierten Speicherort für Ihre Daten festlegen? ' +
-            'Wenn Sie auf "Abbrechen" klicken, wird der Standardspeicherort verwendet.'
-        );
-
-        if (useCustomPath) {
-            logMessage('Benutzer möchte einen benutzerdefinierten Speicherort festlegen');
-            const directoryResult = await window.openDirectoryPicker();
-
-            if (directoryResult) {
-                logMessage('Benutzer hat Speicherort ausgewählt: ' + directoryResult.path);
-                await window.setStoragePath(directoryResult);
-            } else {
-                logMessage('Benutzer hat den Dialog abgebrochen. Standardpfad wird verwendet.');
-            }
-        } else {
-            logMessage('Standardpfad wird verwendet.');
-        }
-
-        setFirstLoginStatus();
-    }
 }
 
 // Verknüpfe den UI-Button mit der zentralen Logging-Funktion

@@ -146,8 +146,21 @@ async function setStoragePath(path, username) {
             // Handle für späteren Zugriff speichern
             directoryHandle = handle;
             
-            // Serialisieren des Handles ist nicht möglich, aber wir merken uns, dass wir einen Handle haben
-            localStorage.setItem('hasDirectoryHandle', 'true');
+            // Prüfen, ob wir auf das Verzeichnis schreiben können
+            if (handle) {
+                try {
+                    // Versuchen, eine Testdatei zu schreiben, um zu prüfen, ob wir Schreibrechte haben
+                    const testResult = await saveTestFile(handle);
+                    console.log('Testdatei erfolgreich geschrieben:', testResult);
+                    
+                    // Serialisieren des Handles ist nicht möglich, aber wir merken uns, dass wir einen Handle haben
+                    localStorage.setItem('hasDirectoryHandle', 'true');
+                } catch (error) {
+                    console.error('Fehler beim Schreiben der Testdatei:', error);
+                    showWarning('Der ausgewählte Ordner ist nicht beschreibbar. Bitte wählen Sie einen anderen Ordner aus.');
+                    return false;
+                }
+            }
         } else {
             pathString = path;
             localStorage.removeItem('hasDirectoryHandle');
@@ -268,6 +281,13 @@ async function saveData(resourceName, data, username) {
         
         const jsonData = JSON.stringify(data);
         
+        // Debug-Ausgabe: Zeigen, wo die Daten gespeichert werden
+        console.log(`Speichere ${resourceName}:`, {
+            inFileSystem: !!directoryHandle,
+            directoryHandleName: directoryHandle ? directoryHandle.name : 'keiner',
+            fallbackToLocalStorage: !directoryHandle
+        });
+        
         // Wenn wir einen DirectoryHandle haben, versuchen wir die Datei dort zu speichern
         if (directoryHandle) {
             try {
@@ -289,22 +309,15 @@ async function saveData(resourceName, data, username) {
                 // Stream schließen
                 await writable.close();
                 
-                // Handle-Erneuerung ist nicht mehr nötig, da wir erfolgreich waren
-                localStorage.removeItem('needsHandleRenewal');
+                console.log(`Datei ${resourceName} erfolgreich im Dateisystem gespeichert`);
                 
                 return true;
             } catch (error) {
                 console.error(`Fehler beim Speichern von ${resourceName} im Dateisystem:`, error);
                 
-                // Prüfen, ob wir eine Aufforderung zur Handle-Erneuerung anzeigen sollen
-                if (localStorage.getItem('needsHandleRenewal') === 'true' && window.showInfo) {
-                    // Handle-Erneuerung erforderlich - nur einmal anzeigen
-                    window.showInfo('Für den Dateizugriff ist es erforderlich, den Speicherordner neu auszuwählen. Bitte öffnen Sie die Profileinstellungen.', 8000);
-                    localStorage.setItem('needsHandleRenewal', 'shown');
-                }
-                
                 // Fallback auf localStorage
                 localStorage.setItem(getResourcePath(resourceName, username), jsonData);
+                console.log(`Datei ${resourceName} als Fallback im localStorage gespeichert`);
                 return true;
             }
         } else {
@@ -349,9 +362,6 @@ async function loadData(resourceName, defaultValue = null, username) {
                     const file = await fileHandle.getFile();
                     const text = await file.text();
                     
-                    // Handle-Erneuerung ist nicht mehr nötig, da wir erfolgreich waren
-                    localStorage.removeItem('needsHandleRenewal');
-                    
                     return JSON.parse(text);
                 } catch (fileError) {
                     if (fileError.name === 'NotFoundError') {
@@ -362,13 +372,6 @@ async function loadData(resourceName, defaultValue = null, username) {
                 }
             } catch (error) {
                 console.error(`Fehler beim Laden von ${resourceName} aus dem Dateisystem:`, error);
-                
-                // Prüfen, ob wir eine Aufforderung zur Handle-Erneuerung anzeigen sollen
-                if (localStorage.getItem('needsHandleRenewal') === 'true' && window.showInfo) {
-                    // Handle-Erneuerung erforderlich - nur einmal anzeigen
-                    window.showInfo('Für den Dateizugriff ist es erforderlich, den Speicherordner neu auszuwählen. Bitte öffnen Sie die Profileinstellungen.', 8000);
-                    localStorage.setItem('needsHandleRenewal', 'shown');
-                }
                 
                 // Fallback auf localStorage
             }
@@ -494,19 +497,146 @@ async function listResources(username) {
  * @returns {boolean} True, wenn der Benutzer den Speicherordner auswählen sollte, sonst False.
  */
 function needsStorageConfiguration(username) {
-    // Wenn kein Speicherort konfiguriert ist, ist keine Auswahl nötig (wird automatisch Standard verwendet)
-    if (!isStoragePathConfigured(username)) {
+    // Wir brauchen keine spezielle Konfiguration mehr, da die Berechtigung 
+    // beim Zugriff automatisch angefragt wird
+    return false;
+}
+
+/**
+ * Prüft, ob ein Benutzer nach dem Speicherort gefragt werden sollte.
+ * Dies ist der Fall, wenn es sein erster Login ist und noch kein benutzerspezifischer Speicherort festgelegt wurde.
+ * @param {string} username - Der Benutzername.
+ * @returns {boolean} True, wenn der Benutzer nach dem Speicherort gefragt werden sollte.
+ */
+function shouldAskForStoragePath(username) {
+    if (!username) return false;
+    
+    // Prüfen, ob es der erste Login ist
+    const userFirstLoginKey = `firstLogin_${username}`;
+    const isFirstLogin = localStorage.getItem(userFirstLoginKey) !== 'completed';
+    
+    // Prüfen, ob bereits ein benutzerspezifischer Speicherort festgelegt wurde
+    const hasCustomPath = localStorage.getItem(`storagePath_${username}`) !== null;
+    
+    // Nur fragen, wenn es der erste Login ist und noch kein Pfad festgelegt wurde
+    return isFirstLogin && !hasCustomPath;
+}
+
+/**
+ * Markiert den ersten Login eines Benutzers als abgeschlossen.
+ * @param {string} username - Der Benutzername.
+ */
+function markFirstLoginCompleted(username) {
+    if (!username) return;
+    const userFirstLoginKey = `firstLogin_${username}`;
+    localStorage.setItem(userFirstLoginKey, 'completed');
+}
+
+/**
+ * Versucht, das Verzeichnis-Handle für einen benutzerdefinierten Speicherort zu bekommen.
+ * Diese Funktion ist vereinfacht und verwendet den gespeicherten Pfad für den Benutzer.
+ * @param {string} [username] - Optional: Der Benutzername, für den das Handle benötigt wird.
+ * @returns {Promise<Object|null>} Promise mit dem Verzeichnis-Handle oder null bei Fehler.
+ */
+async function getCustomDirectoryHandle(username) {
+    try {
+        const currentUsername = username || localStorage.getItem('username');
+        if (!currentUsername) return null;
+        
+        // Prüfen, ob ein benutzerdefinierter Pfad verwendet wird
+        if (isDefaultPath(currentUsername)) {
+            // Für den Standardpfad benötigen wir kein Handle
+            return null;
+        }
+        
+        // Wenn wir bereits ein Handle haben, versuchen wir es zu verwenden
+        if (directoryHandle) {
+            try {
+                // Die Berechtigung wird automatisch angefragt, wenn nötig
+                await directoryHandle.requestPermission({ mode: 'readwrite' });
+                return directoryHandle;
+            } catch (error) {
+                console.log('Vorhandenes Handle konnte nicht verwendet werden:', error);
+            }
+        }
+        
+        // In diesem Fall muss der Benutzer den Ordner auswählen
+        // Die showDirectoryPicker-Methode kümmert sich um die Berechtigungsanfrage
+        console.log('Benutzer muss Ordner auswählen');
+        try {
+            const result = await openDirectoryPicker();
+            if (result && result.handle) {
+                return result.handle;
+            }
+        } catch (error) {
+            console.error('Fehler bei der Ordnerauswahl:', error);
+        }
+        
+        return null;
+    } catch (error) {
+        console.error('Fehler beim Zugriff auf benutzerdefinierten Speicherort:', error);
+        return null;
+    }
+}
+
+/**
+ * Erstellt eine Testdatei im Benutzerverzeichnis, um zu prüfen, ob der Datenzugriff funktioniert.
+ * Diese Funktion kann über die Konsole aufgerufen werden, um zu testen, ob Dateien geschrieben werden können.
+ * @returns {Promise<boolean>} True, wenn erfolgreich eine Testdatei erstellt wurde.
+ */
+async function testFileAccess() {
+    try {
+        if (!directoryHandle) {
+            console.error('Kein DirectoryHandle vorhanden. Bitte wählen Sie zuerst einen Speicherort aus.');
+            return false;
+        }
+        
+        // Testdatei erstellen
+        const testResult = await saveTestFile(directoryHandle);
+        console.log('Testdatei erfolgreich erstellt:', testResult);
+        
+        // Jetzt versuchen, die Datei zu lesen
+        try {
+            const fileHandle = await directoryHandle.getFileHandle('lernapp_test.txt');
+            const file = await fileHandle.getFile();
+            const text = await file.text();
+            console.log('Testdatei Inhalt:', text);
+            return true;
+        } catch (readError) {
+            console.error('Fehler beim Lesen der Testdatei:', readError);
+            return false;
+        }
+    } catch (error) {
+        console.error('Fehler beim Testen des Dateizugriffs:', error);
         return false;
     }
+}
+
+/**
+ * Debug-Funktion, um den aktuellen Status des directoryHandle zu überprüfen.
+ * Diese Funktion kann auf der Konsole aufgerufen werden, um zu sehen, ob ein gültiger Handle vorliegt.
+ * @returns {Object} Informationen über den aktuellen directoryHandle-Status.
+ */
+function debugDirectoryHandleStatus() {
+    const currentUsername = localStorage.getItem('username');
+    const hasDirectoryHandleFlag = localStorage.getItem('hasDirectoryHandle') === 'true';
+    const path = getStoragePath(currentUsername);
+    const isDefault = isDefaultPath(currentUsername);
     
-    // Wenn wir keinen Handle hatten, brauchen wir auch keinen neuen zu wählen
-    if (localStorage.getItem('hasDirectoryHandle') !== 'true') {
-        return false;
-    }
+    const status = {
+        currentUsername,
+        path,
+        isDefaultPath: isDefault,
+        hasDirectoryHandleFlag,
+        directoryHandleExists: !!directoryHandle,
+        directoryHandleValue: directoryHandle ? {
+            name: directoryHandle.name,
+            kind: directoryHandle.kind
+        } : null
+    };
     
-    // Wenn der Handle erneuert werden muss und wichtige Aktionen geplant sind,
-    // sollte der Benutzer den Ordner neu auswählen
-    return localStorage.getItem('needsHandleRenewal') === 'true';
+    console.log('DirectoryHandle Status:', status);
+    return status;
 }
 
 // Globale Funktionen exportieren
@@ -518,12 +648,165 @@ window.resetStoragePath = resetStoragePath;
 window.verifyStoragePath = verifyStoragePath;
 window.openDirectoryPicker = openDirectoryPicker;
 window.getDirectoryHandle = getDirectoryHandle;
+window.testFileAccess = testFileAccess;
+window.debugDirectoryHandleStatus = debugDirectoryHandleStatus;
+/**
+ * Erstellt eine Testdatei im angegebenen Verzeichnis, um zu prüfen, ob der Zugriff funktioniert.
+ * @param {Object} dirHandle - Das Verzeichnis-Handle.
+ * @returns {Promise<void>} Promise, das aufgelöst wird, wenn die Testdatei erstellt wurde.
+ */
+async function saveTestFile(dirHandle) {
+    try {
+        // Berechtigung prüfen/erneuern
+        const permission = await dirHandle.requestPermission({ mode: 'readwrite' });
+        if (permission !== 'granted') {
+            throw new Error('Keine Schreibberechtigung für das Verzeichnis');
+        }
+        
+        // Testdatei erstellen/öffnen
+        const fileHandle = await dirHandle.getFileHandle('lernapp_test.txt', { create: true });
+        
+        // Schreibbaren Stream holen
+        const writable = await fileHandle.createWritable();
+        
+        // Testdaten schreiben
+        const testData = `LernApp Testzugriff - ${new Date().toISOString()}`;
+        await writable.write(testData);
+        
+        // Stream schließen
+        await writable.close();
+        
+        return true;
+    } catch (error) {
+        console.error('Fehler beim Erstellen der Testdatei:', error);
+        throw error;
+    }
+}
+
+/**
+ * Führt eine Überprüfung durch, ob der benutzerdefinierten Speicherort funktioniert.
+ * Diese Funktion ist vereinfacht, da die Berechtigung beim Zugriff automatisch angefragt wird.
+ * @returns {Promise<boolean>} Promise, das zu True aufgelöst wird, wenn alles in Ordnung ist.
+ */
+async function checkStorage() {
+    try {
+        const username = localStorage.getItem('username');
+        if (!username) return false; // Nicht eingeloggt
+        
+        // Prüfen, ob ein benutzerdefinierter Speicherort verwendet wird
+        if (isDefaultPath(username)) {
+            // Standard-Speicherort - keine Probleme zu erwarten
+            return true;
+        }
+        
+        // Prüfen, ob der Speicherort zugänglich ist
+        const isValid = await verifyStoragePath();
+        if (!isValid) {
+            if (window.showWarning) {
+                window.showWarning(
+                    'Der konfigurierte Speicherort ist nicht zugänglich. ' +
+                    'Ihre Daten werden vorerst nur im Browser gespeichert.',
+                    8000
+                );
+            }
+            
+            return false;
+        }
+        
+        return true;
+    } catch (error) {
+        console.error('Fehler bei der Speicherort-Überprüfung:', error);
+        return false;
+    }
+}
+
+/**
+ * Migriert alle Daten von einem Speicherort zu einem anderen.
+ * Diese Funktion wird verwendet, um Daten vom aktuellen Speicherort in einen neuen zu verschieben.
+ * @param {Object} newDirectoryHandle - Der Handle des neuen Zielverzeichnisses
+ * @param {string} [username] - Optional: Der Benutzername, für den die Daten migriert werden sollen.
+ * @returns {Promise<Object>} Ein Objekt mit Informationen über den Migrationsprozess.
+ */
+async function migrateStorage(newDirectoryHandle, username) {
+    try {
+        const currentUsername = username || localStorage.getItem('username');
+        if (!currentUsername) {
+            throw new Error('Kein Benutzername gefunden');
+        }
+
+        // Speichern des alten DirectoryHandle-Zustands
+        const oldDirectoryHandle = directoryHandle;
+        
+        // Auflisten aller Ressourcen am aktuellen Speicherort
+        const resources = await listResources(currentUsername);
+        console.log(`${resources.length} Ressourcen werden migriert:`, resources);
+        
+        // Ergebnisstatistik initialisieren
+        const result = {
+            total: resources.length,
+            migrated: 0,
+            failed: 0,
+            failedResources: []
+        };
+
+        // Temporäres Setzen des neuen DirectoryHandle für das Speichern
+        directoryHandle = newDirectoryHandle;
+        
+        // Jede Ressource laden und am neuen Ort speichern
+        for (const resourceName of resources) {
+            try {
+                // DirectoryHandle zurücksetzen zum Laden
+                directoryHandle = oldDirectoryHandle;
+                
+                // Daten vom alten Speicherort laden
+                const data = await loadData(resourceName, null, currentUsername);
+                
+                if (data !== null) {
+                    // DirectoryHandle auf neuen Ort setzen
+                    directoryHandle = newDirectoryHandle;
+                    
+                    // Daten am neuen Speicherort speichern
+                    const success = await saveData(resourceName, data, currentUsername);
+                    
+                    if (success) {
+                        result.migrated++;
+                    } else {
+                        result.failed++;
+                        result.failedResources.push(resourceName);
+                    }
+                }
+            } catch (error) {
+                console.error(`Fehler beim Migrieren von ${resourceName}:`, error);
+                result.failed++;
+                result.failedResources.push(resourceName);
+            }
+        }
+
+        // Jetzt endgültig den neuen Speicherort konfigurieren
+        directoryHandle = newDirectoryHandle;
+        await setStoragePath({
+            path: newDirectoryHandle.name,
+            handle: newDirectoryHandle
+        }, currentUsername);
+        
+        return result;
+    } catch (error) {
+        console.error('Fehler bei der Speicherort-Migration:', error);
+        throw error;
+    }
+}
+
+window.shouldAskForStoragePath = shouldAskForStoragePath;
+window.markFirstLoginCompleted = markFirstLoginCompleted;
 window.saveData = saveData;
 window.loadData = loadData;
 window.deleteData = deleteData;
 window.listResources = listResources;
 window.needsStorageConfiguration = needsStorageConfiguration;
 window.isDefaultPath = isDefaultPath;
+window.getCustomDirectoryHandle = getCustomDirectoryHandle;
+window.checkStorage = checkStorage;
+window.migrateStorage = migrateStorage;
 
 // Bei DOMContentLoaded prüfen, ob ein Speicherort konfiguriert ist
 document.addEventListener('DOMContentLoaded', async () => {
@@ -531,38 +814,30 @@ document.addEventListener('DOMContentLoaded', async () => {
     const currentUsername = localStorage.getItem('username');
     
     if (!isStoragePathConfigured(currentUsername)) {
-        console.log('Kein Speicherort konfiguriert. Standard wird verwendet:', DEFAULT_STORAGE_PATH);
-        
-        // Standard-Speicherort festlegen, wenn noch keiner gesetzt ist
+        // Standard-Speicherort festlegen, wenn noch keiner gesetzt ist (ohne Benachrichtigung)
+        console.log('Initialisiere Standard-Speicherort');
         await setStoragePath(DEFAULT_STORAGE_PATH, currentUsername);
     } else {
         const path = getStoragePath(currentUsername);
-        console.log('Konfigurierter Speicherort:', path);
+        console.log('Konfigurierter Speicherort gefunden');
         
-        // Prüfen, ob wir einen gespeicherten Handle wiederherstellen können
+        // Wenn ein Verzeichnis-Handle zuvor verwendet wurde, initialisieren wir es wieder
         if (localStorage.getItem('hasDirectoryHandle') === 'true') {
-            console.log('Ein Verzeichnis-Handle wurde zuvor verwendet, aber kann nicht direkt wiederhergestellt werden.');
+            console.log('Ein Verzeichnis-Handle wurde zuvor verwendet, versuche es zu initialisieren');
             
-            // Nur auf Seiten, die aktiv Dateizugriff benötigen, eine Meldung anzeigen
-            // und auch nur, wenn der Benutzer explizit eine Aktion ausführt, die den Handle benötigt
-            
-            // In localStorage merken, dass wir wissen, dass der Handle erneuert werden muss
-            localStorage.setItem('needsHandleRenewal', 'true');
-            
-            // Den Hinweis speichern, aber nicht direkt anzeigen - nur wenn nötig
-            console.log('Handle-Erneuerung wird bei Bedarf angefordert.');
-        }
-        
-        // Speicherort überprüfen
-        const isValid = await verifyStoragePath();
-        if (!isValid) {
-            console.warn('Der konfigurierte Speicherort ist möglicherweise nicht zugänglich.');
-            
-            // Wenn der Speicherort ungültig ist, setzen wir auf den Standard zurück
-            if (window.showWarning) {
-                window.showWarning('Der konfigurierte Speicherort ist nicht zugänglich. Standardspeicherort wird verwendet.', 8000);
+            // Versuchen, den DirectoryHandle bei Seitenstart zu initialisieren
+            try {
+                // Versuchen, das Handle wiederherzustellen durch Auswahl des Ordners
+                const handle = await getCustomDirectoryHandle(currentUsername);
+                if (handle) {
+                    directoryHandle = handle;
+                    console.log('DirectoryHandle erfolgreich initialisiert');
+                } else {
+                    console.log('DirectoryHandle konnte nicht automatisch initialisiert werden, wird bei nächstem Zugriff angefragt');
+                }
+            } catch (error) {
+                console.warn('Fehler bei der Initialisierung des DirectoryHandles:', error);
             }
-            await resetStoragePath(currentUsername);
         }
     }
 });

@@ -1,7 +1,12 @@
-// Hier können zukünftige Interaktionen und Funktionen hinzugefügt werden
-console.log('Willkommen bei der LernApp!');
-
+// Zentrales Skript für die LernApp
+// Willkommensnachricht - wird über den zentralen Logger geloggt, sobald dieser verfügbar ist
 document.addEventListener('DOMContentLoaded', () => {
+    // Wenn der Logger verfügbar ist, nutze diesen
+    if (window.logger) {
+        window.logger.info('Willkommen bei der LernApp!');
+    } else {
+        console.log('Willkommen bei der LernApp!');
+    }
     const currentPath = window.location.pathname;
     const startseiteLink = document.querySelector('nav ul li a[href="#"]');
     const appLink = document.querySelector('nav div a');
