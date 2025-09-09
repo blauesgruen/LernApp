@@ -714,3 +714,41 @@ window.getPermissionStatus = getPermissionStatus; // Debug-Funktion
 if (window.localStorage.getItem('debug_mode') === 'true') {
     console.log('%cPersistentes Dateisystem-Modul initialisiert', 'color: green; font-weight: bold');
 }
+
+/**
+ * Fordert explizit die Dateisystemberechtigung an.
+ * Diese Funktion kann verwendet werden, wenn die Berechtigung für das aktuelle
+ * DirectoryHandle noch nicht vorliegt oder explizit angefordert werden soll.
+ * @returns {Promise<boolean>} True, wenn die Berechtigung erteilt wurde, sonst False.
+ */
+async function requestFileSystemPermission() {
+    console.log('Fordere explizit Dateisystemberechtigung an...');
+    
+    try {
+        // Prüfen, ob es ein gespeichertes Handle gibt
+        if (!window.directoryHandle) {
+            const restored = await restoreDirectoryHandle();
+            if (!restored) {
+                console.log('Kein DirectoryHandle verfügbar, kann keine Berechtigung anfordern');
+                return false;
+            }
+        }
+        
+        // Versuchen, die Berechtigung zu verifizieren oder anzufordern
+        const hasPermission = await verifyPermission(window.directoryHandle, true);
+        
+        if (hasPermission) {
+            console.log('Dateisystemberechtigung erfolgreich erhalten');
+            return true;
+        } else {
+            console.log('Benutzer hat Dateisystemberechtigung abgelehnt');
+            return false;
+        }
+    } catch (error) {
+        console.error('Fehler beim Anfordern der Dateisystemberechtigung:', error);
+        return false;
+    }
+}
+
+// Funktion global verfügbar machen
+window.requestFileSystemPermission = requestFileSystemPermission;

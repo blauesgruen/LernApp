@@ -262,6 +262,12 @@ async function handleLogin(username, password) {
                         if (window.resetStoragePath) {
                             await window.resetStoragePath(currentUsername);
                             logMessage('Standardspeicherort für Benutzer festgelegt');
+                            
+                            // Nach dem Zurücksetzen des Pfads versuchen, die Berechtigung sofort zu erhalten
+                            if (window.requestFileSystemPermission) {
+                                logMessage('Versuche Dateisystem-Berechtigung für Standardspeicherort zu erhalten');
+                                await window.requestFileSystemPermission();
+                            }
                         }
                         
                         if (window.markFirstLoginCompleted) {

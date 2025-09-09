@@ -407,10 +407,63 @@ async function setStoragePath(path, username) {
  * @param {string} [username] - Optional: Der Benutzername, für den der Speicherort zurückgesetzt werden soll.
  * @returns {Promise<boolean>} Promise, das zu True aufgelöst wird, wenn das Zurücksetzen erfolgreich war.
  */
-async function resetStoragePath(username) {
-    directoryHandle = null;
-    localStorage.removeItem('hasDirectoryHandle');
-    return await setStoragePath(DEFAULT_STORAGE_PATH, username);
+/**
+ * Versucht, ein DirectoryHandle für den Standardspeicherort zu erstellen,
+ * wenn File System Access API verfügbar ist.
+ * @returns {Promise<FileSystemDirectoryHandle|null>} Das erstellte DirectoryHandle oder null bei Fehler.
+ */
+async function createDefaultDirectoryHandle() {
+    log('Versuche, ein DirectoryHandle für den Standardspeicherort zu erstellen');
+    
+    try {
+        // Prüfen, ob die File System Access API verfügbar ist
+        if (window.showDirectoryPicker) {
+            // Benutzer nach Ordnerauswahl fragen
+            log('File System Access API verfügbar, fordere Benutzer zur Ordnerauswahl auf');
+            
+            // Informationsbenachrichtigung vor dem Dialog anzeigen
+            if (window.showInfo) {
+                window.showInfo('Bitte wählen Sie einen Ordner für Ihre LernApp-Daten aus.');
+            }
+            
+            // Dialog öffnen
+            const handle = await window.showDirectoryPicker({
+                id: 'defaultLernAppStorage',
+                startIn: 'documents',
+                mode: 'readwrite',
+                suggestedName: DEFAULT_STORAGE_PATH
+            });
+            
+            if (handle) {
+                log('Benutzer hat erfolgreich einen Ordner ausgewählt:', 'info', handle.name);
+                
+                // Handle global und lokal speichern
+                directoryHandle = handle;
+                window.directoryHandle = handle;
+                
+                // Flag setzen
+                localStorage.setItem('hasDirectoryHandle', 'true');
+                
+                // Handle in IndexedDB speichern
+                if (window.storeDirectoryHandle) {
+                    try {
+                        await window.storeDirectoryHandle(handle);
+                        log('DirectoryHandle erfolgreich in IndexedDB gespeichert');
+                    } catch (error) {
+                        log('Fehler beim Speichern des DirectoryHandle in IndexedDB:', 'error', error);
+                    }
+                }
+                
+                return handle;
+            }
+        } else {
+            log('File System Access API nicht verfügbar, kann kein DirectoryHandle erstellen', 'warn');
+        }
+    } catch (error) {
+        log('Fehler beim Erstellen des DirectoryHandle für den Standardspeicherort:', 'error', error);
+    }
+    
+    return null;
 }
 
 /**
@@ -497,9 +550,19 @@ async function saveData(resourceName, data, username) {
         // 1. Versuch: Im Dateisystem speichern (wenn verfügbar)
         if (directoryHandle) {
             try {
+                // Debug-Information vor der Speicherung
+                log(`Versuche ${resourceName} im Dateisystem zu speichern: ${new Date().toLocaleTimeString()}`);
+                log(`DirectoryHandle: ${directoryHandle ? 'Verfügbar' : 'Nicht verfügbar'}`);
+                if (directoryHandle) {
+                    log(`DirectoryHandle-Name: ${directoryHandle.name}`);
+                }
+                
                 // Datei erstellen/öffnen - der Browser kümmert sich selbst um die Berechtigungsanfrage
                 const fileHandle = await directoryHandle.getFileHandle(resourceName, { create: true });
+                log(`FileHandle für ${resourceName} erfolgreich erhalten`);
+                
                 const writable = await fileHandle.createWritable();
+                log(`Writable für ${resourceName} erfolgreich erhalten`);
                 
                 // Debug-Information zur Speicherung
                 log(`Speichere ${resourceName} im Dateisystem: ${new Date().toLocaleTimeString()}`);
@@ -516,6 +579,7 @@ async function saveData(resourceName, data, username) {
             } catch (error) {
                 log(`✗ Fehler beim Speichern im Dateisystem: ${error.message}`, 'error');
                 log(`Fehler beim Speichern von ${resourceName} im Dateisystem:`, 'error', error);
+                console.error('Vollständiger Fehler beim Dateisystem-Zugriff:', error);
             }
         }
         
@@ -1262,6 +1326,56 @@ function debugDirectoryHandleStatus() {
     
     console.log('DirectoryHandle Status:', status);
     return status;
+}
+
+/**
+ * Setzt den Speicherpfad auf den Standardpfad zurück.
+ * Diese Funktion löscht alle vorhandenen Einstellungen und setzt
+ * den Pfad auf den Standardwert zurück.
+ * @param {string} [username] - Optional: Der Benutzername, für den der Pfad zurückgesetzt werden soll.
+ * @param {boolean} [askForDirectory=false] - Optional: Wenn true, wird der Benutzer nach einem Verzeichnis gefragt.
+ * @returns {Promise<boolean>} True, wenn der Pfad erfolgreich zurückgesetzt wurde, sonst False.
+ */
+async function resetStoragePath(username, askForDirectory = false) {
+    try {
+        // DirectoryHandle zurücksetzen
+        directoryHandle = null;
+        window.directoryHandle = null;
+        
+        // Flags zurücksetzen
+        localStorage.removeItem('hasDirectoryHandle');
+        localStorage.removeItem('directoryHandleRestored');
+        localStorage.removeItem('directoryHandleRestoredInSession');
+        
+        // Debug-Meldung für bessere Nachvollziehbarkeit
+        log(`Setze Speicherpfad für ${username || 'aktuellen Benutzer'} auf Standardpfad zurück`);
+        
+        // Nur wenn explizit gewünscht, nach einem Verzeichnis fragen
+        let defaultHandle = null;
+        if (askForDirectory) {
+            log('Benutzer wird nach einem Speicherort gefragt');
+            defaultHandle = await createDefaultDirectoryHandle();
+        } else {
+            log('Verwende Standardpfad ohne Benutzerinteraktion');
+        }
+        
+        if (defaultHandle) {
+            log('DirectoryHandle für Standardpfad erstellt, verwende es für setStoragePath');
+            
+            // Speicherpfad mit dem neuen Handle setzen
+            return await setStoragePath({
+                path: DEFAULT_STORAGE_PATH,
+                handle: defaultHandle
+            }, username);
+        } else {
+            log('Kein DirectoryHandle verwendet, setze nur den Standardpfad', 'info');
+        }
+    } catch (error) {
+        log('Fehler beim Zurücksetzen des Speicherpfads:', 'error', error);
+    }
+    
+    // Fallback: Standardpfad ohne Handle verwenden
+    return await setStoragePath(DEFAULT_STORAGE_PATH, username);
 }
 
 // Globale Funktionen exportieren

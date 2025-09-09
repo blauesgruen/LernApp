@@ -5,6 +5,27 @@
  * wiederhergestellt wird, um Probleme mit verlorenem Speicherzugriff nach Seitenwechseln zu vermeiden.
  */
 
+// Hilfsfunktion zum Diagnostizieren des DirectoryHandle-Status
+function diagnoseFsAccessStatus() {
+    const logFunc = window.logger ? window.logger.info.bind(window.logger) : console.log;
+    
+    logFunc('=== Dateisystem-Zugriff Diagnose ===');
+    logFunc(`Eingeloggt: ${localStorage.getItem('loggedIn') === 'true' ? 'Ja' : 'Nein'}`);
+    logFunc(`Benutzername: ${localStorage.getItem('username') || 'Nicht gesetzt'}`);
+    logFunc(`hasDirectoryHandle Flag: ${localStorage.getItem('hasDirectoryHandle') || 'Nicht gesetzt'}`);
+    logFunc(`hasStoredDirectoryHandle Flag: ${localStorage.getItem('hasStoredDirectoryHandle') || 'Nicht gesetzt'}`);
+    
+    // Prüfen auf benutzerspezifische Pfade
+    const username = localStorage.getItem('username');
+    if (username) {
+        logFunc(`Benutzerspezifischer Pfad: ${localStorage.getItem(`storagePath_${username}`) || 'Nicht gesetzt'}`);
+        logFunc(`First Login Status: ${localStorage.getItem(`firstLoginComplete_${username}`) || 'Nicht gesetzt'}`);
+    }
+    
+    logFunc(`window.directoryHandle verfügbar: ${window.directoryHandle ? 'Ja' : 'Nein'}`);
+    logFunc('=== Ende der Diagnose ===');
+}
+
 // Bei DOMContentLoaded sofort den DirectoryHandle wiederherstellen
 document.addEventListener('DOMContentLoaded', async () => {
     const logFunc = window.logger ? window.logger.info.bind(window.logger) : console.log;
@@ -88,3 +109,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         errorFunc('Fehler beim Wiederherstellen des DirectoryHandle beim Seitenladen:', error);
     }
 });
+
+// Hilfsfunktion zum globalen Fenster hinzufügen
+window.diagnoseFsAccessStatus = diagnoseFsAccessStatus;
