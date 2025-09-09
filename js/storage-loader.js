@@ -1,5 +1,5 @@
 /**
- * Lademanager für das Speichermodul und die Dateisystem-API
+ * Modul zum kontrollierten Laden der Speichermodule
  * 
  * Dieses Skript organisiert das korrekte Laden der Speichermodule in der richtigen Reihenfolge
  * und stellt sicher, dass die Abhängigkeiten korrekt aufgelöst werden.
@@ -9,12 +9,10 @@
 const config = {
     // Hauptmodule
     modules: {
-        persistentFileSystem: '/js/persistent-file-system.js',
+        storageCore: '/js/storage-core.js',
         storageIndexedDB: '/js/storage-indexeddb.js',
-        storage: '/js/storage.js',
-        storageAccess: '/js/storage-access.js',
-        storageFix: '/js/storage-fix.js',
-        debugTools: '/js/debug-persistent-storage.js'
+        debugTools: '/js/debug-persistent-storage.js',
+        compatibility: '/js/storage-compatibility.js'
     },
     
     // Optionen
@@ -91,35 +89,28 @@ async function init() {
     try {
         log('Starte Ladevorgang der Speichermodule');
         
-        // Debug-Tools zuerst laden (wenn aktiviert)
-        if (config.options.loadDebugTools) {
-            await loadModule(config.modules.debugTools);
-            log('Debug-Tools geladen, fahre mit Hauptmodulen fort', 'debug');
-        }
-        
         // Prüfen, ob der Benutzer eingeloggt ist
         const isLoggedIn = localStorage.getItem('loggedIn') === 'true' && localStorage.getItem('username');
         
         if (isLoggedIn) {
             log('Benutzer ist eingeloggt, lade alle Speichermodule', 'info');
-            // Nur für eingeloggte Benutzer: Persistentes Dateisystem laden
-            await loadModule(config.modules.persistentFileSystem);
+            
+            // Debug-Tools zuerst laden (wenn aktiviert)
+            if (config.options.loadDebugTools) {
+                await loadModule(config.modules.debugTools);
+                log('Debug-Tools geladen, fahre mit Hauptmodulen fort', 'debug');
+            }
             
             // IndexedDB Fallback-Speicher laden
             await loadModule(config.modules.storageIndexedDB);
             
-            // Storage-Access-Module laden (für Zugriffsüberprüfung)
-            await loadModule(config.modules.storageAccess);
+            // Hauptspeichermodul laden (neue vereinfachte Version)
+            await loadModule(config.modules.storageCore);
+            
+            // Kompatibilitätsadapter laden
+            await loadModule(config.modules.compatibility);
         } else {
             log('Benutzer ist nicht eingeloggt, lade nur grundlegende Speichermodule', 'info');
-        }
-        
-        // Hauptspeichermodul wird immer geladen
-        await loadModule(config.modules.storage);
-        
-        // Storage-Fix-Modul laden (für automatische Reparatur)
-        if (isLoggedIn) {
-            await loadModule(config.modules.storageFix);
         }
         
         // Ladevorgang abgeschlossen
@@ -146,17 +137,20 @@ async function loadPersistentStorageModules() {
     try {
         log('Lade persistente Speichermodule nach erfolgreichem Login', 'info');
         
-        // Persistentes Dateisystem laden
-        await loadModule(config.modules.persistentFileSystem);
+        // Debug-Tools zuerst laden (wenn aktiviert)
+        if (config.options.loadDebugTools) {
+            await loadModule(config.modules.debugTools);
+            log('Debug-Tools geladen, fahre mit Hauptmodulen fort', 'debug');
+        }
         
         // IndexedDB Fallback-Speicher laden
         await loadModule(config.modules.storageIndexedDB);
         
-        // Storage-Access-Module laden
-        await loadModule(config.modules.storageAccess);
+        // Hauptspeichermodul laden (neue vereinfachte Version)
+        await loadModule(config.modules.storageCore);
         
-        // Storage-Fix-Modul laden
-        await loadModule(config.modules.storageFix);
+        // Kompatibilitätsadapter laden
+        await loadModule(config.modules.compatibility);
         
         log('Persistente Speichermodule erfolgreich nachgeladen', 'success');
         

@@ -5,8 +5,17 @@
  */
 
 // Ein spezieller Cache-Schlüssel für das Speichern des Verzeichnispfades
-const DIR_HANDLE_STORE_NAME = 'lernapp-directory-handles';
-const DIR_HANDLE_KEY = 'main-directory-handle';
+// Globale Variablen nur deklarieren, wenn sie noch nicht existieren
+if (typeof DIR_HANDLE_STORE_NAME === 'undefined') {
+    const DIR_HANDLE_STORE_NAME = 'lernapp-directory-handles';
+    const DIR_HANDLE_KEY = 'main-directory-handle';
+    
+    // Globale Verfügbarkeit sicherstellen
+    window.DIR_HANDLE_STORE_NAME = DIR_HANDLE_STORE_NAME;
+    window.DIR_HANDLE_KEY = DIR_HANDLE_KEY;
+} else {
+    console.log('DIR_HANDLE_STORE_NAME bereits definiert, überspringe Deklaration');
+}
 
 /**
  * Initialisiert die IndexedDB für die Verzeichnis-Handle-Speicherung

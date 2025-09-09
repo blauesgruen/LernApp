@@ -148,7 +148,7 @@ async function debugPersistentStorage() {
  */
 function openDebugDatabase() {
     return new Promise((resolve, reject) => {
-        const request = indexedDB.open(DEBUG_DB_NAME, 1);
+        const request = indexedDB.open(DEBUG_DB_NAME, 2);  // Version auf 2 aktualisiert
         
         request.onupgradeneeded = (event) => {
             const db = event.target.result;

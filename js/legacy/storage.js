@@ -4,12 +4,24 @@
  * Verwaltet den Speicherort für die Daten der LernApp.
  * Unterstützt lokale Speicherung, Cloud-Speicherorte (z.B. Dropbox) und native Dateisystemzugriffe.
  */
+
+// Standardpfad definieren, der konsistent im gesamten Code verwendet werden kann
+if (typeof window.DEFAULT_STORAGE_PATH === 'undefined') {
+    window.DEFAULT_STORAGE_PATH = 'LernAppDatenbank';
+    console.log('DEFAULT_STORAGE_PATH global definiert als', window.DEFAULT_STORAGE_PATH);
+} else {
+    console.log('DEFAULT_STORAGE_PATH bereits global definiert als', window.DEFAULT_STORAGE_PATH);
+}
+
+// Standardpfad für lokale Verwendung
+const DEFAULT_STORAGE_PATH = window.DEFAULT_STORAGE_PATH;
+
 function getStoragePath(username) {
     const currentUser = username || localStorage.getItem('username');
     if (!currentUser) {
-        return localStorage.getItem('storagePath') || DEFAULT_STORAGE_PATH;
+        return localStorage.getItem('storagePath') || window.DEFAULT_STORAGE_PATH;
     }
-    return localStorage.getItem(`storagePath_${currentUser}`) || DEFAULT_STORAGE_PATH;
+    return localStorage.getItem(`storagePath_${currentUser}`) || window.DEFAULT_STORAGE_PATH;
 }
 
 /**
@@ -45,6 +57,81 @@ function getStorageDisplayName(username) {
     
     return String(path);
 }
+
+/**
+ * Erstellt ein simuliertes DirectoryHandle für den Standardspeicherort.
+ * Dieses Handle unterstützt die grundlegenden Operationen, speichert aber alle Daten
+ * im localStorage, anstatt im Dateisystem.
+ * @returns {Object} Ein simuliertes DirectoryHandle
+ */
+function createVirtualDirectoryHandle() {
+    log('Erstelle virtuelles DirectoryHandle für Standardspeicherort');
+    
+    // Basis-Schlüssel für localStorage
+    const baseKey = `virtual_fs_${DEFAULT_STORAGE_PATH}`;
+    
+    // Simuliertes DirectoryHandle-Objekt
+    const virtualHandle = {
+        name: DEFAULT_STORAGE_PATH,
+        kind: 'directory',
+        
+        // Simuliert das Holen eines FileHandle
+        async getFileHandle(name, options = {}) {
+            log(`Virtuelles getFileHandle: ${name}`, 'info');
+            const fileKey = `${baseKey}/${name}`;
+            
+            // Wenn die Datei nicht existiert und create=false
+            if (!localStorage.getItem(fileKey) && !options.create) {
+                throw new Error(`Datei ${name} existiert nicht im virtuellen Dateisystem`);
+            }
+            
+            // FileHandle zurückgeben
+            return {
+                name: name,
+                kind: 'file',
+                
+                // Gibt einen Writable-Stream zurück
+                async createWritable() {
+                    let data = '';
+                    
+                    return {
+                        // Schreiben in den Stream
+                        async write(content) {
+                            if (typeof content === 'string') {
+                                data = content;
+                            } else if (content instanceof Blob) {
+                                data = await content.text();
+                            } else {
+                                data = String(content);
+                            }
+                        },
+                        
+                        // Stream schließen und Daten speichern
+                        async close() {
+                            localStorage.setItem(fileKey, data);
+                            log(`Datei ${name} in virtuellem Dateisystem gespeichert`, 'info');
+                            return true;
+                        }
+                    };
+                },
+                
+                // Liest die Datei
+                async getFile() {
+                    const content = localStorage.getItem(fileKey) || '';
+                    return new Blob([content], { type: 'application/json' });
+                }
+            };
+        },
+        
+        // Simuliert eine Berechtigungsabfrage - immer erfolgreich
+        async requestPermission() {
+            return 'granted';
+        }
+    };
+    
+    return virtualHandle;
+}
+
 /**
  * Verwaltet den Speicherort für die Daten der LernApp.
  * Unterstützt lokale Speicherung, Cloud-Speicherorte (z.B. Dropbox) und native Dateisystemzugriffe.
@@ -72,11 +159,14 @@ function log(message, type = 'info', ...args) {
     }
 }
 
-// Standardpfad für Daten (wenn kein benutzerdefinierter Pfad angegeben wurde)
-const DEFAULT_STORAGE_PATH = 'lernapp_data';
+// Hilfsfunktionen für spezifische Log-Levels
+function debug(message, ...args) {
+    log(message, 'debug', ...args);
+}
 
-// Exportiere den Standardpfad, damit andere Skripte darauf zugreifen können
-window.DEFAULT_STORAGE_PATH = DEFAULT_STORAGE_PATH;
+function warn(message, ...args) {
+    log(message, 'warn', ...args);
+}
 
 // Variable für den aktuellen Handle zum Ordner (File System Access API)
 let directoryHandle = null;
@@ -221,6 +311,32 @@ async function getDirectoryHandle(username) {
                 }
             }    // Kein Handle vorhanden - das ist normal und kein Fehler
     return null;
+}
+
+/**
+ * Versucht, den DirectoryHandle zu reparieren und automatisch wiederherzustellen.
+ * Diese Funktion ist eine Brücke zu der autoRepairDirectoryHandle-Funktion in storage-fix.js
+ * @returns {Promise<boolean>} True wenn die Reparatur erfolgreich war, andernfalls false
+ */
+async function repairDirectoryHandle() {
+    try {
+        // Prüfen, ob die Funktion direkt global verfügbar ist
+        if (typeof window.autoRepairDirectoryHandle === 'function') {
+            debug('Verwende global verfügbare autoRepairDirectoryHandle-Funktion');
+            return await window.autoRepairDirectoryHandle();
+        } else {
+            warn('autoRepairDirectoryHandle-Funktion ist nicht global verfügbar');
+            return false;
+        }
+    } catch (err) {
+        // Logger-Funktionen verwenden oder als Fallback console.error
+        if (window.logger && typeof window.logger.error === 'function') {
+            window.logger.error('Fehler beim Versuch, DirectoryHandle zu reparieren:', err);
+        } else {
+            console.error('Fehler beim Versuch, DirectoryHandle zu reparieren:', err);
+        }
+        return false;
+    }
 }
 
 /**
@@ -547,7 +663,79 @@ async function saveData(resourceName, data, username) {
             directoryHandle = window.directoryHandle;
         }
         
-        // 1. Versuch: Im Dateisystem speichern (wenn verfügbar)
+        // 1. Erst im lokalen Speicher sichern (Backupprinzip - immer zuerst ausführen)
+        try {
+            // Überprüfen, ob die Daten das Quota überschreiten könnten
+            const dataSize = new Blob([jsonData]).size;
+            // Typische localStorage-Quota liegt bei 5-10MB, wir verwenden 4MB als sicheren Wert
+            const estimatedAvailableSpace = 4 * 1024 * 1024; 
+            
+            if (dataSize > estimatedAvailableSpace) {
+                console.log(`Warnung: Daten sind sehr groß (${(dataSize/1024/1024).toFixed(2)}MB), könnte Quota überschreiten`);
+                
+                // Versuch, die Daten zu komprimieren
+                if (window.compressData) {
+                    try {
+                        const compressedData = await window.compressData(jsonData);
+                        localStorage.setItem(getResourcePath(resourceName, username), compressedData);
+                        log(`Datei ${resourceName} komprimiert im localStorage gespeichert (Backup)`, 'info');
+                        localStorageSuccess = true;
+                    } catch (compressErr) {
+                        console.log(`Komprimierung fehlgeschlagen: ${compressErr.message}`);
+                    }
+                }
+                
+                // Alternativ: Speichere im IndexedDB als Fallback für große Daten
+                if (!localStorageSuccess && window.saveToIndexedDB) {
+                    try {
+                        await window.saveToIndexedDB(resourceName, jsonData, username);
+                        // Speichere einen Hinweis im localStorage, dass die Daten in IndexedDB sind
+                        localStorage.setItem(getResourcePath(resourceName, username), `indexeddb:${Date.now()}`);
+                        log(`Datei ${resourceName} in IndexedDB gespeichert (Backup)`, 'info');
+                        localStorageSuccess = true;
+                    } catch (idbErr) {
+                        console.log(`IndexedDB-Speicherung fehlgeschlagen: ${idbErr.message}`);
+                    }
+                }
+            } else {
+                // Normaler Speichervorgang für kleinere Daten
+                localStorage.setItem(getResourcePath(resourceName, username), jsonData);
+                log(`Datei ${resourceName} im localStorage gespeichert (Backup)`, 'info');
+                localStorageSuccess = true;
+            }
+            
+            if (localStorageSuccess) {
+                showNotification('Datei ' + resourceName + ' im Browser-Speicher gespeichert', 'success');
+            } else {
+                showNotification('Fehler beim Speichern im Browser-Speicher', 'error');
+            }
+        } catch (localErr) {
+            log(`Fehler beim Speichern im lokalen Speicher: ${localErr.message}`, 'error');
+            showNotification('Fehler beim Speichern im Browser-Speicher: ' + localErr.message, 'error');
+        }
+        
+        // 2. Versuch: Im Dateisystem speichern (wenn verfügbar)
+        // Automatische Reparatur versuchen, wenn kein direktes Handle verfügbar ist
+        let reparaturVersucht = false;
+        
+        if (!directoryHandle) {
+            log('Kein DirectoryHandle verfügbar, versuche automatische Reparatur vor dem Speichern...', 'info');
+            const repaired = await repairDirectoryHandle();
+            reparaturVersucht = true;
+            
+            if (repaired) {
+                log('DirectoryHandle erfolgreich vor Speicherung repariert', 'info');
+                // Aktualisiere die lokale Variable mit dem globalen Handle
+                if (window.directoryHandle) {
+                    directoryHandle = window.directoryHandle;
+                    log('Lokales DirectoryHandle aktualisiert nach Reparatur', 'info');
+                }
+            } else {
+                log('Vorab-Reparatur des DirectoryHandle fehlgeschlagen', 'warn');
+            }
+        }
+        
+        // Versuche nun im Dateisystem zu speichern, wenn ein Handle verfügbar ist
         if (directoryHandle) {
             try {
                 // Debug-Information vor der Speicherung
@@ -576,78 +764,48 @@ async function saveData(resourceName, data, username) {
                 log(`✓ Dateisystem-Speicherung erfolgreich: ${new Date().toLocaleTimeString()}`);
                 log(`Datei ${resourceName} erfolgreich im Dateisystem gespeichert`);
                 fileSystemSuccess = true;
-            } catch (error) {
-                log(`✗ Fehler beim Speichern im Dateisystem: ${error.message}`, 'error');
-                log(`Fehler beim Speichern von ${resourceName} im Dateisystem:`, 'error', error);
-                console.error('Vollständiger Fehler beim Dateisystem-Zugriff:', error);
+            } catch (err) {
+                log(`✗ Fehler beim Speichern im Dateisystem: ${err.message}`, 'error');
+                log(`Fehler beim Speichern von ${resourceName} im Dateisystem:`, 'error', err);
+                console.error('Vollständiger Fehler beim Dateisystem-Zugriff:', err);
+                
+                // Nur wenn noch nicht versucht wurde zu reparieren, jetzt versuchen
+                if (!reparaturVersucht) {
+                    // Versuchen wir, das DirectoryHandle zu reparieren
+                    log('Versuche, das DirectoryHandle zu reparieren...', 'info');
+                    const repaired = await repairDirectoryHandle();
+                    
+                    if (repaired) {
+                        log('DirectoryHandle erfolgreich repariert, versuche erneut zu speichern...', 'info');
+                        
+                        try {
+                            // Neuer Versuch nach erfolgreicher Reparatur
+                            const fileHandle = await directoryHandle.getFileHandle(resourceName, { create: true });
+                            const writable = await fileHandle.createWritable();
+                            
+                            await writable.write(jsonData);
+                            await writable.close();
+                            
+                            log(`✓ Dateisystem-Speicherung nach Reparatur erfolgreich: ${new Date().toLocaleTimeString()}`);
+                            fileSystemSuccess = true;
+                        } catch (retryErr) {
+                            log(`✗ Fehler beim erneuten Speichern nach Reparatur: ${retryErr.message}`, 'error');
+                        }
+                    } else {
+                        log('DirectoryHandle-Reparatur fehlgeschlagen', 'warn');
+                    }
+                } else {
+                    log('Keine weitere Reparatur versucht, da bereits eine Reparatur durchgeführt wurde', 'info');
+                }
             }
         }
         
-        // 2. Immer auch im localStorage/IndexedDB speichern (als Backup)
-        try {
-            // Überprüfen, ob die Daten das Quota überschreiten könnten
-            const dataSize = new Blob([jsonData]).size;
-            // Typische localStorage-Quota liegt bei 5-10MB, wir verwenden 4MB als sicheren Wert
-            const estimatedAvailableSpace = 4 * 1024 * 1024; 
-            
-            if (dataSize > estimatedAvailableSpace) {
-                console.log(`Warnung: Daten sind sehr groß (${(dataSize/1024/1024).toFixed(2)}MB), könnte Quota überschreiten`);
-                
-                // Versuch, die Daten zu komprimieren
-                if (window.compressData) {
-                    try {
-                        const compressedData = await window.compressData(jsonData);
-                        localStorage.setItem(getResourcePath(resourceName, username), compressedData);
-                        log(`Datei ${resourceName} komprimiert im localStorage gespeichert (Backup)`, 'info');
-                        localStorageSuccess = true;
-                    } catch (compressError) {
-                        console.log(`Komprimierung fehlgeschlagen: ${compressError.message}`);
-                    }
-                }
-                
-                // Alternativ: Speichere im IndexedDB als Fallback für große Daten
-                if (!localStorageSuccess && window.saveToIndexedDB) {
-                    try {
-                        await window.saveToIndexedDB(resourceName, jsonData, username);
-                        // Speichere einen Hinweis im localStorage, dass die Daten in IndexedDB sind
-                        localStorage.setItem(getResourcePath(resourceName, username), `indexeddb:${Date.now()}`);
-                        log(`Datei ${resourceName} in IndexedDB gespeichert (Backup)`, 'info');
-                        localStorageSuccess = true;
-                    } catch (idbError) {
-                        console.log(`IndexedDB-Speicherung fehlgeschlagen: ${idbError.message}`);
-                    }
-                }
-            } else {
-                // Normaler Speichervorgang für kleinere Daten
-                localStorage.setItem(getResourcePath(resourceName, username), jsonData);
-                log(`Datei ${resourceName} im localStorage gespeichert (Backup)`, 'info');
-                localStorageSuccess = true;
-            }
-        } catch (storageError) {
-            // Prüfen, ob es sich um eine Quota-Überschreitung handelt
-            if (storageError.name === 'QuotaExceededError' || 
-                storageError.message.includes('quota') || 
-                storageError.message.includes('Storage')) {
-                
-                console.log(`localStorage-Quota überschritten. Versuche Fallback-Lösung...`);
-                
-                // Versuche es mit IndexedDB als Fallback
-                if (window.saveToIndexedDB) {
-                    try {
-                        await window.saveToIndexedDB(resourceName, jsonData, username);
-                        log(`Datei ${resourceName} in IndexedDB gespeichert (Backup)`, 'info');
-                        localStorageSuccess = true;
-                    } catch (idbError) {
-                        console.log(`IndexedDB-Speicherung fehlgeschlagen: ${idbError.message}`);
-                    }
-                }
-                
-                if (!localStorageSuccess) {
-                    log(`Speicherquota überschritten. Backup konnte nicht erstellt werden.`, 'warn');
-                }
-            } else {
-                log(`Fehler beim Speichern im localStorage: ${storageError.message}`, 'error');
-            }
+        // Abschließende Erfolgsmeldung und Warnung, falls Dateisystem-Speicherung fehlschlug
+        if (!fileSystemSuccess) {
+            log('Warnung: Speicherung im Dateisystem fehlgeschlagen', 'warn');
+            showNotification('Warnung: Speicherung im Dateisystem fehlgeschlagen', 'warning');
+        } else {
+            log('Speicherung im Dateisystem erfolgreich', 'info');
         }
         
         // Zeige Erfolgs- oder Fehlermeldung basierend auf den Ergebnissen
@@ -669,10 +827,10 @@ async function saveData(resourceName, data, username) {
             }
             return false;
         }
-    } catch (error) {
-        log(`Fehler beim Speichern von ${resourceName}:`, 'error', error);
+    } catch (err) {
+        log(`Fehler beim Speichern von ${resourceName}:`, 'error', err);
         if (window.showError) {
-            window.showError(`Fehler beim Speichern der Daten: ${error.message}`);
+            window.showError(`Fehler beim Speichern der Daten: ${err.message}`);
         }
         return false;
     }
@@ -1350,32 +1508,36 @@ async function resetStoragePath(username, askForDirectory = false) {
         // Debug-Meldung für bessere Nachvollziehbarkeit
         log(`Setze Speicherpfad für ${username || 'aktuellen Benutzer'} auf Standardpfad zurück`);
         
-        // Nur wenn explizit gewünscht, nach einem Verzeichnis fragen
+        // Handle für den Speicherort definieren
         let defaultHandle = null;
+        
+        // Nur wenn explizit gewünscht, nach einem Verzeichnis fragen
         if (askForDirectory) {
             log('Benutzer wird nach einem Speicherort gefragt');
             defaultHandle = await createDefaultDirectoryHandle();
         } else {
-            log('Verwende Standardpfad ohne Benutzerinteraktion');
+            log('Erstelle virtuelles DirectoryHandle für transparenten Fallback');
+            defaultHandle = createVirtualDirectoryHandle();
         }
         
-        if (defaultHandle) {
-            log('DirectoryHandle für Standardpfad erstellt, verwende es für setStoragePath');
-            
-            // Speicherpfad mit dem neuen Handle setzen
-            return await setStoragePath({
-                path: DEFAULT_STORAGE_PATH,
-                handle: defaultHandle
-            }, username);
-        } else {
-            log('Kein DirectoryHandle verwendet, setze nur den Standardpfad', 'info');
-        }
+        // DirectoryHandle global und lokal speichern
+        directoryHandle = defaultHandle;
+        window.directoryHandle = defaultHandle;
+        
+        // Flag setzen, dass wir ein DirectoryHandle haben
+        localStorage.setItem('hasDirectoryHandle', 'true');
+        
+        // Speicherpfad mit dem Handle setzen
+        return await setStoragePath({
+            path: DEFAULT_STORAGE_PATH,
+            handle: defaultHandle
+        }, username);
     } catch (error) {
         log('Fehler beim Zurücksetzen des Speicherpfads:', 'error', error);
+        
+        // Fallback: Standardpfad ohne Handle verwenden
+        return await setStoragePath(DEFAULT_STORAGE_PATH, username);
     }
-    
-    // Fallback: Standardpfad ohne Handle verwenden
-    return await setStoragePath(DEFAULT_STORAGE_PATH, username);
 }
 
 // Globale Funktionen exportieren
@@ -1697,6 +1859,7 @@ window.listResources = listResources;
 window.needsStorageConfiguration = needsStorageConfiguration;
 window.getStorageDisplayName = getStorageDisplayName;
 window.initializeStorageForUser = initializeStorageForUser;
+window.repairDirectoryHandle = repairDirectoryHandle;
 // Track user interactions to enable directory picker
 document.addEventListener('mousedown', function() {
     window._userInteractionActive = true;
@@ -1724,6 +1887,12 @@ document.addEventListener('directoryHandleRestored', function(event) {
                         await writable.write(`Storage-Test: ${new Date().toISOString()}`);
                         await writable.close();
                         console.log('✓ Testdatei erfolgreich geschrieben - storage.js DirectoryHandle funktioniert');
+                        
+                        // Erfolg anzeigen
+                        if (window.showSuccess && !window._directoryHandleSuccessShown) {
+                            window.showSuccess('Dateisystem-Zugriff erfolgreich hergestellt.');
+                            window._directoryHandleSuccessShown = true;
+                        }
                     } catch (fileError) {
                         console.error('Fehler beim Schreiben der Testdatei in storage.js:', fileError);
                     }
@@ -1806,8 +1975,29 @@ async function initializeStorageForUser(username) {
                 return true;
             } else {
                 console.warn('DirectoryHandle konnte nicht wiederhergestellt werden');
+                console.log('Erstelle virtuelles DirectoryHandle als Fallback');
+                
+                // Erstelle ein virtuelles DirectoryHandle als Fallback
+                const virtualHandle = createVirtualDirectoryHandle();
+                directoryHandle = virtualHandle;
+                window.directoryHandle = virtualHandle;
+                
+                // Flag setzen, dass wir ein DirectoryHandle haben
+                localStorage.setItem('hasDirectoryHandle', 'true');
+                
+                console.log('Virtuelles DirectoryHandle wurde erstellt und gesetzt');
+                return true;
             }
         }
+        
+        // Wenn keine Wiederherstellungsfunktion verfügbar ist, trotzdem ein virtuelles Handle erstellen
+        console.log('Keine restoreDirectoryHandle-Funktion verfügbar, erstelle virtuelles DirectoryHandle');
+        const virtualHandle = createVirtualDirectoryHandle();
+        directoryHandle = virtualHandle;
+        window.directoryHandle = virtualHandle;
+        
+        // Flag setzen, dass wir ein DirectoryHandle haben
+        localStorage.setItem('hasDirectoryHandle', 'true');
         
         return true;
     } catch (error) {

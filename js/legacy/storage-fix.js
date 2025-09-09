@@ -122,23 +122,25 @@ async function autoRepairDirectoryHandle() {
         return false;
     }
     
-    log('Starte automatische Wiederherstellung des DirectoryHandle...');
-    
-    // 1. Versuch: Direkte Wiederherstellung mit der Standardfunktion
-    if (window.restoreDirectoryHandle) {
-        try {
-            log('Methode 1: Versuche restoreDirectoryHandle...');
-            const success = await window.restoreDirectoryHandle();
-            if (success) {
-                log('DirectoryHandle erfolgreich wiederhergestellt mit restoreDirectoryHandle!');
-                return true;
+        log('Starte automatische Wiederherstellung des DirectoryHandle...');
+        
+        // Erfolgsvariable für die endgültige Statusmeldung
+        let wiederherstellungErfolgreich = false;
+        
+        // 1. Versuch: Direkte Wiederherstellung mit der Standardfunktion
+        if (window.restoreDirectoryHandle) {
+            try {
+                log('Methode 1: Versuche restoreDirectoryHandle...');
+                const success = await window.restoreDirectoryHandle();
+                if (success) {
+                    log('DirectoryHandle erfolgreich wiederhergestellt mit restoreDirectoryHandle!');
+                    wiederherstellungErfolgreich = true;
+                    return true;
+                }
+            } catch (e) {
+                warn(`Fehler bei Methode 1: ${e.message}`);
             }
-        } catch (e) {
-            warn(`Fehler bei Methode 1: ${e.message}`);
-        }
-    }
-    
-    // 2. Versuch: Erweiterte Wiederherstellung mit forceRestoreDirectoryHandle
+        }    // 2. Versuch: Erweiterte Wiederherstellung mit forceRestoreDirectoryHandle
     if (window.forceRestoreDirectoryHandle) {
         try {
             log('Methode 2: Versuche forceRestoreDirectoryHandle...');
@@ -157,6 +159,7 @@ async function autoRepairDirectoryHandle() {
                             if (window.showSuccess) {
                                 window.showSuccess('Speicherortzugriff automatisch wiederhergestellt.');
                             }
+                            wiederherstellungErfolgreich = true;
                             return true;
                         }
                     } catch (testError) {
@@ -177,7 +180,7 @@ async function autoRepairDirectoryHandle() {
         const keyName = 'main-directory-handle';
         
         const db = await new Promise((resolve, reject) => {
-            const request = indexedDB.open(dbName, 1);
+            const request = indexedDB.open(dbName, 2);  // Version auf 2 aktualisiert
             request.onerror = reject;
             request.onsuccess = (event) => resolve(event.target.result);
         });
@@ -207,6 +210,7 @@ async function autoRepairDirectoryHandle() {
                                 if (window.showSuccess) {
                                     window.showSuccess('Speicherortzugriff automatisch wiederhergestellt.');
                                 }
+                                wiederherstellungErfolgreich = true;
                                 return true;
                             }
                         } catch (testError) {
@@ -223,7 +227,7 @@ async function autoRepairDirectoryHandle() {
         
         // Wenn der Fehler darauf hindeutet, dass der Objektspeicher nicht gefunden wurde,
         // dann existiert vermutlich kein gespeichertes Handle
-        if (e.message.includes('object stores was not found')) {
+        if (e.message && e.message.includes('object stores was not found')) {
             // Setze die Flags zurück, da kein Handle vorhanden ist
             localStorage.removeItem('hasDirectoryHandle');
             localStorage.removeItem('hasStoredDirectoryHandle');
@@ -233,8 +237,21 @@ async function autoRepairDirectoryHandle() {
     
     // Alle Methoden fehlgeschlagen
     warn('Automatische Wiederherstellung fehlgeschlagen. Benutzerinteraktion erforderlich.');
+    
+    // Zeige den Speicherort-Auswähler an, wenn alle Methoden fehlgeschlagen sind
+    if (!wiederherstellungErfolgreich && window.showStorageSelector) {
+        // Kurze Verzögerung, um sicherzustellen, dass die Seite vollständig geladen ist
+        setTimeout(() => {
+            log('Zeige Speicherort-Auswähler an...');
+            window.showStorageSelector();
+        }, 1500);
+    }
+    
     return false;
 }
+
+// Funktion global verfügbar machen
+window.autoRepairDirectoryHandle = autoRepairDirectoryHandle;
 
 /**
  * Erstellt eine Benachrichtigung mit einem Button, der es dem Benutzer ermöglicht,

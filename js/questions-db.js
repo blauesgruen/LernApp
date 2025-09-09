@@ -469,6 +469,32 @@ window.deleteCategory = deleteCategory;
 window.initializeDefaultCategories = initializeDefaultCategories;
 window.initializeUserStatistics = initializeUserStatistics;
 
+// Hilfsfunktion zum Hinzufügen von Funktionen zur Warteschlange
+function runWhenStorageReady(fn) {
+    if (window.loadData && window.saveData) {
+        // Wenn Storage bereits bereit ist, direkt ausführen
+        fn();
+    } else {
+        // Andernfalls zur Warteschlange hinzufügen
+        if (typeof window.storageReadyQueue === 'undefined') {
+            window.storageReadyQueue = [];
+        }
+        window.storageReadyQueue.push(fn);
+    }
+}
+
+// Event-Listener für das Laden der Speichermodule
+window.addEventListener('storageModulesLoaded', () => {
+    console.log('Speichermodule geladen, verarbeite Warteschlange mit', (window.storageReadyQueue ? window.storageReadyQueue.length : 0), 'Funktionen');
+    // Alle Funktionen in der Warteschlange ausführen
+    if (window.storageReadyQueue && window.storageReadyQueue.length > 0) {
+        while (window.storageReadyQueue.length > 0) {
+            const fn = window.storageReadyQueue.shift();
+            fn();
+        }
+    }
+});
+
 // Bei DOMContentLoaded die Standardkategorien initialisieren
 document.addEventListener('DOMContentLoaded', async () => {
     // Prüfen, ob der Benutzer eingeloggt ist
@@ -476,11 +502,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     const username = localStorage.getItem('username');
     
     if (isLoggedIn && username) {
-        try {
-            await initializeDefaultCategories();
-            await initializeUserStatistics(username);
-        } catch (error) {
-            console.error('Fehler bei der Initialisierung:', error);
-        }
+        runWhenStorageReady(async () => {
+            try {
+                await initializeDefaultCategories();
+                await initializeUserStatistics(username);
+            } catch (error) {
+                console.error('Fehler bei der Initialisierung:', error);
+            }
+        });
     }
 });

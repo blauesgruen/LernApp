@@ -12,6 +12,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.1/css/all.min.css">
     <!-- Zentrales Logging-System laden -->
     <script src="js/logger.js"></script>
+    <!-- Speichermodule-Loader -->
+    <script src="js/storage-loader.js"></script>
 </head>
 <body>
     <div id="header-container"></div>
@@ -123,14 +125,7 @@
 
     <script src="js/auth.js"></script>
     <script src="js/notification.js"></script>
-    <script src="js/storage.js"></script>
     <script src="js/quiz-db.js"></script>
-    <script src="js/persistent-file-system.js"></script>
-    <script src="js/storage-handler.js"></script>
-    <!-- Debug-Tools für Dateisystem-Zugriff -->
-    <script src="js/debug-storage.js"></script>
-    <!-- Fix für Dateisystem-Zugriff -->
-    <script src="js/storage-fix.js"></script>
     <script>
         // Header und Footer dynamisch laden
         async function loadHeaderAndFooter() {
