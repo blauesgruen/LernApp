@@ -1,6 +1,7 @@
 // category-management.js - Verwaltung von Kategorien und Gruppen
 
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('DEBUG: DOMContentLoaded Event ausgelöst');
     // Prüfen, ob der Benutzer eingeloggt ist
     const isLoggedIn = localStorage.getItem('loggedIn') === 'true';
     const username = localStorage.getItem('username');
@@ -120,6 +121,7 @@ document.addEventListener('DOMContentLoaded', function() {
      * Initialisiert die Seite
      */
     async function initializePage() {
+        console.log('DEBUG: initializePage wird gestartet');
         try {
             // Kategorien und Gruppen laden
             await Promise.all([
@@ -144,6 +146,7 @@ document.addEventListener('DOMContentLoaded', function() {
      * Lädt alle Kategorien und zeigt sie im Baumformat an
      */
     async function loadCategoryTree() {
+        console.log('DEBUG: loadCategoryTree wird gestartet');
         try {
             categoryTree.innerHTML = '<p class="loading-info">Kategorien werden geladen...</p>';
             
@@ -201,6 +204,8 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             
             categoryTree.innerHTML = html;
+            console.log('Rendered HTML:', html, userCategories);
+            console.log('Starte loadCategoryTree');
             
             // Event-Listener für die Kategorien hinzufügen
             document.querySelectorAll('.tree-item-category').forEach(item => {

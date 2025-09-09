@@ -85,33 +85,6 @@
     <script src="js/auth.js"></script>
     <script src="js/notification.js"></script>
     <script src="js/storage-loader.js"></script>
-    
-    <!-- Warten bis Storage-Module geladen sind -->
-    <script>
-        // Prüfen, ob die Storage-Module bereits geladen wurden
-        const storageModulesReady = window.loadData && window.saveData;
-        
-        if (!storageModulesReady) {
-            // Event-Listener für die Anzeige einer Ladeanzeige hinzufügen
-            window.addEventListener('DOMContentLoaded', () => {
-                console.log("Warte auf Speichermodule...");
-                const loadingMsg = document.createElement('div');
-                loadingMsg.id = 'storage-loading-indicator';
-                loadingMsg.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#f8d7da;color:#721c24;padding:10px;text-align:center;z-index:9999;';
-                loadingMsg.textContent = 'Lade Speichermodule...';
-                document.body.appendChild(loadingMsg);
-                
-                // Event-Listener für das Ende des Ladevorgangs
-                window.addEventListener('storageModulesLoaded', () => {
-                    const indicator = document.getElementById('storage-loading-indicator');
-                    if (indicator) indicator.remove();
-                    console.log("Speichermodule erfolgreich geladen!");
-                });
-            });
-        }
-    </script>
-    
-    <script src="js/quiz-db.js"></script>
     <script src="js/cleanup-categories.js"></script>
     <script>
         // Header und Footer dynamisch laden
@@ -141,6 +114,18 @@
                     }
                 }
 
+                // Nach Laden des Headers und Footers: Storage-Funktionen sind jetzt global verfügbar
+                const scriptsToLoad = [
+                    'js/quiz-db.js',
+                    'js/category-management.js'
+                ];
+                for (const src of scriptsToLoad) {
+                    const s = document.createElement('script');
+                    s.src = src;
+                    s.async = false;
+                    document.body.appendChild(s);
+                }
+
                 if (window.updateNavigation) { window.updateNavigation(); }
                 setTimeout(() => { try { if (window.updateStorageStatusIcon) window.updateStorageStatusIcon(); } catch (e) {} }, 50);
             } catch (error) {
@@ -151,6 +136,5 @@
         // Header und Footer laden
         loadHeaderAndFooter();
     </script>
-    <script src="js/category-management.js"></script>
 </body>
 </html>

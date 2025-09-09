@@ -23,7 +23,7 @@ window.getUserSpecificHandleKey = getUserSpecificHandleKey;
  */
 async function openHandleDatabase() {
     return new Promise((resolve, reject) => {
-        const request = indexedDB.open('LernAppDirectoryHandles', 3);
+        const request = indexedDB.open('LernAppDirectoryHandles', 4); // Version 4, damit alle ObjectStores verfügbar sind
         request.onerror = (event) => reject(event.target.error);
         request.onsuccess = (event) => resolve(event.target.result);
     });
@@ -83,29 +83,33 @@ window.storeDirectoryHandle = storeDirectoryHandle;
 async function restoreDirectoryHandle() {
     try {
         const username = getCurrentUsername();
+        console.log(`🔍 [restoreDirectoryHandle] Starte Wiederherstellung für Benutzer: ${username}`);
         const db = await openHandleDatabase();
         const handle = await getHandleFromDatabase(db);
-        if (!handle) {
-            console.warn(`⚠️ Kein gespeichertes DirectoryHandle für Benutzer ${username} gefunden`);
-            return null;
+        console.log('🔍 [restoreDirectoryHandle] Aus Datenbank geladenes Handle:', handle);
+        // Prüfe, ob das Handle gültig ist (echtes DirectoryHandle)
+        if (!handle || typeof handle.getFileHandle !== 'function') {
+            console.warn('⚠️ [restoreDirectoryHandle] Das gespeicherte DirectoryHandle ist nicht mehr gültig. Bitte wählen Sie das Verzeichnis erneut aus.');
+            window.directoryHandle = null;
+            // Optional: UI-Trigger oder Hinweis für erneute Auswahl
+            return false;
         }
         try {
-            if (!handle || typeof handle.requestPermission !== 'function') {
-                throw new Error('Ungültiges DirectoryHandle');
-            }
             const permission = await handle.requestPermission();
+            console.log(`🔑 [restoreDirectoryHandle] Berechtigungsabfrage Ergebnis: ${permission}`);
             if (permission !== 'granted') {
-                console.warn('⚠️ Berechtigung zum Zugriff auf das DirectoryHandle wurde verweigert');
+                console.warn('⚠️ [restoreDirectoryHandle] Berechtigung zum Zugriff auf das DirectoryHandle wurde verweigert');
                 return false;
             }
         } catch (permissionError) {
-            console.error('Fehler beim Anfordern der Berechtigung:', permissionError);
+            console.error('❌ [restoreDirectoryHandle] Fehler beim Anfordern der Berechtigung:', permissionError);
             return false;
         }
         window.directoryHandle = handle;
+        console.log('✅ [restoreDirectoryHandle] DirectoryHandle erfolgreich wiederhergestellt und global gesetzt.');
         return true;
     } catch (error) {
-        console.error('Fehler bei der Wiederherstellung des DirectoryHandle:', error);
+        console.error('❌ [restoreDirectoryHandle] Fehler bei der Wiederherstellung des DirectoryHandle:', error);
         return false;
     }
 }
@@ -198,11 +202,41 @@ window.syncStorage = async function() {
  * Hilfsfunktion: Daten aus IndexedDB laden
  */
 async function getFromIndexedDB(key) {
-    // ...implementiere Zugriff auf IndexedDB...
-    // Beispiel: window.getHandleFromDatabase() für DirectoryHandle, sonst eigene Logik
-    // Hier Dummy-Implementierung:
-    if (window.getHandleFromDatabase) {
-        return await window.getHandleFromDatabase(null, key);
+    // Trennung: DirectoryHandle nur mit speziellem Schlüssel, sonst eigene ObjectStore für Daten
+    if (key.startsWith('dir-handle-')) {
+        if (window.openHandleDatabase && window.getHandleFromDatabase) {
+            const db = await window.openHandleDatabase();
+            return await window.getHandleFromDatabase(db, key);
+        }
+    } else {
+        // Für alle anderen Daten: eigene ObjectStore 'lernapp-data'
+        if (window.openHandleDatabase) {
+            const db = await window.openHandleDatabase();
+            // Prüfe, ob ObjectStore existiert
+            if (!db.objectStoreNames.contains('lernapp-data')) {
+                // Store existiert nicht, lege ihn an
+                db.close();
+                await new Promise((resolve, reject) => {
+                    const req = indexedDB.open('LernAppDirectoryHandles', 4);
+                    req.onupgradeneeded = (event) => {
+                        const db2 = event.target.result;
+                        if (!db2.objectStoreNames.contains('lernapp-data')) {
+                            db2.createObjectStore('lernapp-data');
+                        }
+                    };
+                    req.onsuccess = () => resolve();
+                    req.onerror = () => reject();
+                });
+                return null;
+            }
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction('lernapp-data', 'readonly');
+                const store = transaction.objectStore('lernapp-data');
+                const request = store.get(key);
+                request.onerror = (event) => resolve(null);
+                request.onsuccess = () => resolve(request.result || null);
+            });
+        }
     }
     // Fallback: localStorage
     const raw = localStorage.getItem(key);
@@ -217,9 +251,34 @@ async function saveToIndexedDB(key, data) {
     if (typeof data === 'object' && data !== null) {
         data._lastModified = Date.now();
     }
-    // ...implementiere Zugriff auf IndexedDB...
-    if (window.storeDirectoryHandle) {
-        await window.storeDirectoryHandle(data, key);
+    // Trennung: DirectoryHandle nur mit speziellem Schlüssel, sonst eigene ObjectStore für Daten
+    if (!key.startsWith('dir-handle-')) {
+        if (window.openHandleDatabase) {
+            const db = await window.openHandleDatabase();
+            // Prüfe, ob ObjectStore existiert
+            if (!db.objectStoreNames.contains('lernapp-data')) {
+                db.close();
+                await new Promise((resolve, reject) => {
+                    const req = indexedDB.open('LernAppDirectoryHandles', 4);
+                    req.onupgradeneeded = (event) => {
+                        const db2 = event.target.result;
+                        if (!db2.objectStoreNames.contains('lernapp-data')) {
+                            db2.createObjectStore('lernapp-data');
+                        }
+                    };
+                    req.onsuccess = () => resolve();
+                    req.onerror = () => reject();
+                });
+                return;
+            }
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction('lernapp-data', 'readwrite');
+                const store = transaction.objectStore('lernapp-data');
+                const request = store.put(data, key);
+                request.onerror = (event) => reject(event.target.error);
+                request.onsuccess = () => resolve(true);
+            });
+        }
     }
     // Fallback: localStorage
     localStorage.setItem(key, JSON.stringify(data));
