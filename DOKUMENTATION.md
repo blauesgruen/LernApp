@@ -437,3 +437,41 @@ Die App ermöglicht die Erstellung von Fragen mit:
 - Die Datenpfade werden so konstruiert, dass sie mit echten Dateisystempfaden kompatibel sind.
 - Alle Speicherfunktionen sind asynchron gestaltet, um die verschiedenen Backends einheitlich zu unterstützen.
 - Die Implementierung prüft die Verfügbarkeit der APIs und bietet sinnvolle Fallbacks und Fehlermeldungen.
+
+# Speicherverwaltung in der LernApp
+
+Die LernApp verwendet ein hybrides Speichersystem, das sowohl lokale Speicherung im Browser als auch optionales Speichern in einem vom Nutzer gewählten Verzeichnis unterstützt.
+
+## Lokale Speicherung
+- Standardmäßig werden alle Daten (Kategorien, Gruppen, Fragen, Nutzer, etc.) lokal im Browser gespeichert.
+- Verwendete Technologien: IndexedDB und localStorage.
+- Die Daten sind persistent und stehen auch nach einem Neustart des Browsers zur Verfügung.
+
+## Externer Speicherort (DirectoryHandle)
+- Nutzer können einen Speicherort (Ordner) auswählen, in dem die Daten zusätzlich als Dateien abgelegt werden.
+- Die Speicherung erfolgt dann parallel: lokal im Browser und im gewählten Verzeichnis.
+- Die Berechtigungen für den Zugriff auf das Verzeichnis werden über die File System Access API verwaltet.
+
+## Synchronisation
+- Die App bietet eine zentrale Synchronisationsfunktion, die lokale und externe Daten abgleicht.
+- Änderungen werden automatisch in beide Speicherorte geschrieben, sobald ein externer Speicherort festgelegt ist.
+- Die Synchronisation kann manuell oder automatisch angestoßen werden.
+- Konflikte werden nach dem Prinzip "letzte Änderung gewinnt" behandelt.
+
+## Globale Storage-Funktionen
+- Alle relevanten Storage-Funktionen sind zentral in `js/storage-global.js` definiert und werden global bereitgestellt (z.B. `window.loadData`, `window.saveData`, `window.syncStorage`).
+- Die Funktionen erkennen automatisch, ob ein externer Speicherort vorhanden ist und speichern entsprechend doppelt.
+- Die Synchronisation kann über `window.syncStorage()` ausgelöst werden.
+
+## Typische Abläufe
+- Beim ersten Login wird nur lokal gespeichert.
+- Nach Auswahl eines Speicherorts werden alle neuen und geänderten Daten auch im Verzeichnis gespeichert.
+- Die Synchronisation sorgt dafür, dass beide Speicherorte konsistent bleiben.
+
+## Hinweise
+- Die Speicherung im externen Verzeichnis ist optional und erfordert die Zustimmung des Nutzers.
+- Die App prüft und fordert Berechtigungen automatisch an.
+- Die Storage-Logik ist modular und kann einfach erweitert werden.
+
+---
+Letzte Aktualisierung: 09.09.2025
