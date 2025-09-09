@@ -260,7 +260,8 @@ async function handleLogin(username, password) {
                         logMessage('Erster Login: Verwende automatisch den Standardspeicherort ohne Dialog');
                         
                         if (window.resetStoragePath) {
-                            await window.resetStoragePath(currentUsername);
+                            // Bei erstem Login, false als zweiten Parameter übergeben, um keinen Dialog zu zeigen
+                            await window.resetStoragePath(currentUsername, false);
                             logMessage('Standardspeicherort für Benutzer festgelegt');
                             
                             // Nach dem Zurücksetzen des Pfads versuchen, die Berechtigung sofort zu erhalten

@@ -52,7 +52,8 @@ function showFirstLoginDialog() {
     if (useDefaultButton) {
         useDefaultButton.addEventListener('click', function() {
             if (window.resetStoragePath) {
-                window.resetStoragePath();
+                // Hier true als zweiten Parameter übergeben, da der Benutzer explizit nach Dateiauswahl gefragt werden soll
+                window.resetStoragePath(undefined, true);
                 showSuccess('Der Standardpfad wird verwendet.');
                 markFirstLoginComplete();
                 dialog.style.display = 'none';
