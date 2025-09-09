@@ -527,7 +527,29 @@ window.quizDB = {
     saveQuizResult
 };
 
-// Datenbank beim Laden initialisieren
+// Datenbank beim Laden initialisieren, aber erst nach dem Laden der Speichermodule
 document.addEventListener('DOMContentLoaded', async () => {
-    await initializeDatabase();
+    // Funktion definieren, die nach dem Laden der Speichermodule ausgeführt wird
+    const initializeQuizDb = async () => {
+        console.log("Speichermodule geladen, initialisiere Quiz-Datenbank...");
+        await initializeDatabase();
+    };
+    
+    // Prüfen, ob die Speichermodule bereits geladen wurden
+    if (window.loadData && window.saveData) {
+        await initializeQuizDb();
+    } else {
+        // Auf das Laden der Speichermodule warten
+        window.addEventListener('storageModulesLoaded', async () => {
+            await initializeQuizDb();
+        });
+        
+        // Sicherheits-Timeout für den Fall, dass das Ereignis nicht ausgelöst wird
+        setTimeout(async () => {
+            if (!window.loadData || !window.saveData) {
+                console.warn("Timeout beim Warten auf Speichermodule. Versuche Initialisierung trotzdem...");
+                await initializeQuizDb();
+            }
+        }, 3000);
+    }
 });

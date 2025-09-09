@@ -25,7 +25,7 @@ async function initHandleDb() {
     return new Promise((resolve, reject) => {
         try {
             console.log('Initialisiere IndexedDB für Directory Handles...');
-            const request = indexedDB.open('LernAppDirectoryHandles', 2); // Erhöhte Version, um Update zu erzwingen
+            const request = indexedDB.open('LernAppDirectoryHandles', 3); // Version 3 (match storage-core)
             
             request.onerror = (event) => {
                 console.error('Fehler beim Öffnen der IndexedDB:', event.target.error);

@@ -256,15 +256,45 @@
                 for (const script of headerScripts) {
                     if (script.innerText) {
                         eval(script.innerText);
+                    } else if (script.src) {
+                        const s = document.createElement('script');
+                        s.src = script.src;
+                        document.head.appendChild(s);
                     }
                 }
                 
+                // Skripte aus dem Footer auswerten (wichtig, weil innerHTML <script> nicht automatisch ausgeführt wird)
+                const footerScripts = document.getElementById('footer-container').querySelectorAll('script');
+                for (const script of footerScripts) {
+                    if (script.innerText) {
+                        try { eval(script.innerText); } catch (e) { console.error('Fehler beim Ausführen eines Footer-inline-scripts:', e); }
+                    } else if (script.src) {
+                        const s = document.createElement('script');
+                        s.src = script.src;
+                        // Setze async=false um die Reihenfolge zu erhalten
+                        s.async = false;
+                        document.body.appendChild(s);
+                    }
+                }
+
                 // Explizit die Navigation aktualisieren, wenn nötig
                 if (window.updateNavigation) {
-                    // Wir vermeiden einen Log hier, um doppelte Einträge zu vermeiden
                     // Die updateNavigation-Funktion hat bereits Throttling-Schutz
                     window.updateNavigation();
                 }
+
+                // Falls das Storage-Status-Skript eine globale Aktualisierungsfunktion anbietet, rufe sie auf
+                setTimeout(() => {
+                    try {
+                        if (window.updateStorageStatusIcon) {
+                            window.updateStorageStatusIcon();
+                        } else if (window.updateStorageStatus) {
+                            window.updateStorageStatus();
+                        }
+                    } catch (e) {
+                        // kein Problem, nur optionales Update
+                    }
+                }, 50);
             } catch (error) {
                 console.error('Fehler beim Laden des Headers oder Footers:', error);
             }

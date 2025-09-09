@@ -47,15 +47,23 @@
                 for (const script of headerScripts) {
                     if (script.innerText) {
                         eval(script.innerText);
+                    } else if (script.src) {
+                        const s = document.createElement('script'); s.src = script.src; document.head.appendChild(s);
                     }
                 }
-                
-                // Explizit die Navigation aktualisieren, wenn nötig
-                if (window.updateNavigation) {
-                    // Wir vermeiden einen Log hier, um doppelte Einträge zu vermeiden
-                    // Die updateNavigation-Funktion hat bereits Throttling-Schutz
-                    window.updateNavigation();
+
+                // Skripte aus dem Footer auswerten
+                const footerScripts = document.getElementById('footer-container').querySelectorAll('script');
+                for (const script of footerScripts) {
+                    if (script.innerText) {
+                        try { eval(script.innerText); } catch (e) { console.error('Footer-inline-script error', e); }
+                    } else if (script.src) {
+                        const s = document.createElement('script'); s.src = script.src; s.async = false; document.body.appendChild(s);
+                    }
                 }
+
+                if (window.updateNavigation) { window.updateNavigation(); }
+                setTimeout(() => { try { if (window.updateStorageStatusIcon) window.updateStorageStatusIcon(); } catch (e) {} }, 50);
                 
                 // Breadcrumbs initialisieren (leerer Pfad für Dashboard als Startseite)
                 if (window.breadcrumbs) {

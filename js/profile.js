@@ -1,3 +1,51 @@
+// Speicherort nach Login wiederherstellen
+async function restoreUserDirectoryHandle() {
+    const currentStoragePathSpan = document.getElementById('current-storage-path');
+    const username = localStorage.getItem('username') || 'default';
+        async function tryRestore() {
+            if (window.restoreDirectoryHandle) {
+                try {
+                    const handle = await window.restoreDirectoryHandle(username);
+                    if (handle) {
+                        window.directoryHandle = handle;
+                        if (currentStoragePathSpan) currentStoragePathSpan.textContent = handle.name || 'Ordner ausgewählt';
+                        try { document.dispatchEvent(new CustomEvent('directoryHandleChanged', { detail: { handle } })); } catch (e) {}
+                        return true;
+                    }
+                } catch (e) {
+                    // ignore - retry may happen on ready events
+                }
+            }
+
+            // Fallback: Nur Name aus localStorage anzeigen
+            const name = localStorage.getItem(`directoryHandleName_${username}`);
+            if (name && currentStoragePathSpan) {
+                currentStoragePathSpan.textContent = name;
+                return false;
+            }
+            // nothing to show
+            return false;
+        }
+
+        // Sofort versuchen
+        await tryRestore();
+
+        // Falls noch nicht erfolgreich, erneut versuchen, wenn die Storage-Module bereit sind
+        const retryEvents = ['storageSystemReady', 'persistentStorageModulesLoaded', 'storageModulesLoaded'];
+        const onReady = async () => {
+            try {
+                await tryRestore();
+            } catch (e) {}
+            retryEvents.forEach(ev => window.removeEventListener(ev, onReady));
+        };
+        retryEvents.forEach(ev => window.addEventListener(ev, onReady));
+}
+
+    // Auf DOMContentLoaded registrieren
+    document.addEventListener('DOMContentLoaded', restoreUserDirectoryHandle);
+
+// Nach Login aufrufen
+document.addEventListener('DOMContentLoaded', restoreUserDirectoryHandle);
 // profile.js - Handhabt die Profilverwaltung
 
 // Hilfsfunktion für konsistentes Logging in der gesamten Datei
@@ -18,26 +66,36 @@ function logMessage(message, type = 'info', ...args) {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Elemente für Benutzername
-    const usernameDisplay = document.getElementById('username-display');
-    const newUsernameInput = document.getElementById('new-username');
-    const updateUsernameBtn = document.getElementById('update-username-btn');
-
-    // Elemente für Passwort
-    const currentPasswordInput = document.getElementById('current-password');
-    const newPasswordInput = document.getElementById('new-password');
-    const confirmPasswordInput = document.getElementById('confirm-password');
-    const changePasswordBtn = document.getElementById('change-password-btn');
-
-    // Elemente für Speicherort
-    const currentStoragePathSpan = document.getElementById('current-storage-path');
-    const browseStoragePathBtn = document.getElementById('browse-storage-path-btn');
-    const resetStoragePathBtn = document.getElementById('reset-storage-path-btn');
     const migrateStorageBtn = document.getElementById('migrate-storage-btn');
-
-    // Elemente für Backup
+    const changePasswordBtn = document.getElementById('change-password-btn');
+    const resetStoragePathBtn = document.getElementById('reset-storage-path-btn');
+    const updateUsernameBtn = document.getElementById('update-username-btn');
+    const browseStoragePathBtn = document.getElementById('browse-storage-path-btn');
+    const usernameDisplay = document.getElementById('username-display');
     const createBackupBtn = document.getElementById('create-backup-btn');
     const listBackupsBtn = document.getElementById('list-backups-btn');
+    const currentStoragePathSpan = document.getElementById('current-storage-path');
+    const username = localStorage.getItem('username') || 'default';
+
+    // Speicherort nach Login wiederherstellen und UI aktualisieren
+    if (window.restoreDirectoryHandle) {
+        window.restoreDirectoryHandle(username).then(handle => {
+            if (handle) {
+                window.directoryHandle = handle;
+                currentStoragePathSpan.textContent = handle.name || 'Ordner ausgewählt';
+                try { currentStoragePathSpan.dataset.storageVerified = 'true'; } catch (e) {}
+                try {
+                    document.dispatchEvent(new CustomEvent('directoryHandleChanged', { detail: { handle } }));
+                } catch (e) { console.warn('directoryHandleChanged dispatch failed', e); }
+            }
+        });
+    } else {
+        const name = localStorage.getItem(`directoryHandleName_${username}`);
+        if (name) {
+            currentStoragePathSpan.textContent = name;
+            try { currentStoragePathSpan.dataset.storageVerified = 'false'; } catch (e) {}
+        }
+    }
 
     // Elemente für Löschaktionen
     const deleteQuestionsBtn = document.getElementById('delete-questions-btn');
@@ -96,36 +154,70 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Aktuellen Speicherpfad anzeigen, falls vorhanden
     function updateStoragePathDisplay() {
-        if (window.isStoragePathConfigured && window.getStoragePath) {
-            const currentUsername = localStorage.getItem('username');
-            if (window.isStoragePathConfigured(currentUsername)) {
-                // Verwenden der neuen Funktion zur benutzerfreundlichen Anzeige des Speicherorts
-                let displayPath = 'Standard';
-                
-                if (window.getStorageDisplayName) {
-                    // Die neue Funktion verwenden, wenn verfügbar
-                    displayPath = window.getStorageDisplayName(currentUsername);
+    // ...Hier wird die neue Logik für die Speicherort-Festlegung aufgebaut...
+    // Minimalistische Logik: Button öffnet Dateibrowser und speichert Handle
+    if (browseStoragePathBtn) {
+        browseStoragePathBtn.disabled = false;
+        browseStoragePathBtn.title = "Ordner auswählen";
+        browseStoragePathBtn.onclick = async () => {
+            try {
+                const handle = await window.showDirectoryPicker({
+                    id: 'LernAppStorage',
+                    startIn: 'documents',
+                    mode: 'readwrite'
+                });
+                window.directoryHandle = handle;
+                currentStoragePathSpan.textContent = handle.name || 'Ordner ausgewählt';
+
+                // Persistentes Speichern in IndexedDB, zugeordnet zum User
+                try { document.dispatchEvent(new CustomEvent('directoryHandleChanged', { detail: { handle } })); } catch (e) {}
+                const username = localStorage.getItem('username') || 'default';
+                if (window.storeDirectoryHandle) {
+                    await window.storeDirectoryHandle(handle, username);
+                    try { currentStoragePathSpan.dataset.storageVerified = 'true'; } catch (e) {}
                 } else {
-                    // Fallback zur alten Methode
-                    let path = window.getStoragePath(currentUsername);
-                    if (path !== null && path !== undefined) {
-                        displayPath = String(path);
-                    }
+                    // Fallback: Name im localStorage speichern
+                    localStorage.setItem(`directoryHandleName_${username}`, handle.name || 'Ordner ausgewählt');
+                    try { currentStoragePathSpan.dataset.storageVerified = 'true'; } catch (e) {}
                 }
-                
-                currentStoragePathSpan.textContent = displayPath;
-            } else {
-                currentStoragePathSpan.textContent = 'Standard';
+            } catch (err) {
+                currentStoragePathSpan.textContent = 'Keine Auswahl';
+                try { currentStoragePathSpan.dataset.storageVerified = 'false'; } catch (e) {}
             }
-        } else {
-            // Fehlermeldung anzeigen und in den Log schreiben
-            console.error("Speicherpfad-Funktionen nicht verfügbar.");
-            currentStoragePathSpan.textContent = 'Nicht verfügbar';
-        }
+        };
+    }
     }
     
-    // Initialen Speicherpfad anzeigen
-    updateStoragePathDisplay();
+    // Initialen Speicherpfad anzeigen - nach dem Laden der Speichermodule
+    const updateStorageDisplay = () => {
+        updateStoragePathDisplay();
+        
+        // Event-Listener für Änderungen am DirectoryHandle
+        document.addEventListener('directoryHandleChanged', () => {
+            // Aktualisierung der Anzeige nach Änderungen am DirectoryHandle
+            updateStoragePathDisplay();
+        });
+    };
+    
+    // Prüfen, ob die Speichermodule bereits geladen wurden oder Loader-Flags gesetzt sind
+    if ((window.isStoragePathConfigured && window.getStoragePath) || window.__storageModulesLoaded || window.__persistentStorageModulesLoaded) {
+        updateStorageDisplay();
+    } else {
+        // Auf das Laden der Speichermodule warten
+        window.addEventListener('storageModulesLoaded', updateStorageDisplay);
+        window.addEventListener('persistentStorageModulesLoaded', updateStorageDisplay);
+        
+        // Sicherheits-Timeout
+        setTimeout(() => {
+            if (!window.isStoragePathConfigured && !window.__storageModulesLoaded && !window.__persistentStorageModulesLoaded) {
+                console.warn("Timeout beim Warten auf Speichermodule für Pfadanzeige.");
+                updateStoragePathDisplay(); // Trotzdem versuchen
+            } else {
+                // Falls die Flags gesetzt wurden kurz bevor der Timeout ausgelöst wurde, versuche die Anzeige zu aktualisieren
+                try { updateStorageDisplay(); } catch (e) {}
+            }
+        }, 2000);
+    }
 
     // Benutzernamen aktualisieren
     if (updateUsernameBtn) {
@@ -267,101 +359,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Der "Speicherort setzen"-Button wurde entfernt, da wir jetzt nur den Browse-Button verwenden
-
-    // Ordner-Auswahl-Dialog öffnen
-    if (browseStoragePathBtn) {
-        browseStoragePathBtn.addEventListener('click', async function() {
-            // Prüfen, ob die File System Access API unterstützt wird
-            if (!window.isFileSystemAccessSupported || !window.isFileSystemAccessSupported()) {
-                showError('Dein Browser unterstützt leider nicht die Auswahl von Ordnern. Diese Funktion ist nicht verfügbar.');
-                return;
-            }
-
-            try {
-                // Setzen des expliziten Flags für den Directory Picker
-                window._forceDirectoryPicker = true;
-                
-                // Ordner-Auswahl-Dialog öffnen
-                let directoryHandle;
-                try {
-                    directoryHandle = await window.openDirectoryPicker();
-                } catch (dialogError) {
-                    if (dialogError.name === 'AbortError') {
-                        // Der Benutzer hat den Dialog abgebrochen - das ist kein Fehler
-                        showInfo('Ordnerauswahl wurde abgebrochen.');
-                        return;
-                    }
-                    throw dialogError; // Andere Fehler werden weitergegeben
-                }
-                
-                if (!directoryHandle) {
-                    showError('Kein Ordner ausgewählt.');
-                    return;
-                }
-                
-                // Prüfen, ob wir ein gültiges DirectoryHandle haben
-                if (!directoryHandle || typeof directoryHandle !== 'object') {
-                    showError('Ungültiges Verzeichnis ausgewählt. Bitte versuchen Sie es erneut.');
-                    return;
-                }
-                
-                // Pfad und Handle für den Speicherort vorbereiten
-                const directoryName = directoryHandle.name || 
-                                      (directoryHandle.toString ? directoryHandle.toString() : 'LernAppDatenbank');
-                
-                // Debug-Log für das DirectoryHandle-Objekt
-                logMessage('Verzeichnis ausgewählt: ' + JSON.stringify({
-                    name: directoryHandle.name,
-                    kind: directoryHandle.kind
-                }));
-                
-                try {
-                    // Speicherpfad aktualisieren
-                    const currentUsername = localStorage.getItem('username');
-                    
-                    // Wir übergeben direkt das DirectoryHandle an setStoragePath
-                    const success = await window.setStoragePath(directoryHandle, currentUsername);
-                    
-                    if (success) {
-                        // Handle wurde erfolgreich aktualisiert, alle Flags zurücksetzen
-                        localStorage.removeItem('needsHandleRenewal');
-                        // Zurücksetzen des Benachrichtigungszählers
-                        localStorage.setItem('directoryNotificationCount', '0');
-                        
-                        // UI aktualisieren
-                        updateStoragePathDisplay();
-                        
-                        // Zusätzliche Erfolgsmeldung mit dem tatsächlich gespeicherten Pfad
-                        const gespeicherterPfad = window.getStoragePath(currentUsername);
-                        showSuccess(`Speicherort "${gespeicherterPfad}" wurde erfolgreich konfiguriert und der Dateizugriff ist jetzt vollständig hergestellt.`);
-                        
-                        // Die Datenbankdateien wurden bereits in der setStoragePath-Funktion initialisiert
-                        // Kein weiterer Aufruf von createInitialDatabaseFiles nötig
-                        logMessage('Speicherort wurde erfolgreich konfiguriert.', 'info');
-                    } else {
-                        showError('Der Speicherort konnte nicht gesetzt werden. Bitte wählen Sie einen anderen Ordner.');
-                    }
-                } catch (error) {
-                    logMessage('Fehler beim Setzen des Speicherorts: ' + error.message, 'error');
-                    showError('Fehler beim Setzen des Speicherorts: ' + error.message);
-                }
-            } catch (error) {
-                // Benutzer hat den Dialog abgebrochen oder es ist ein Fehler aufgetreten
-                if (error.name === 'AbortError') {
-                    // Nur Info-Meldung, kein Fehler
-                    showInfo('Ordnerauswahl wurde abgebrochen.');
-                } else {
-                    // Fehler anzeigen (wird automatisch auch geloggt)
-                    showError(`Fehler beim Öffnen des Ordner-Auswahl-Dialogs: ${error.message}`);
-                }
-            } finally {
-                // Immer das Flag zurücksetzen
-                window._forceDirectoryPicker = false;
-            }
-        });
-    }
-
     // Speicherpfad zurücksetzen
     if (resetStoragePathBtn && window.resetStoragePath) {
         resetStoragePathBtn.addEventListener('click', async function() {
@@ -370,6 +367,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             if (success) {
                 updateStoragePathDisplay();
+                try { document.dispatchEvent(new CustomEvent('directoryHandleChanged', { detail: { handle: null } })); } catch (e) {}
                 showSuccess('Speicherpfad wurde auf den Standardwert zurückgesetzt.');
             } else {
                 showError('Fehler beim Zurücksetzen des Speicherpfads.');

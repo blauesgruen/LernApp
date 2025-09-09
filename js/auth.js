@@ -70,7 +70,24 @@ function logMessage(message, type = 'info') {
     } else {
         // Fallback, falls der Logger noch nicht geladen ist
         const timestamp = new Date().toISOString();
-        console[type](`[${timestamp}] ${type.toUpperCase()}: ${message}`);
+        // Sicherstellen, dass wir nur unterstützte Konsolenmethoden verwenden
+        switch (type.toLowerCase()) {
+            case 'error':
+                console.error(`[${timestamp}] ERROR: ${message}`);
+                break;
+            case 'warn':
+            case 'warning':
+                console.warn(`[${timestamp}] WARN: ${message}`);
+                break;
+            case 'debug':
+                console.debug(`[${timestamp}] DEBUG: ${message}`);
+                break;
+            case 'success':
+                console.log(`[${timestamp}] SUCCESS: ${message}`);
+                break;
+            default:
+                console.log(`[${timestamp}] INFO: ${message}`);
+        }
     }
 }
 
@@ -168,17 +185,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Login-Funktion
 async function handleLogin(username, password) {
-    logMessage('handleLogin wurde aufgerufen mit Benutzername: ' + username + ' und Passwort: ' + password);
+    logMessage('🔐 handleLogin wurde aufgerufen mit Benutzername: ' + username);
 
     // Prüfen, ob hashPassword-Funktion verfügbar ist
     if (!window.hashPassword) {
-        logMessage('Fehler: hashPassword-Funktion nicht verfügbar', 'error');
+        logMessage('❌ Fehler: hashPassword-Funktion nicht verfügbar', 'error');
         showError('Ein interner Fehler ist aufgetreten.');
         return;
     }
 
     if (!username || !password) {
-        logMessage('Fehler: Benutzername oder Passwort ist leer', 'error');
+        logMessage('❌ Fehler: Benutzername oder Passwort ist leer', 'error');
         showError('Benutzername und Passwort dürfen nicht leer sein!');
         return;
     }
@@ -206,7 +223,7 @@ async function handleLogin(username, password) {
             users = mergedUsers;
         }
     } catch (error) {
-        logMessage('Fehler beim Laden der Benutzer aus der Storage-API: ' + error.message, 'error');
+        logMessage('❌ Fehler beim Laden der Benutzer aus der Storage-API: ' + error.message, 'error');
     }
 
     const hashedPassword = await window.hashPassword(password);
@@ -218,96 +235,169 @@ async function handleLogin(username, password) {
     );
 
     // Debugging-Logs
-    logMessage('Benutzerliste aus localStorage: ' + JSON.stringify(users));
-    logMessage('Eingegebenes Passwort vor Hashing: ' + password);
-    logMessage('Gehashtes Passwort: ' + hashedPassword);
+    logMessage('👥 Benutzerliste aus localStorage: ' + JSON.stringify(users));
+    logMessage('🔑 Gehashtes Passwort: ' + hashedPassword);
 
     if (user) {
         // Speichere den korrekten Benutzernamen (mit der richtigen Groß-/Kleinschreibung)
         localStorage.setItem('username', user.username);
         setLoginStatus(true);
-        logMessage('Login-Status wurde auf "eingeloggt" gesetzt.');
+        logMessage('✅ Login-Status wurde auf "eingeloggt" gesetzt für: ' + user.username);
         
         // Prüfen, ob es der erste Login dieses Benutzers ist
         const isFirstTimeUser = window.shouldAskForStoragePath && window.shouldAskForStoragePath(user.username);
         
         if (isFirstTimeUser) {
-            logMessage('Erster Login des Benutzers erkannt: ' + user.username);
+            logMessage('🆕 Erster Login des Benutzers erkannt: ' + user.username);
         }
         
         showSuccess('Login erfolgreich! Sie werden weitergeleitet...');
         
         // Jetzt, wo der Benutzer angemeldet ist, initialisieren wir seinen spezifischen Speicherort
-        setTimeout(async () => {
+        try {
+            const currentUsername = localStorage.getItem('username');
+            
+            // Zuerst die persistenten Speichermodule laden, falls noch nicht geladen
+            if (window.loadPersistentStorageModules) {
+                logMessage('📂 Lade persistente Speichermodule nach Login für Benutzer: ' + currentUsername);
+                await window.loadPersistentStorageModules();
+            } else {
+                logMessage('⚠️ Warnung: loadPersistentStorageModules-Funktion nicht verfügbar', 'warn');
+            }
+            
+            // Prüfen, ob die notwendigen Funktionen für die Speicherinitialisierung verfügbar sind
+            if (!window.initializeStorageForUser) {
+                logMessage('⚠️ Warnung: initializeStorageForUser-Funktion nicht verfügbar', 'warn');
+                window.location.href = 'dashboard.html';
+                return;
+            }
+            
+            // Speicherort für den Benutzer initialisieren ohne Dialog zu zeigen
+            logMessage('🔄 Initialisiere Speicherort für Benutzer: ' + currentUsername, 'debug');
+            
             try {
-                const currentUsername = localStorage.getItem('username');
-                
-                // Zuerst die persistenten Speichermodule laden, falls noch nicht geladen
-                if (window.loadPersistentStorageModules) {
-                    logMessage('Lade persistente Speichermodule nach Login für Benutzer: ' + currentUsername);
-                    await window.loadPersistentStorageModules();
-                } else {
-                    logMessage('Warnung: loadPersistentStorageModules-Funktion nicht verfügbar', 'warn');
+                // Status der IndexedDB-Datenbank vor der Initialisierung prüfen
+                if (window.listAllHandles) {
+                    const handlesBeforeInit = await window.listAllHandles();
+                    logMessage('📊 Vorhandene Handles vor Initialisierung: ' + JSON.stringify(handlesBeforeInit), 'debug');
                 }
                 
-                // Speicherort für den Benutzer initialisieren ohne Dialog zu zeigen
-                if (window.initializeStorageForUser) {
-                    logMessage('Initialisiere Speicherort für Benutzer: ' + currentUsername);
-                    await window.initializeStorageForUser(currentUsername);
+                // Option hinzufügen, dass kein Modal angezeigt werden soll
+                const options = { showModal: false };
+                const result = await window.initializeStorageForUser(currentUsername, options);
+                logMessage('📂 Speicherort-Initialisierung abgeschlossen: ' + (result ? 'Erfolgreich' : 'Mit Problemen'), result ? 'success' : 'warn');
+                
+                // Bei Problemen zusätzliche Diagnose ausführen
+                if (!result) {
+                    logMessage('🔍 Initialisierung nicht erfolgreich, führe erweiterte Diagnose durch...', 'debug');
                     
-                    // Bei erstem Login - Standardspeicherort verwenden und Login als abgeschlossen markieren
-                    if (isFirstTimeUser) {
-                        logMessage('Erster Login: Verwende automatisch den Standardspeicherort ohne Dialog');
+                    // Listung aller vorhandenen Handles nach der fehlgeschlagenen Initialisierung
+                    if (window.listAllHandles) {
+                        const handlesAfterFailedInit = await window.listAllHandles();
+                        logMessage('📊 Vorhandene Handles nach fehlgeschlagener Initialisierung: ' + JSON.stringify(handlesAfterFailedInit), 'debug');
+                    }
+                    
+                    if (window.checkIndexedDBStorage) {
+                        logMessage('🔍 Führe IndexedDB-Diagnose durch...', 'debug');
+                        const checkResult = await window.checkIndexedDBStorage();
+                        logMessage('📊 IndexedDB-Diagnose: ' + JSON.stringify(checkResult), 'debug');
                         
-                        if (window.resetStoragePath) {
-                            // Bei erstem Login, false als zweiten Parameter übergeben, um keinen Dialog zu zeigen
-                            await window.resetStoragePath(currentUsername, false);
-                            logMessage('Standardspeicherort für Benutzer festgelegt');
+                        // Bei Bedarf Reparatur durchführen
+                        if (window.repairIndexedDBStorage) {
+                            logMessage('🔧 Versuche IndexedDB zu reparieren...', 'debug');
+                            const repairResult = await window.repairIndexedDBStorage();
+                            logMessage('🔧 IndexedDB-Reparatur: ' + JSON.stringify(repairResult), 'debug');
                             
-                            // Nach dem Zurücksetzen des Pfads versuchen, die Berechtigung sofort zu erhalten
-                            if (window.requestFileSystemPermission) {
-                                logMessage('Versuche Dateisystem-Berechtigung für Standardspeicherort zu erhalten');
-                                await window.requestFileSystemPermission();
-                            }
-                        }
-                        
-                        if (window.markFirstLoginCompleted) {
-                            logMessage('Markiere ersten Login als abgeschlossen für: ' + currentUsername);
-                            window.markFirstLoginCompleted(currentUsername);
-                        }
-                    } 
-                    // Bei erneutem Login - Speicherzugriff prüfen
-                    else {
-                        // Prüfe den Speicherzugriff, ohne einen Dialog zu zeigen
-                        if (window.checkStorageAccess) {
-                            logMessage('Prüfe Speicherzugriff für bestehenden Benutzer...');
-                            try {
-                                const accessResult = await window.checkStorageAccess(currentUsername);
-                                
-                                if (accessResult.accessAvailable) {
-                                    logMessage(`Speicherzugriff erfolgreich: ${accessResult.message}`);
-                                } else {
-                                    logMessage(`Speicherzugriff nicht verfügbar: ${accessResult.message}`, 'warn');
-                                }
-                            } catch (accessError) {
-                                logMessage('Fehler bei der Speicherzugriffsprüfung: ' + accessError.message, 'error');
-                            }
+                            // Nach Reparatur erneut initialisieren
+                            const retryResult = await window.initializeStorageForUser(currentUsername);
+                            logMessage('🔄 Speicherort-Initialisierung nach Reparatur: ' + (retryResult ? 'Erfolgreich' : 'Mit Problemen'), retryResult ? 'success' : 'error');
                         }
                     }
-                } else {
-                    logMessage('Warnung: initializeStorageForUser-Funktion nicht verfügbar', 'warn');
                 }
                 
-                // In jedem Fall zum Dashboard weiterleiten
-                window.location.href = 'dashboard.html';
-            } catch (error) {
-                logMessage('Fehler beim Zugriff auf den Speicherort: ' + error.message, 'error');
-                // Auch bei Fehler zum Dashboard weiterleiten
-                window.location.href = 'dashboard.html';
+                // Listung aller vorhandenen Handles nach der Initialisierung
+                if (window.listAllHandles) {
+                    const handlesAfterInit = await window.listAllHandles();
+                    logMessage('📊 Vorhandene Handles nach Initialisierung: ' + JSON.stringify(handlesAfterInit), 'debug');
+                }
+                
+                // Bei erstem Login - Standardspeicherort verwenden und Login als abgeschlossen markieren
+                if (isFirstTimeUser) {
+                    logMessage('🆕 Erster Login: Verwende automatisch den Standardspeicherort ohne Dialog');
+                    
+                    if (window.resetStoragePath) {
+                        // Bei erstem Login, false als zweiten Parameter übergeben, um keinen Dialog zu zeigen
+                        await window.resetStoragePath(currentUsername, false);
+                        logMessage('📂 Standardspeicherort für Benutzer festgelegt');
+                        
+                        // Nach dem Zurücksetzen des Pfads versuchen, die Berechtigung sofort zu erhalten
+                        if (window.requestFileSystemPermission) {
+                            logMessage('🔐 Versuche Dateisystem-Berechtigung für Standardspeicherort zu erhalten');
+                            await window.requestFileSystemPermission();
+                        }
+                    }
+                    
+                    if (window.markFirstLoginCompleted) {
+                        logMessage('✅ Markiere ersten Login als abgeschlossen für: ' + currentUsername);
+                        window.markFirstLoginCompleted(currentUsername);
+                    }
+                } 
+                // Bei erneutem Login - Speicherzugriff prüfen
+                else {
+                    // Prüfe den Speicherzugriff, ohne einen Dialog zu zeigen
+                    if (window.checkStorageAccess) {
+                        logMessage('🔍 Prüfe Speicherzugriff für bestehenden Benutzer...');
+                        try {
+                            const accessResult = await window.checkStorageAccess(currentUsername);
+                            
+                            if (accessResult.accessAvailable) {
+                                logMessage(`✅ Speicherzugriff erfolgreich: ${accessResult.message}`);
+                            } else {
+                                logMessage(`⚠️ Speicherzugriff nicht verfügbar: ${accessResult.message}`, 'warn');
+                                
+                                // Versuche, den Zugriff automatisch wiederherzustellen
+                                if (accessResult.canAttemptRepair && window.repairStorageAccess) {
+                                    logMessage('🔧 Versuche, den Speicherzugriff automatisch wiederherzustellen...');
+                                    const repairAttempt = await window.repairStorageAccess(currentUsername, { showModal: false });
+                                    logMessage(`${repairAttempt.success ? '✅' : '❌'} Reparaturversuch: ${repairAttempt.message}`, 
+                                              repairAttempt.success ? 'success' : 'error');
+                                }
+                            }
+                        } catch (accessError) {
+                            logMessage('❌ Fehler bei der Speicherzugriffsprüfung: ' + accessError.message, 'error');
+                        }
+                    }
+                }
+            } catch (storageError) {
+                logMessage('❌ Fehler bei der Speicherort-Initialisierung: ' + storageError.message, 'error');
+                
+                // Versuche eine Reparatur bei Initialisierungsfehlern
+                if (window.emergencyStorageRepair) {
+                    logMessage('🚨 Führe Notfall-Reparatur des Speichers durch...');
+                    try {
+                        const emergencyResult = await window.emergencyStorageRepair(currentUsername);
+                        logMessage(`${emergencyResult.success ? '✅' : '❌'} Notfall-Reparatur: ${emergencyResult.message}`,
+                                  emergencyResult.success ? 'success' : 'error');
+                    } catch (emergencyError) {
+                        logMessage('❌ Fehler bei der Notfall-Reparatur: ' + emergencyError.message, 'error');
+                    }
+                }
             }
-        }, 1000);
+            
+            // In jedem Fall zum Dashboard weiterleiten
+            setTimeout(() => {
+                window.location.href = 'dashboard.html';
+            }, 1000);
+            
+        } catch (error) {
+            logMessage('❌ Fehler beim Zugriff auf den Speicherort: ' + error.message, 'error');
+            // Auch bei Fehler zum Dashboard weiterleiten
+            setTimeout(() => {
+                window.location.href = 'dashboard.html';
+            }, 1000);
+        }
     } else {
-        logMessage('Kein passender Benutzer gefunden oder Passwort stimmt nicht überein.', 'error');
+        logMessage('❌ Kein passender Benutzer gefunden oder Passwort stimmt nicht überein.', 'error');
         showError('Benutzername oder Passwort falsch!');
         setLoginStatus(false);
     }

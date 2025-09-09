@@ -35,6 +35,8 @@
     <script src="js/auth.js"></script>
     <script src="js/notification.js"></script>
     <script src="js/storage-loader.js"></script>
+    <script src="js/login-page.js"></script>
+    <script src="js/storage-test.js"></script>
     <script>
         // Header und Footer dynamisch laden
         async function loadHeaderAndFooter() {
@@ -48,16 +50,23 @@
                 for (const script of headerScripts) {
                     if (script.innerText) {
                         eval(script.innerText);
+                    } else if (script.src) {
+                        const s = document.createElement('script'); s.src = script.src; document.head.appendChild(s);
                     }
                 }
-                
-                // Explizit die Navigation aktualisieren
-                if (window.updateNavigation) {
-                    console.log('Navigation wird nach dem Laden des Headers aktualisiert.');
-                    window.updateNavigation();
-                } else {
-                    console.log('updateNavigation-Funktion nicht gefunden.');
+
+                // Skripte aus dem Footer auswerten
+                const footerScripts = document.getElementById('footer-container').querySelectorAll('script');
+                for (const script of footerScripts) {
+                    if (script.innerText) {
+                        try { eval(script.innerText); } catch (e) { console.error('Footer-inline-script error', e); }
+                    } else if (script.src) {
+                        const s = document.createElement('script'); s.src = script.src; s.async = false; document.body.appendChild(s);
+                    }
                 }
+
+                if (window.updateNavigation) { window.updateNavigation(); }
+                setTimeout(() => { try { if (window.updateStorageStatusIcon) window.updateStorageStatusIcon(); } catch (e) {} }, 50);
             } catch (error) {
                 console.error('Fehler beim Laden des Headers oder Footers:', error);
             }

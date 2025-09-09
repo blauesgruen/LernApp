@@ -11,14 +11,18 @@ const config = {
     modules: {
         storageCore: '/js/storage-core.js',
         storageIndexedDB: '/js/storage-indexeddb.js',
+        storageUser: '/js/storage-user.js',
         debugTools: '/js/debug-persistent-storage.js',
+        repairTools: '/js/storage-repair.js',
         compatibility: '/js/storage-compatibility.js'
     },
     
     // Optionen
     options: {
         loadDebugTools: true,
-        logLoadingProcess: true
+        loadRepairTools: true,
+        logLoadingProcess: true,
+        immediateInitialization: true  // Sofortige Initialisierung ohne auf DOMContentLoaded zu warten
     }
 };
 
@@ -78,6 +82,14 @@ function loadModule(url) {
             reject(error);
         };
         
+        // Prüfen, ob das Skript bereits geladen wurde
+        const existingScript = document.querySelector(`script[src="${url}"]`);
+        if (existingScript) {
+            log(`Modul bereits geladen: ${url}`, 'info');
+            resolve(); // Sofort auflösen, wenn das Skript bereits geladen ist
+            return;
+        }
+        
         document.head.appendChild(script);
     });
 }
@@ -95,17 +107,29 @@ async function init() {
         if (isLoggedIn) {
             log('Benutzer ist eingeloggt, lade alle Speichermodule', 'info');
             
-            // Debug-Tools zuerst laden (wenn aktiviert)
+            // Module in der richtigen Reihenfolge laden
+            const moduleLoadingOrder = [];
+            
+            // Debug- und Reparatur-Tools optional hinzufügen
             if (config.options.loadDebugTools) {
-                await loadModule(config.modules.debugTools);
-                log('Debug-Tools geladen, fahre mit Hauptmodulen fort', 'debug');
+                moduleLoadingOrder.push(config.modules.debugTools);
+            }
+            if (config.options.loadRepairTools) {
+                moduleLoadingOrder.push(config.modules.repairTools);
             }
             
-            // IndexedDB Fallback-Speicher laden
-            await loadModule(config.modules.storageIndexedDB);
+            // Kernmodule immer in dieser Reihenfolge
+            moduleLoadingOrder.push(
+                config.modules.storageIndexedDB,
+                config.modules.storageCore,
+                config.modules.storageUser,
+                config.modules.compatibility
+            );
             
-            // Hauptspeichermodul laden (neue vereinfachte Version)
-            await loadModule(config.modules.storageCore);
+            // Module nacheinander laden, um die richtige Initialisierungsreihenfolge sicherzustellen
+            for (const modulePath of moduleLoadingOrder) {
+                await loadModule(modulePath);
+            }
             
             // Kompatibilitätsadapter laden
             await loadModule(config.modules.compatibility);
@@ -115,7 +139,10 @@ async function init() {
         
         // Ladevorgang abgeschlossen
         log('Speichermodule erfolgreich geladen', 'success');
-        
+
+        // Setze ein globales Flag, damit nachträglich geladene Listener es abfragen können
+        try { window.__storageModulesLoaded = true; } catch (e) { /* best-effort */ }
+
         // Event auslösen, dass alle Module geladen wurden
         window.dispatchEvent(new CustomEvent('storageModulesLoaded', { 
             detail: { isFullyLoaded: isLoggedIn } 
@@ -143,19 +170,82 @@ async function loadPersistentStorageModules() {
             log('Debug-Tools geladen, fahre mit Hauptmodulen fort', 'debug');
         }
         
+        // Reparatur-Tools laden (wenn aktiviert)
+        if (config.options.loadRepairTools) {
+            await loadModule(config.modules.repairTools);
+            log('Reparatur-Tools geladen, fahre mit Hauptmodulen fort', 'debug');
+        }
+        
         // IndexedDB Fallback-Speicher laden
         await loadModule(config.modules.storageIndexedDB);
         
         // Hauptspeichermodul laden (neue vereinfachte Version)
-        await loadModule(config.modules.storageCore);
-        
-        // Kompatibilitätsadapter laden
-        await loadModule(config.modules.compatibility);
-        
+        // Module sind jetzt alle geladen
         log('Persistente Speichermodule erfolgreich nachgeladen', 'success');
         
+        // Nur einmal initialisieren mit einem kurzen Timeout, um sicherzustellen,
+        // dass die Module vollständig initialisiert sind
+        setTimeout(async () => {
+            // Prüfen, ob ein Benutzer eingeloggt ist und ggf. Speicher initialisieren
+            const currentUsername = localStorage.getItem('username');
+            if (currentUsername && window.initializeStorageForUser) {
+                log(`Aktiver Benutzer gefunden: ${currentUsername}, initialisiere Speicher`, 'info');
+                try {
+                    // Optionen übergeben, um keine Modals anzuzeigen
+                    const options = { showModal: false };
+                    const initResult = await window.initializeStorageForUser(currentUsername, options);
+                    log(`Speicher-Initialisierung: ${initResult ? 'Erfolgreich' : 'Mit Problemen'}`, 
+                        initResult ? 'success' : 'warning');
+                
+                // Bei Problemen Diagnose durchführen
+                if (!initResult && window.listAllHandles) {
+                    const handles = await window.listAllHandles();
+                    log(`Vorhandene Handles: ${JSON.stringify(handles)}`, 'debug');
+                    
+                    // Automatische Reparatur versuchen ohne Modals
+                    if (window.repairStorageAccess) {
+                        log('Versuche automatische Reparatur des Speicherzugriffs', 'info');
+                        const repairResult = await window.repairStorageAccess(currentUsername, { showModal: false });
+                        log(`Reparaturversuch: ${repairResult.success ? 'Erfolgreich' : 'Fehlgeschlagen'} - ${repairResult.message}`, 
+                            repairResult.success ? 'success' : 'warning');
+                    }
+                }
+            } catch (initError) {
+                log(`Fehler bei Speicher-Initialisierung: ${initError.message}`, 'error');
+            }
+        }
+        }, 500); // Ende des setTimeout
+        
+        // Set global flag for persistent modules
+        try { window.__persistentStorageModulesLoaded = true; } catch (e) { /* best-effort */ }
+
         // Event auslösen
         window.dispatchEvent(new CustomEvent('persistentStorageModulesLoaded'));
+
+        // Best-effort: Falls ein restoreDirectoryHandle verfügbar ist, versuche das Handle zu laden
+        // und setze es global, damit Seiten, die Events verpasst haben, das Handle bekommen.
+        try {
+            if (typeof window.restoreDirectoryHandle === 'function') {
+                const username = localStorage.getItem('username') || undefined;
+                try {
+                    const handle = await window.restoreDirectoryHandle(username);
+                    if (handle) {
+                        try { window.directoryHandle = handle; } catch (e) {}
+                        try { document.dispatchEvent(new CustomEvent('directoryHandleChanged', { detail: { handle } })); } catch (e) {}
+                        if (typeof window.updateStorageStatusIcon === 'function') {
+                            try { window.updateStorageStatusIcon(); } catch (e) {}
+                        }
+                        log('Automatisches Wiederherstellen des DirectoryHandle erfolgreich', 'success');
+                    } else {
+                        log('Kein DirectoryHandle beim automatischen Wiederherstellungsversuch gefunden', 'debug');
+                    }
+                } catch (restoreErr) {
+                    log(`Fehler beim automatischen Wiederherstellungsversuch: ${restoreErr.message}`, 'warning');
+                }
+            }
+        } catch (e) {
+            // best-effort, ignore
+        }
         
         return true;
     } catch (error) {
@@ -168,10 +258,36 @@ async function loadPersistentStorageModules() {
 // Funktion global verfügbar machen
 window.loadPersistentStorageModules = loadPersistentStorageModules;
 
+// Flag um zu verfolgen, ob wir bereits eine Initialisierung ausgeführt haben
+let hasInitialized = false;
+
 // Ladevorgang starten, wenn das DOM geladen ist
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
+    document.addEventListener('DOMContentLoaded', () => {
+        if (!hasInitialized) {
+            hasInitialized = true;
+            init();
+        }
+    });
 } else {
     // DOM ist bereits geladen, direkt starten
-    init();
+    if (!hasInitialized) {
+        hasInitialized = true;
+        init();
+    }
+}
+
+// Sofortige Initialisierung ohne auf DOMContentLoaded zu warten
+if (config.options.immediateInitialization && !hasInitialized) {
+    log('Starte sofortige Initialisierung der Speichermodule', 'info');
+    
+    (async function() {
+        try {
+            hasInitialized = true;
+            await loadPersistentStorageModules();
+            log('Sofortige Initialisierung abgeschlossen', 'success');
+        } catch (error) {
+            log(`Fehler bei sofortiger Initialisierung: ${error.message}`, 'error');
+        }
+    })();
 }

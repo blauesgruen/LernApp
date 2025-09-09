@@ -3,10 +3,17 @@
  * Dieses Skript bietet erweiterte Debugging-Funktionen für die IndexedDB-Speicherung von DirectoryHandles
  */
 
-// Konstanten für den Zugriff auf die IndexedDB-Datenbank
-const DEBUG_DB_NAME = 'LernAppDirectoryHandles';
-const DEBUG_STORE_NAME = 'lernapp-directory-handles';
-const DEBUG_KEY_NAME = 'main-directory-handle';
+// Guard gegen mehrfaches Laden
+if (typeof window.DEBUG_PERSISTENT_STORAGE_LOADED !== 'undefined') {
+    console.warn('⚠️ Debug-Tools für persistente Speicherung wurden bereits geladen. Doppelte Initialisierung vermieden.');
+} else {
+    window.DEBUG_PERSISTENT_STORAGE_LOADED = true;
+
+    // Konstanten für den Zugriff auf die IndexedDB-Datenbank
+    const DEBUG_DB_NAME = 'LernAppDirectoryHandles';
+    const DEBUG_STORE_NAME = 'lernapp-directory-handles';
+    const DEBUG_HANDLE_KEY_PREFIX = 'dir-handle-'; // Prefix für benutzerspezifische Handles
+    const DEBUG_OLD_KEY_NAME = 'main-directory-handle';
 
 // Sofort Meldung ausgeben, dass Debugging-Tools geladen wurden
 if (window.logger) {
@@ -53,14 +60,37 @@ async function debugPersistentStorage() {
                 const db = await openDebugDatabase();
                 const tx = db.transaction(DEBUG_STORE_NAME, 'readonly');
                 const store = tx.objectStore(DEBUG_STORE_NAME);
-                const request = store.get(DEBUG_KEY_NAME);
+                
+                // Aktuellen Benutzernamen ermitteln
+                const username = localStorage.getItem('username') || 'default';
+                const userHandleKey = `${DEBUG_HANDLE_KEY_PREFIX}${username}`;
+                
+                // Zuerst nach dem benutzerspezifischen Schlüssel suchen
+                const request = store.get(userHandleKey);
                 
                 await new Promise((resolve, reject) => {
                     request.onsuccess = () => {
-                        status.indexedDBStatus.hasStoredHandle = !!request.result;
-                        status.indexedDBStatus.handleName = request.result ? request.result.name : null;
-                        status.indexedDBStatus.handleKind = request.result ? request.result.kind : null;
-                        resolve();
+                        if (request.result) {
+                            status.indexedDBStatus.hasStoredHandle = true;
+                            status.indexedDBStatus.handleName = request.result.name;
+                            status.indexedDBStatus.handleKind = request.result.kind;
+                            status.indexedDBStatus.key = userHandleKey;
+                            resolve();
+                        } else {
+                            // Falls nicht gefunden, nach dem alten Schlüssel suchen
+                            const oldRequest = store.get(DEBUG_OLD_KEY_NAME);
+                            oldRequest.onsuccess = () => {
+                                status.indexedDBStatus.hasStoredHandle = !!oldRequest.result;
+                                status.indexedDBStatus.handleName = oldRequest.result ? oldRequest.result.name : null;
+                                status.indexedDBStatus.handleKind = oldRequest.result ? oldRequest.result.kind : null;
+                                status.indexedDBStatus.key = DEBUG_OLD_KEY_NAME;
+                                resolve();
+                            };
+                            oldRequest.onerror = (event) => {
+                                status.indexedDBStatus.error = event.target.error.message;
+                                reject(event.target.error);
+                            };
+                        }
                     };
                     request.onerror = (event) => {
                         status.indexedDBStatus.error = event.target.error.message;
@@ -91,8 +121,8 @@ async function debugPersistentStorage() {
             status.localStorage = {
                 username,
                 storagePath: localStorage.getItem('storagePath') || localStorage.getItem(`storagePath_${username}`),
-                hasDirectoryHandle: localStorage.getItem('hasDirectoryHandle') === 'true',
-                hasStoredDirectoryHandle: localStorage.getItem('hasStoredDirectoryHandle') === 'true'
+                hasDirectoryHandle: localStorage.getItem(`hasDirectoryHandle_${username}`) === 'true',
+                hasStoredDirectoryHandle: localStorage.getItem(`hasStoredDirectoryHandle_${username}`) === 'true'
             };
             
             logFunc(`Benutzer: ${status.localStorage.username || 'Nicht eingeloggt'}`);
@@ -148,7 +178,7 @@ async function debugPersistentStorage() {
  */
 function openDebugDatabase() {
     return new Promise((resolve, reject) => {
-        const request = indexedDB.open(DEBUG_DB_NAME, 2);  // Version auf 2 aktualisiert
+        const request = indexedDB.open(DEBUG_DB_NAME, 3);  // Version auf 3 aktualisiert
         
         request.onupgradeneeded = (event) => {
             const db = event.target.result;
@@ -226,17 +256,46 @@ async function clearStoredDirectoryHandle() {
         const tx = db.transaction(DEBUG_STORE_NAME, 'readwrite');
         const store = tx.objectStore(DEBUG_STORE_NAME);
         
+        // Aktuellen Benutzernamen ermitteln
+        const username = localStorage.getItem('username') || 'default';
+        const userHandleKey = `${DEBUG_HANDLE_KEY_PREFIX}${username}`;
+        
         await new Promise((resolve, reject) => {
-            const request = store.delete(DEBUG_KEY_NAME);
+            // Zuerst den benutzerspezifischen Schlüssel löschen
+            const userRequest = store.delete(userHandleKey);
             
-            request.onsuccess = () => {
-                logFunc('✓ Gespeichertes DirectoryHandle gelöscht');
-                resolve();
+            userRequest.onsuccess = () => {
+                logFunc(`✓ Benutzerspezifisches DirectoryHandle (${userHandleKey}) gelöscht`);
+                
+                // Dann den alten Schlüssel löschen
+                const oldRequest = store.delete(DEBUG_OLD_KEY_NAME);
+                
+                oldRequest.onsuccess = () => {
+                    logFunc(`✓ Altes DirectoryHandle (${DEBUG_OLD_KEY_NAME}) gelöscht`);
+                    resolve();
+                };
+                
+                oldRequest.onerror = (event) => {
+                    logFunc(`Altes DirectoryHandle nicht gefunden oder konnte nicht gelöscht werden: ${event.target.error.message}`);
+                    resolve(); // Trotzdem fortfahren
+                };
             };
             
-            request.onerror = (event) => {
-                errorFunc(`Fehler beim Löschen des DirectoryHandle: ${event.target.error.message}`);
-                reject(event.target.error);
+            userRequest.onerror = (event) => {
+                logFunc(`Benutzerspezifisches DirectoryHandle nicht gefunden oder konnte nicht gelöscht werden: ${event.target.error.message}`);
+                
+                // Versuchen, das alte zu löschen
+                const oldRequest = store.delete(DEBUG_OLD_KEY_NAME);
+                
+                oldRequest.onsuccess = () => {
+                    logFunc(`✓ Altes DirectoryHandle (${DEBUG_OLD_KEY_NAME}) gelöscht`);
+                    resolve();
+                };
+                
+                oldRequest.onerror = (event) => {
+                    errorFunc(`Fehler beim Löschen des alten DirectoryHandle: ${event.target.error.message}`);
+                    reject(event.target.error);
+                };
             };
             
             tx.oncomplete = () => {
@@ -244,9 +303,16 @@ async function clearStoredDirectoryHandle() {
             };
         });
         
-        // Flags in localStorage zurücksetzen
+        // Benutzerspezifische Flags in localStorage zurücksetzen
+        localStorage.removeItem(`hasDirectoryHandle_${username}`);
+        localStorage.removeItem(`hasStoredDirectoryHandle_${username}`);
+        localStorage.removeItem(`directoryHandleName_${username}`);
+        localStorage.removeItem(`directoryHandleName_${username}`);
+        
+        // Für Abwärtskompatibilität auch die alten Flags zurücksetzen
         localStorage.removeItem('hasDirectoryHandle');
         localStorage.removeItem('hasStoredDirectoryHandle');
+        localStorage.removeItem('directoryHandleName');
         
         logFunc('Flags in localStorage zurückgesetzt');
         
@@ -471,3 +537,5 @@ window.clearStoredDirectoryHandle = clearStoredDirectoryHandle;
 window.showDebugCommands = showDebugCommands;
 window.testFileAccess = testFileAccess;
 window.forceRestoreDirectoryHandle = forceRestoreDirectoryHandle;
+
+} // Ende des Guards gegen mehrfaches Laden

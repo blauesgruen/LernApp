@@ -5,13 +5,19 @@
  * indem es IndexedDB als Fallback-Speicher verwendet.
  */
 
-// Konfiguration
-const IDB_CONFIG = {
-    dbName: 'LernAppDataStore',
-    version: 1,
-    storeName: 'lernapp-data',
-    keyPrefix: 'data_'
-};
+// Guard gegen mehrfaches Laden
+if (typeof window.STORAGE_INDEXEDDB_LOADED !== 'undefined') {
+    console.warn('⚠️ IndexedDB-Speicher wurde bereits geladen. Doppelte Initialisierung vermieden.');
+} else {
+    window.STORAGE_INDEXEDDB_LOADED = true;
+
+    // Konfiguration
+    const IDB_CONFIG = {
+        dbName: 'LernAppDataStore',
+        version: 1,
+        storeName: 'lernapp-data',
+        keyPrefix: 'data_'
+    };
 
 /**
  * Initialisiert die IndexedDB Datenbank
@@ -268,3 +274,5 @@ if (isIndexedDBSupported()) {
 } else {
     console.warn('IndexedDB wird von diesem Browser nicht unterstützt. Großer Datenspeicher nicht verfügbar.');
 }
+
+} // Ende des Guards gegen mehrfaches Laden
