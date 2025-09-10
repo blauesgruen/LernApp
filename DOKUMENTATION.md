@@ -178,6 +178,37 @@ Alle App-Daten werden in Supabase-Tabellen gespeichert. Es gibt keine lokalen JS
 
 ## Schritt-für-Schritt Umsetzung
 
+---
+
+## Tatsächliche Tabellenspalten (aktuell im Projekt)
+
+Die folgenden Spalten sind derzeit in der Datenbankstruktur der App im Einsatz (exakte Namen):
+
+- categories
+   - id
+   - name
+   - description
+   - maincategory
+   - owner
+   - collaborators
+
+- groups
+   - id
+   - name
+   - category_id
+   - created_by
+   - created_at
+
+- questions
+   - id
+   - text
+   - imageurl
+   - options
+   - explanation
+   - categoryid
+
+Hinweis: Einige JS-Module normalisieren Feldnamen beim Zugriff (z. B. `category_id` → `categoryId`). Prüfe beim Schreiben von RLS-Policies die exakten Spaltennamen in deiner Supabase-Konsole.
+
 1. **Supabase-Projekt anlegen**
    - Tabellen für Kategorien, Gruppen, Fragen, Statistiken erstellen (siehe oben)
    - Storage-Bucket für Bilder anlegen

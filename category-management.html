@@ -80,6 +80,33 @@
 
     <div id="footer-container"></div>
 
+    <!-- Edit Item Modal -->
+    <div id="edit-item-modal" class="modal-dialog" aria-hidden="true" style="display:none;">
+        <div class="modal-content">
+            <button class="modal-close" aria-label="Schließen">×</button>
+            <h2 id="edit-item-title">Element bearbeiten</h2>
+            <div class="modal-body">
+                <form id="edit-item-form">
+                    <input type="hidden" id="edit-item-type" value="" />
+                    <input type="hidden" id="edit-item-id" value="" />
+                    <div class="form-group">
+                        <label for="edit-item-name">Name</label>
+                        <input type="text" id="edit-item-name" required />
+                    </div>
+                    <div class="form-group" id="edit-item-category-row" style="display:none;">
+                        <label for="edit-item-category">Kategorie</label>
+                        <select id="edit-item-category"></select>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn-primary">Speichern</button>
+                        <button type="button" id="edit-item-delete" class="btn-danger">Löschen</button>
+                        <button type="button" class="modal-close btn-secondary">Abbrechen</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <script src="js/notification.js"></script>
     <script>
         // Header und Footer dynamisch laden

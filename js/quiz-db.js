@@ -68,7 +68,7 @@ async function loadCategories() {
             id: c.id,
             name: c.name,
             description: c.description ?? c.desc ?? '',
-            mainCategory: c.main_category ?? c.mainCategory ?? null,
+            mainCategory: c.maincategory ?? c.main_category ?? c.mainCategory ?? null,
             createdBy: c.created_by ?? c.createdBy ?? (c.owner ?? null),
             createdAt: c.created_at ?? c.createdAt ?? null,
             // preserve other fields
@@ -111,7 +111,7 @@ async function saveCategories(categories) {
  * @param {string} createdBy - Benutzername des Erstellers
  * @returns {Promise<object|null>} Die erstellte Kategorie oder null bei Fehler
  */
-async function createCategory(name, mainCategory = MAIN_CATEGORY.TEXT, createdBy) {
+async function createCategory(name, createdBy, mainCategory = MAIN_CATEGORY.TEXT) {
     if (!window.supabase) {
         console.error('Supabase-Client ist nicht verfügbar.');
         return null;
@@ -122,11 +122,23 @@ async function createCategory(name, mainCategory = MAIN_CATEGORY.TEXT, createdBy
     }
 
     try {
+        // generate an id client-side if the DB has no default for id
+        let newId = null;
+        try {
+            if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+                newId = crypto.randomUUID();
+            }
+        } catch (e) { /* ignore */ }
+        if (!newId) newId = 'c-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,8);
+
         const { data, error } = await window.supabase.from('categories').insert({
+            id: newId,
             name,
+            // DB column is `maincategory`
+            maincategory: mainCategory,
+            // set owner (used by existing policies) and collaborators
             owner: createdBy,
-            collaborators: [createdBy],
-            created_at: new Date().toISOString()
+            collaborators: [createdBy]
         }).select();
         
         if (error) {
@@ -134,7 +146,18 @@ async function createCategory(name, mainCategory = MAIN_CATEGORY.TEXT, createdBy
             return null;
         }
         
-        return data[0];
+        // normalize returned row to camelCase expected by the UI
+        const c = data && data[0] ? data[0] : null;
+        if (!c) return null;
+        return {
+            id: c.id,
+            name: c.name,
+            description: c.description ?? c.desc ?? '',
+            mainCategory: c.maincategory ?? c.main_category ?? c.mainCategory ?? null,
+            createdBy: c.created_by ?? c.createdBy ?? c.owner ?? null,
+            createdAt: c.created_at ?? c.createdAt ?? null,
+            ...c
+        };
     } catch (error) {
         console.error("Fehler beim Erstellen der Kategorie:", error);
         return null;
@@ -231,6 +254,150 @@ async function createGroup(name, categoryId, createdBy) {
     } catch (error) {
         console.error("Fehler beim Erstellen der Gruppe:", error);
         return null;
+    }
+}
+
+/**
+ * Aktualisiert eine bestehende Gruppe
+ * @param {string} groupId
+ * @param {{name?:string, categoryId?:string}} updates
+ * @returns {Promise<object|null>}
+ */
+async function updateGroup(groupId, updates) {
+    if (!window.supabase) {
+        console.error('Supabase-Client ist nicht verfügbar.');
+        return null;
+    }
+    if (!groupId) {
+        console.error('groupId ist erforderlich.');
+        return null;
+    }
+    try {
+        const payload = {};
+        if (typeof updates.name !== 'undefined') payload.name = updates.name;
+        if (typeof updates.categoryId !== 'undefined') payload.category_id = updates.categoryId;
+
+        const { data, error } = await window.supabase.from('groups').update(payload).eq('id', groupId).select();
+        if (error) {
+            console.error('Fehler beim Aktualisieren der Gruppe:', error);
+            return null;
+        }
+        // return normalized object
+        const g = data && data[0] ? data[0] : null;
+        if (!g) return null;
+        return {
+            id: g.id,
+            name: g.name,
+            categoryId: g.category_id ?? g.categoryId ?? null,
+            createdBy: g.created_by ?? g.createdBy ?? null,
+            createdAt: g.created_at ?? g.createdAt ?? null,
+            ...g
+        };
+    } catch (error) {
+        console.error('Fehler beim Aktualisieren der Gruppe:', error);
+        return null;
+    }
+}
+
+/**
+ * Löscht eine Gruppe
+ * @param {string} groupId
+ * @returns {Promise<boolean>}
+ */
+async function deleteGroup(groupId) {
+    if (!window.supabase) {
+        console.error('Supabase-Client ist nicht verfügbar.');
+        return false;
+    }
+    if (!groupId) {
+        console.error('groupId ist erforderlich.');
+        return false;
+    }
+    try {
+        const { error } = await window.supabase.from('groups').delete().eq('id', groupId);
+        if (error) {
+            console.error('Fehler beim Löschen der Gruppe:', error);
+            return false;
+        }
+        return true;
+    } catch (error) {
+        console.error('Fehler beim Löschen der Gruppe:', error);
+        return false;
+    }
+}
+
+/**
+ * Aktualisiert eine bestehende Kategorie in Supabase
+ */
+async function updateCategory(categoryId, updates) {
+    if (!window.supabase) {
+        console.error('Supabase-Client ist nicht verfügbar.');
+        return null;
+    }
+    if (!categoryId) return null;
+    try {
+        const payload = {};
+        if (typeof updates.name !== 'undefined') payload.name = updates.name;
+        if (typeof updates.description !== 'undefined') payload.description = updates.description;
+    if (typeof updates.mainCategory !== 'undefined') payload.maincategory = updates.mainCategory;
+
+        const { data, error } = await window.supabase.from('categories').update(payload).eq('id', categoryId).select();
+        if (error) {
+            console.error('Fehler beim Aktualisieren der Kategorie:', error);
+            return null;
+        }
+        const c = data && data[0] ? data[0] : null;
+        if (!c) return null;
+        return {
+            id: c.id,
+            name: c.name,
+            description: c.description,
+            mainCategory: c.maincategory ?? c.main_category ?? c.mainCategory ?? null,
+            createdBy: c.created_by ?? c.createdBy ?? c.owner ?? null,
+            createdAt: c.created_at ?? c.createdAt ?? null,
+            ...c
+        };
+    } catch (error) {
+        console.error('Fehler beim Aktualisieren der Kategorie:', error);
+        return null;
+    }
+}
+
+/**
+ * Löscht eine Kategorie in Supabase (prüft vorher auf Fragen)
+ */
+async function deleteCategory(categoryId) {
+    if (!window.supabase) {
+        console.error('Supabase-Client ist nicht verfügbar.');
+        return false;
+    }
+    if (!categoryId) return false;
+    try {
+        // Prüfe, ob Fragen vorhanden sind
+        const { data: questions, error: qErr } = await window.supabase.from('questions').select('id').eq('categoryid', categoryId).limit(1);
+        if (qErr) {
+            console.error('Fehler beim Prüfen der Fragen zur Kategorie:', qErr);
+            return false;
+        }
+        if (questions && questions.length > 0) {
+            showError('Diese Kategorie kann nicht gelöscht werden, da ihr noch Fragen zugeordnet sind.');
+            return false;
+        }
+
+        const { data: delData, error: delErr } = await window.supabase.from('categories').delete().eq('id', categoryId).select();
+        if (delErr) {
+            console.error('Fehler beim Löschen der Kategorie:', delErr);
+            return false;
+        }
+        // if no rows were returned, nothing was deleted (possibly RLS or wrong id)
+        if (!delData || delData.length === 0) {
+            console.warn('Löschen nicht durchgeführt: keine Zeile betroffen (mögliche RLS-Verweigerung oder falsche ID).');
+            return false;
+        }
+        return true;
+    } catch (error) {
+        console.error('Fehler beim Löschen der Kategorie:', error);
+        return false;
     }
 }
 
@@ -674,6 +841,10 @@ window.quizDB = {
     createCategory,
     loadGroups,
     createGroup,
+    updateGroup,
+    deleteGroup,
+    updateCategory,
+    deleteCategory,
     loadQuestions,
     createQuestion,
     getQuizQuestions,

@@ -166,6 +166,17 @@ async function loadCategoryTree() {
             catItem.appendChild(toggleBtn);
             catItem.appendChild(iconSpan);
             catItem.appendChild(textSpan);
+            // Edit icon for category (append last so it appears on the right)
+            const editBtnCat = document.createElement('button');
+            editBtnCat.type = 'button';
+            editBtnCat.className = 'tree-item-edit';
+            editBtnCat.title = 'Kategorie bearbeiten';
+            editBtnCat.setAttribute('aria-label', 'Kategorie bearbeiten');
+            editBtnCat.tabIndex = 0;
+            editBtnCat.innerHTML = '<i class="fas fa-edit" aria-hidden="true"></i>';
+            editBtnCat.setAttribute('data-type','category');
+            editBtnCat.setAttribute('data-id', category.id);
+            catItem.appendChild(editBtnCat);
 
             // Group container
             const groupContainer = document.createElement('div');
@@ -184,8 +195,23 @@ async function loadCategoryTree() {
                     const gText = document.createElement('span');
                     gText.className = 'tree-item-text';
                     gText.textContent = group.name;
+
+                    // Edit icon for group
+                    const editBtnGroup = document.createElement('button');
+                    editBtnGroup.type = 'button';
+                    editBtnGroup.className = 'tree-item-edit';
+                    editBtnGroup.title = 'Gruppe bearbeiten';
+                    editBtnGroup.innerHTML = '<i class="fas fa-edit" aria-hidden="true"></i>';
+                    editBtnGroup.setAttribute('data-type','group');
+                    editBtnGroup.setAttribute('data-id', group.id);
+                    editBtnGroup.setAttribute('data-category-id', category.id);
+
                     g.appendChild(gIcon);
                     g.appendChild(gText);
+                    // Edit icon for group (append last so it appears on the right)
+                    editBtnGroup.setAttribute('aria-label', 'Gruppe bearbeiten');
+                    editBtnGroup.tabIndex = 0;
+                    g.appendChild(editBtnGroup);
                     groupContainer.appendChild(g);
                 });
             } else {
@@ -208,6 +234,17 @@ async function loadCategoryTree() {
         // Event delegation for better performance and simpler logic
         categoryTree.removeEventListener('click', categoryTree._delegatedClickHandler);
         const delegatedClickHandler = function(e) {
+            // open edit modal when clicking edit buttons
+            const editClick = e.target.closest('.tree-item-edit');
+            if (editClick && categoryTree.contains(editClick)) {
+                e.stopPropagation();
+                const type = editClick.getAttribute('data-type');
+                const id = editClick.getAttribute('data-id');
+                const categoryId = editClick.getAttribute('data-category-id') || null;
+                openEditModal(type, id, categoryId);
+                return;
+            }
+
             const toggle = e.target.closest('.tree-item-toggle');
             if (toggle && categoryTree.contains(toggle)) {
                 e.stopPropagation();
@@ -262,6 +299,15 @@ async function loadCategoryTree() {
             }
         };
         categoryTree.addEventListener('click', delegatedClickHandler);
+        // keyboard support: Enter/Space on edit buttons
+        categoryTree.addEventListener('keydown', function(e) {
+            const el = e.target.closest && e.target.closest('.tree-item-edit');
+            if (!el) return;
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                el.click();
+            }
+        });
         // keep a reference so we can remove later if needed
         categoryTree._delegatedClickHandler = delegatedClickHandler;
     } catch (error) {
@@ -269,6 +315,188 @@ async function loadCategoryTree() {
         categoryTree.innerHTML = '<p class="error-text">Fehler beim Laden der Kategorien.</p>';
     }
 }
+
+/* ---------------- Edit modal logic ---------------- */
+function openEditModal(type, id, categoryId=null) {
+    const modal = document.getElementById('edit-item-modal');
+    const title = document.getElementById('edit-item-title');
+    const inputName = document.getElementById('edit-item-name');
+    const inputType = document.getElementById('edit-item-type');
+    const inputId = document.getElementById('edit-item-id');
+    const categoryRow = document.getElementById('edit-item-category-row');
+    const categorySelect = document.getElementById('edit-item-category');
+
+    inputType.value = type;
+    inputId.value = id;
+
+    // populate name and category
+    if (type === 'category') {
+        title.textContent = 'Kategorie bearbeiten';
+        categoryRow.style.display = 'none';
+        // find category from loaded categories
+        window.quizDB.loadCategories().then(categories => {
+            const cat = categories.find(c => c.id === id);
+            inputName.value = cat ? cat.name : '';
+        }).catch(() => inputName.value = '');
+    } else if (type === 'group') {
+        title.textContent = 'Gruppe bearbeiten';
+        categoryRow.style.display = '';
+        // fill category select
+        window.quizDB.loadCategories().then(categories => {
+            categorySelect.innerHTML = '<option value="">-- Kategorie wählen --</option>';
+            categories.forEach(c => {
+                const opt = document.createElement('option'); opt.value = c.id; opt.textContent = c.name; categorySelect.appendChild(opt);
+            });
+            // load group details
+            window.quizDB.loadGroups().then(groups => {
+                const g = groups.find(x => x.id === id);
+                inputName.value = g ? g.name : '';
+                if (g) categorySelect.value = g.categoryId || categoryId || '';
+            }).catch(() => inputName.value = '');
+        }).catch(() => { categorySelect.innerHTML = ''; });
+    }
+
+    // show modal
+    modal.style.display = 'block';
+    modal.setAttribute('aria-hidden','false');
+    // focus first control for keyboard users
+    setTimeout(() => {
+        try { document.getElementById('edit-item-name').focus(); } catch (e) {}
+    }, 30);
+}
+
+function closeEditModal() {
+    const modal = document.getElementById('edit-item-modal');
+    // If focus is currently inside the modal, move it to a sensible fallback
+    try {
+        const active = document.activeElement;
+        if (active && modal.contains(active)) {
+            const fallback = document.getElementById('category-name') || document.getElementById('category-tree') || document.body;
+            if (fallback && typeof fallback.focus === 'function') {
+                // ensure fallback can be focused
+                if (!fallback.hasAttribute('tabindex')) fallback.setAttribute('tabindex', '-1');
+                fallback.focus();
+            } else {
+                try { active.blur(); } catch (e) {}
+            }
+        }
+    } catch (e) {
+        console.warn('Fehler beim Verschieben des Fokus aus dem Modal:', e);
+    }
+    modal.style.display = 'none';
+    modal.setAttribute('aria-hidden','true');
+}
+
+// close buttons
+document.addEventListener('click', (e) => {
+    if (e.target.closest && e.target.closest('#edit-item-modal .modal-close')) {
+        closeEditModal();
+    }
+});
+
+// close modal on ESC
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        const modal = document.getElementById('edit-item-modal');
+        if (modal && modal.getAttribute('aria-hidden') === 'false') closeEditModal();
+    }
+});
+
+// handle save
+document.getElementById('edit-item-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const type = document.getElementById('edit-item-type').value;
+    const id = document.getElementById('edit-item-id').value;
+    const name = document.getElementById('edit-item-name').value.trim();
+    const categoryId = document.getElementById('edit-item-category').value;
+    if (!name) { showError('Name darf nicht leer sein.'); return; }
+    // Optimistic UI update with rollback
+    try {
+        if (type === 'category') {
+            const catEl = categoryTree.querySelector(`.tree-item-category[data-id="${id}"]`);
+            const prevName = catEl ? (catEl.querySelector('.tree-item-text').textContent) : null;
+            if (catEl) catEl.querySelector('.tree-item-text').textContent = name;
+            const updated = await window.quizDB.updateCategory(id, { name });
+            if (updated) {
+                showSuccess('Kategorie aktualisiert.');
+            } else {
+                if (catEl && prevName !== null) catEl.querySelector('.tree-item-text').textContent = prevName;
+                showError('Kategorie konnte nicht aktualisiert werden.');
+            }
+        } else if (type === 'group') {
+            const gEl = categoryTree.querySelector(`.tree-item-group[data-id="${id}"]`);
+            const prevName = gEl ? gEl.querySelector('.tree-item-text').textContent : null;
+            const prevCategoryId = gEl ? gEl.dataset.categoryId : null;
+            // optimistic name update
+            if (gEl) gEl.querySelector('.tree-item-text').textContent = name;
+            // optimistic move if category changed
+            let movedBack = false;
+            if (gEl && categoryId && prevCategoryId !== categoryId) {
+                const oldContainer = categoryTree.querySelector(`.tree-group-container[data-category-id="${prevCategoryId}"]`);
+                const newContainer = categoryTree.querySelector(`.tree-group-container[data-category-id="${categoryId}"]`);
+                if (oldContainer && newContainer) {
+                    newContainer.appendChild(gEl);
+                    gEl.dataset.categoryId = categoryId;
+                }
+            }
+            const updated = await window.quizDB.updateGroup(id, { name, categoryId });
+            if (updated) {
+                showSuccess('Gruppe aktualisiert.');
+                // refresh selects
+                await updateCategorySelects();
+            } else {
+                // rollback
+                if (gEl) {
+                    if (prevName !== null) gEl.querySelector('.tree-item-text').textContent = prevName;
+                    if (prevCategoryId && gEl.dataset.categoryId !== prevCategoryId) {
+                        const origContainer = categoryTree.querySelector(`.tree-group-container[data-category-id="${prevCategoryId}"]`);
+                        if (origContainer) { origContainer.appendChild(gEl); gEl.dataset.categoryId = prevCategoryId; }
+                    }
+                }
+                showError('Gruppe konnte nicht aktualisiert werden.');
+            }
+        }
+        closeEditModal();
+        await loadCategoryTree();
+        await updateCategorySelects();
+    } catch (err) {
+        console.error('Fehler beim Speichern:', err);
+        showError('Fehler beim Speichern.');
+    }
+});
+
+// handle delete
+document.getElementById('edit-item-delete').addEventListener('click', async function() {
+    const type = document.getElementById('edit-item-type').value;
+    const id = document.getElementById('edit-item-id').value;
+    try {
+        const confirmed = await (window.helpers && typeof window.helpers.confirmDialog === 'function'
+            ? window.helpers.confirmDialog('Löschen bestätigen', 'Wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.', 'Löschen', 'Abbrechen')
+            : Promise.resolve(confirm('Wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.')));
+        if (!confirmed) return;
+
+        // optimistic delete: remove from DOM first and restore on failure
+        let removedNode = null;
+        if (type === 'category') {
+            const catEl = categoryTree.querySelector(`.tree-item-category[data-id="${id}"]`);
+            if (catEl) { removedNode = catEl; const next = catEl.nextElementSibling; catEl.parentNode.removeChild(catEl); if (next && next.classList.contains('tree-group-container')) { next.parentNode.removeChild(next); removedNode._sibling = next; } }
+            const ok = await window.quizDB.deleteCategory(id);
+            if (ok) showSuccess('Kategorie gelöscht.'); else { showError('Löschen fehlgeschlagen.'); if (removedNode) { const ref = categoryTree.querySelector('.tree-item') || null; categoryTree.insertBefore(removedNode, ref); if (removedNode._sibling) categoryTree.insertBefore(removedNode._sibling, removedNode.nextSibling); } }
+        } else if (type === 'group') {
+            const gEl = categoryTree.querySelector(`.tree-item-group[data-id="${id}"]`);
+            let parent = null, next = null;
+            if (gEl) { parent = gEl.parentNode; next = gEl.nextElementSibling; removedNode = gEl; parent.removeChild(gEl); }
+            const ok = await window.quizDB.deleteGroup(id);
+            if (ok) showSuccess('Gruppe gelöscht.'); else { showError('Löschen fehlgeschlagen.'); if (removedNode && parent) { parent.insertBefore(removedNode, next); } }
+        }
+        closeEditModal();
+        await loadCategoryTree();
+        await updateCategorySelects();
+    } catch (err) {
+        console.error('Fehler beim Löschen:', err);
+        showError('Fehler beim Löschen.');
+    }
+});
 
 /* ----------------- Scrollable hint logic ----------------- */
 /** Returns true if the element has overflowed vertical content */
