@@ -10,6 +10,9 @@ const categoryNameInput = document.getElementById('category-name');
 const categoryTree = document.getElementById('category-tree');
 const selectedCategoryId = document.getElementById('selected-category-id');
 
+// Container für Gruppenliste (kann optional sein)
+const groupsList = document.getElementById('groups-list') || null;
+
 // Elemente für Gruppen-Formular
 const groupForm = document.getElementById('group-form');
 const groupCategorySelect = document.getElementById('group-category');
@@ -120,7 +123,8 @@ async function initializePage() {
 async function loadCategoryTree() {
     console.log('DEBUG: loadCategoryTree wird gestartet');
     try {
-        categoryTree.innerHTML = '<p class="loading-info">Kategorien werden geladen...</p>';
+        // Use safe DOM methods instead of building HTML strings
+        categoryTree.innerHTML = '';
         const [categories, groups] = await Promise.all([
             window.quizDB.loadCategories(),
             window.quizDB.loadGroups()
@@ -128,103 +132,182 @@ async function loadCategoryTree() {
         const userCategories = categories.filter(category => category.createdBy !== 'system');
         console.log('DEBUG: userCategories:', userCategories);
         if (userCategories.length === 0) {
-            categoryTree.innerHTML = '<p class="info-text">Keine Kategorien vorhanden. Erstelle deine erste Kategorie!</p>';
+            const p = document.createElement('p');
+            p.className = 'info-text';
+            p.textContent = 'Keine Kategorien vorhanden. Erstelle deine erste Kategorie!';
+            categoryTree.appendChild(p);
             return;
         }
         userCategories.sort((a, b) => a.name.localeCompare(b.name));
-        let html = '';
+
+        // Build DOM nodes
         userCategories.forEach(category => {
-            const categoryGroups = groups.filter(group => group.categoryId === category.id);
-            categoryGroups.sort((a, b) => a.name.localeCompare(b.name));
-            html += `
-                <div class="tree-item tree-item-category" data-id="${category.id}">
-                    <span class="tree-item-toggle"><i class="fas fa-chevron-right"></i></span>
-                    <span class="tree-item-icon"><i class="fas fa-folder"></i></span>
-                    ${category.name}
-                </div>
-                <div class="tree-group-container" style="display: none;" data-category-id="${category.id}">
-            `;
+            const categoryGroups = groups.filter(group => group.categoryId === category.id).sort((a,b)=>a.name.localeCompare(b.name));
+
+            // Category item
+            const catItem = document.createElement('div');
+            catItem.className = 'tree-item tree-item-category';
+            catItem.dataset.id = category.id;
+
+            const toggleBtn = document.createElement('button');
+            toggleBtn.type = 'button';
+            toggleBtn.className = 'tree-item-toggle';
+            toggleBtn.setAttribute('aria-expanded','false');
+            toggleBtn.innerHTML = '<i class="fas fa-chevron-right" aria-hidden="true"></i>';
+
+            const iconSpan = document.createElement('span');
+            iconSpan.className = 'tree-item-icon';
+            iconSpan.innerHTML = '<i class="fas fa-folder" aria-hidden="true"></i>';
+
+            const textSpan = document.createElement('span');
+            textSpan.className = 'tree-item-text';
+            textSpan.textContent = category.name;
+
+            catItem.appendChild(toggleBtn);
+            catItem.appendChild(iconSpan);
+            catItem.appendChild(textSpan);
+
+            // Group container
+            const groupContainer = document.createElement('div');
+            groupContainer.className = 'tree-group-container';
+            groupContainer.dataset.categoryId = category.id;
+
             if (categoryGroups.length > 0) {
                 categoryGroups.forEach(group => {
-                    html += `
-                        <div class="tree-item tree-item-group" data-category-id="${category.id}" data-id="${group.id}">
-                            <span class="tree-item-icon"><i class="fas fa-tag"></i></span>
-                            ${group.name}
-                        </div>
-                    `;
+                    const g = document.createElement('div');
+                    g.className = 'tree-item tree-item-group';
+                    g.dataset.categoryId = category.id;
+                    g.dataset.id = group.id;
+                    const gIcon = document.createElement('span');
+                    gIcon.className = 'tree-item-icon';
+                    gIcon.innerHTML = '<i class="fas fa-tag" aria-hidden="true"></i>';
+                    const gText = document.createElement('span');
+                    gText.className = 'tree-item-text';
+                    gText.textContent = group.name;
+                    g.appendChild(gIcon);
+                    g.appendChild(gText);
+                    groupContainer.appendChild(g);
                 });
             } else {
-                html += `
-                    <div class="tree-item-empty">
-                        <span class="tree-item-icon"><i class="fas fa-info-circle"></i></span>
-                        Keine Gruppen in dieser Kategorie
-                    </div>
-                `;
+                const empty = document.createElement('div');
+                empty.className = 'tree-item-empty';
+                const emptyIcon = document.createElement('span');
+                emptyIcon.className = 'tree-item-icon';
+                emptyIcon.innerHTML = '<i class="fas fa-info-circle" aria-hidden="true"></i>';
+                const emptyText = document.createElement('span');
+                emptyText.textContent = 'Keine Gruppen in dieser Kategorie';
+                empty.appendChild(emptyIcon);
+                empty.appendChild(emptyText);
+                groupContainer.appendChild(empty);
             }
-            html += `</div>`;
+
+            categoryTree.appendChild(catItem);
+            categoryTree.appendChild(groupContainer);
         });
-        categoryTree.innerHTML = html;
-        console.log('Rendered HTML:', html, userCategories);
-        document.querySelectorAll('.tree-item-category').forEach(item => {
-            item.querySelector('.tree-item-toggle').addEventListener('click', function(e) {
+
+        // Event delegation for better performance and simpler logic
+        categoryTree.removeEventListener('click', categoryTree._delegatedClickHandler);
+        const delegatedClickHandler = function(e) {
+            const toggle = e.target.closest('.tree-item-toggle');
+            if (toggle && categoryTree.contains(toggle)) {
                 e.stopPropagation();
-                const categoryId = item.getAttribute('data-id');
-                const groupContainer = document.querySelector(`.tree-group-container[data-category-id="${categoryId}"]`);
-                if (groupContainer.style.display === 'none') {
-                    groupContainer.style.display = 'block';
-                    this.querySelector('i').classList.replace('fa-chevron-right', 'fa-chevron-down');
-                } else {
-                    groupContainer.style.display = 'none';
-                    this.querySelector('i').classList.replace('fa-chevron-down', 'fa-chevron-right');
+                const cat = toggle.closest('.tree-item-category');
+                if (!cat) return;
+                const catId = cat.dataset.id;
+                const groupContainer = categoryTree.querySelector(`.tree-group-container[data-category-id="${catId}"]`);
+                if (!groupContainer) return;
+                const expanded = groupContainer.classList.toggle('expanded');
+                toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+                const icon = toggle.querySelector('i');
+                if (icon) {
+                    icon.classList.toggle('fa-chevron-right', !expanded);
+                    icon.classList.toggle('fa-chevron-down', expanded);
                 }
-            });
-            item.addEventListener('click', function() {
+                return;
+            }
+
+            const catClick = e.target.closest('.tree-item-category');
+            if (catClick && categoryTree.contains(catClick)) {
                 document.querySelectorAll('.tree-item').forEach(el => el.classList.remove('active'));
-                this.classList.add('active');
-                const clickedCategoryId = this.getAttribute('data-id');
-                document.querySelectorAll('.tree-item-category').forEach(category => {
-                    const catId = category.getAttribute('data-id');
-                    if (catId !== clickedCategoryId) {
-                        const groupContainer = document.querySelector(`.tree-group-container[data-category-id="${catId}"]`);
-                        const toggleIcon = category.querySelector('.tree-item-toggle i');
-                        if (groupContainer.style.display !== 'none') {
-                            groupContainer.style.display = 'none';
-                            if (toggleIcon.classList.contains('fa-chevron-down')) {
-                                toggleIcon.classList.replace('fa-chevron-down', 'fa-chevron-right');
-                            }
-                        }
-                    } else {
-                        const groupContainer = document.querySelector(`.tree-group-container[data-category-id="${catId}"]`);
-                        const toggleIcon = category.querySelector('.tree-item-toggle i');
-                        if (groupContainer.style.display === 'none') {
-                            groupContainer.style.display = 'block';
-                            if (toggleIcon.classList.contains('fa-chevron-right')) {
-                                toggleIcon.classList.replace('fa-chevron-right', 'fa-chevron-down');
-                            }
-                        }
-                    }
+                catClick.classList.add('active');
+                const clickedCategoryId = catClick.dataset.id;
+                // collapse other group containers
+                categoryTree.querySelectorAll('.tree-group-container.expanded').forEach(gc => {
+                    if (gc.dataset.categoryId !== clickedCategoryId) gc.classList.remove('expanded');
                 });
-                const categoryId = this.getAttribute('data-id');
-                selectedCategoryId.value = categoryId;
-                groupCategorySelect.value = categoryId;
-                groupNameInput.focus();
-            });
-        });
-        document.querySelectorAll('.tree-item-group').forEach(item => {
-            item.addEventListener('click', function(e) {
+                // expand this one
+                const groupContainer = categoryTree.querySelector(`.tree-group-container[data-category-id="${clickedCategoryId}"]`);
+                if (groupContainer && !groupContainer.classList.contains('expanded')) {
+                    groupContainer.classList.add('expanded');
+                    const toggleBtn = catClick.querySelector('.tree-item-toggle');
+                    if (toggleBtn) toggleBtn.setAttribute('aria-expanded','true');
+                    const icon = catClick.querySelector('.tree-item-toggle i');
+                    if (icon) { icon.classList.remove('fa-chevron-right'); icon.classList.add('fa-chevron-down'); }
+                }
+                selectedCategoryId.value = clickedCategoryId;
+                groupCategorySelect.value = clickedCategoryId;
+                try { groupNameInput.focus(); } catch (e) {}
+                return;
+            }
+
+            const groupClick = e.target.closest('.tree-item-group');
+            if (groupClick && categoryTree.contains(groupClick)) {
                 e.stopPropagation();
                 document.querySelectorAll('.tree-item').forEach(el => el.classList.remove('active'));
-                this.classList.add('active');
-                const categoryId = this.getAttribute('data-category-id');
+                groupClick.classList.add('active');
+                const categoryId = groupClick.dataset.categoryId;
                 selectedCategoryId.value = categoryId;
                 groupCategorySelect.value = categoryId;
-            });
-        });
+                return;
+            }
+        };
+        categoryTree.addEventListener('click', delegatedClickHandler);
+        // keep a reference so we can remove later if needed
+        categoryTree._delegatedClickHandler = delegatedClickHandler;
     } catch (error) {
         console.error('Fehler beim Laden des Kategoriebaums:', error);
         categoryTree.innerHTML = '<p class="error-text">Fehler beim Laden der Kategorien.</p>';
     }
 }
+
+/* ----------------- Scrollable hint logic ----------------- */
+/** Returns true if the element has overflowed vertical content */
+function isVerticallyScrollable(el) {
+    if (!el) return false;
+    return el.scrollHeight > el.clientHeight + 1; // small tolerance
+}
+
+/** Apply or remove .scrollable class on the category-tree container */
+function markCategoryTreeScrollable() {
+    try {
+        const container = document.querySelector('.profile-col.profile-info .category-tree-container');
+        if (!container) return;
+        // Ensure the element is positioned relative for the pseudo hint to work
+        container.style.position = container.style.position || 'relative';
+        if (isVerticallyScrollable(container) || isVerticallyScrollable(container.querySelector('.category-tree'))) {
+            container.classList.add('scrollable');
+        } else {
+            container.classList.remove('scrollable');
+        }
+    } catch (e) {
+        console.error('Error checking category tree scrollable state', e);
+    }
+}
+
+// Debounced resize listener
+let _resizeTimer = null;
+window.addEventListener('resize', () => {
+    if (_resizeTimer) clearTimeout(_resizeTimer);
+    _resizeTimer = setTimeout(() => {
+        markCategoryTreeScrollable();
+    }, 150);
+});
+
+// Run after initial render
+document.addEventListener('DOMContentLoaded', () => {
+    // small timeout to let layout settle if scripts appended dynamically
+    setTimeout(markCategoryTreeScrollable, 100);
+});
 
 /**
  * Aktualisiert die Kategorie-Auswahlfelder
@@ -318,11 +401,12 @@ function setFormElementWidths() {
         ...document.querySelectorAll('.category-card .form-actions button')
     ];
     elements.forEach(el => {
-        el.style.width = '90%';
-        el.style.marginLeft = 'auto';
-        el.style.marginRight = 'auto';
-        el.style.display = 'block';
-        el.style.boxSizing = 'border-box';
+    // Use full width and let CSS handle spacing; avoid forcing 90% which conflicts with stylesheet
+    el.style.width = '100%';
+    el.style.marginLeft = '0';
+    el.style.marginRight = '0';
+    el.style.display = 'block';
+    el.style.boxSizing = 'border-box';
     });
 }
 

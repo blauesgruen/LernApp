@@ -40,12 +40,12 @@
                         <div class="form-content">
                             <div class="form-group">
                                 <label for="category-name">Name:</label>
-                                <input type="text" id="category-name" required placeholder="z.B. Geschichte" style="width:90%;margin-left:auto;margin-right:auto;display:block;">
+                                <input type="text" id="category-name" required placeholder="z.B. Geschichte">
                             </div>
                         </div>
 
                         <div class="form-actions">
-                            <button type="submit" class="btn-primary" style="width:90%;margin-left:auto;margin-right:auto;display:block;">Kategorie erstellen</button>
+                            <button type="submit" class="btn-primary">Kategorie erstellen</button>
                         </div>
                     </form>
                 </div>
@@ -56,18 +56,18 @@
                         <div class="form-content">
                             <div class="form-group">
                                 <label for="group-category">Kategorie:</label>
-                                <select id="group-category" required style="width:90%;margin-left:auto;margin-right:auto;display:block;">
+                                <select id="group-category" required>
                                     <option value="">-- Kategorie wählen --</option>
                                 </select>
                             </div>
                             <div class="form-group">
                                 <label for="group-name">Name:</label>
-                                <input type="text" id="group-name" required placeholder="z.B. Mittelalter" style="width:90%;margin-left:auto;margin-right:auto;display:block;">
+                                <input type="text" id="group-name" required placeholder="z.B. Mittelalter">
                             </div>
                         </div>
                         
                         <div class="form-actions">
-                            <button type="submit" class="btn-primary" style="width:90%;margin-left:auto;margin-right:auto;display:block;">Gruppe erstellen</button>
+                            <button type="submit" class="btn-primary">Gruppe erstellen</button>
                         </div>
                     </form>
                 </div>
@@ -109,7 +109,7 @@
                     }
                 }
 
-                // Nach Laden des Headers und Footers: Storage-Funktionen sind jetzt global verfügbar
+                // Nach Laden des Headers und Footers: Storage-Funktionen sind jetzt global verfcgbar
                 const scriptsToLoad = [
                     'js/quiz-db.js',
                     'js/category-management.js'
@@ -122,6 +122,8 @@
                 }
 
                 if (window.updateNavigation) { window.updateNavigation(); }
+
+                // Styling for form controls is provided statically in style.css
             } catch (error) {
                 console.error('Fehler beim Laden des Headers oder Footers:', error);
             }

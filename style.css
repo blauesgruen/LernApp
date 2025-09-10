@@ -431,10 +431,11 @@ img.icon {
     box-shadow: 0 2px 12px rgba(0,0,0,0.07);
     padding: 24px 18px 18px 18px;
     min-width: 220px;
-    max-width: 340px;
+    /* Allow cards to fill available horizontal space; children should stretch */
+    max-width: none;
     display: flex;
     flex-direction: column;
-    align-items: center;
+    align-items: stretch;
     position: relative;
     box-sizing: border-box;
     min-height: 420px;
@@ -585,13 +586,68 @@ img.icon {
 .category-card .form-group input,
 .category-card .form-group select,
 .category-card .form-actions button {
-    width: 90% !important;
-    margin-left: auto !important;
-    margin-right: auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
     box-sizing: border-box !important;
     display: block !important;
-    font-size: 1.1rem;
-    padding: 10px 14px;
+    font-size: 1.05rem;
+    padding: 10px 12px;
+}
+
+/* Touch and accessibility improvements: larger touch targets and better spacing */
+.btn-primary, .btn-secondary, .btn-danger {
+    min-height: 44px; /* meet mobile touch target guidelines */
+    padding-left: 16px;
+    padding-right: 16px;
+}
+
+/* Make sure profile columns and category cards adapt on very small screens */
+@media (max-width: 480px) {
+    .profile-col {
+        max-width: 98vw !important;
+        padding: 16px !important;
+        min-height: auto !important;
+    }
+    .profile-col .form-actions .btn-primary,
+    .profile-col .form-actions button {
+        padding: 14px 16px !important;
+        font-size: 1.08rem !important;
+    }
+    .category-card {
+        padding: 14px 8px 14px 0 !important;
+        min-height: auto !important;
+    }
+    .category-card .category-tree {
+        padding: 8px 4px !important;
+    }
+    /* Slightly larger spacing for tree items to improve tap accuracy */
+    .tree-item {
+        padding: 12px 8px !important;
+        font-size: 1.05rem !important;
+    }
+    .tree-item-toggle {
+        padding: 8px !important;
+    }
+}
+
+/* Medium screens: allow a bit more breathing room */
+@media (min-width: 481px) and (max-width: 899px) {
+    .profile-col {
+        max-width: 720px;
+        padding: 18px !important;
+    }
+}
+
+/* Improve focus outlines for keyboard users */
+.profile-col input:focus,
+.profile-col select:focus,
+.profile-col textarea:focus,
+.btn-primary:focus,
+.tree-item-toggle:focus {
+    outline: 3px solid rgba(25,118,210,0.18);
+    outline-offset: 2px;
 }
 .category-card .form-actions {
     width: 100% !important;
@@ -737,6 +793,30 @@ img.icon {
 
 .tree-group-container {
     margin-left: 25px;
+}
+
+/* Collapse/expand using class, not inline styles */
+.tree-group-container {
+    display: none;
+}
+.tree-group-container.expanded {
+    display: block;
+}
+
+.tree-item-toggle {
+    background: none;
+    border: none;
+    padding: 0 8px 0 0;
+    margin-right: 6px;
+    cursor: pointer;
+    color: inherit;
+}
+.tree-item-toggle i {
+    font-size: 0.9rem;
+}
+.tree-item-text {
+    margin-left: 6px;
+    font-weight: 600;
 }
 
 .tree-item-empty {
@@ -1178,9 +1258,11 @@ input, label {
 .category-card .form-group input,
 .category-card .form-group select,
 .category-card .form-actions button {
-    width: 90% !important;
-    margin-left: auto !important;
-    margin-right: auto !important;
+    /* Use the full width of the parent card while respecting padding */
+    width: 100% !important;
+    max-width: 100% !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
     box-sizing: border-box !important;
     display: block !important;
 }
@@ -1190,6 +1272,35 @@ input, label {
 .category-card .form-actions {
     width: 100% !important;
     box-sizing: border-box !important;
+    /* add small horizontal padding so inputs aren't flush against the colored bar */
+    padding-left: 12px;
+    padding-right: 12px;
+}
+
+/* Ensure selects and buttons inside profile-col use the same sizing and feel */
+.profile-col select,
+.profile-col textarea {
+    width: 100% !important;
+    box-sizing: border-box !important;
+    padding: 10px 12px;
+    font-size: 1rem;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+}
+
+.profile-col .form-actions .btn-primary,
+.profile-col .form-actions button {
+    width: 100% !important;
+    padding: 12px 14px !important;
+    font-size: 1.05rem !important;
+    display: block !important;
+}
+
+/* Optional helper to center controls inside smaller containers */
+.control-centered {
+    max-width: 420px;
+    margin-left: auto;
+    margin-right: auto;
 }
 
 /* Kategoriebaum und alle Eltern volle Breite, keine Margin, keine max-width */
@@ -1220,13 +1331,14 @@ input, label {
 .category-card .form-group input,
 .category-card .form-group select,
 .category-card .form-actions button {
-    width: 90% !important;
-    margin-left: auto !important;
-    margin-right: auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
     box-sizing: border-box !important;
     display: block !important;
-    font-size: 1.1rem;
-    padding: 10px 14px;
+    font-size: 1.05rem;
+    padding: 10px 12px;
 }
 
 /* Elterncontainer der Formularelemente volle Breite */
@@ -1242,11 +1354,121 @@ input, label {
 .category-card .form-group input,
 .category-card .form-group select,
 .category-card .form-actions button {
-    width: 90% !important;
-    margin-left: auto !important;
-    margin-right: auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
     box-sizing: border-box !important;
     display: block !important;
-    font-size: 1.1rem;
-    padding: 10px 14px;
+    font-size: 1.05rem;
+    padding: 10px 12px;
+}
+
+/* -------- Height management for the 3-column profile layout -------- */
+/* Desktop: keep all three profile-col cards the same height and limit the
+   left column's internal tree by making it scrollable; this prevents
+   extremely tall trees from pushing the layout.
+*/
+@media (min-width: 900px) {
+    :root {
+        --profile-panel-max-height: 600px; /* adjusted default panel height */
+    }
+
+    #profile-columns {
+        /* Ensure the row is at least the max height so child .profile-col can stretch */
+        min-height: var(--profile-panel-max-height);
+        align-items: stretch; /* already generally set, but be explicit */
+    }
+
+    .profile-col {
+        /* Prevent any single column from growing taller than the desired panel height */
+        max-height: var(--profile-panel-max-height);
+        overflow: hidden; /* hide overflow; inner scroll areas handle internal content */
+    }
+
+    /* Make the category tree scroll internally when it grows beyond the available space */
+    .profile-col.profile-info .category-tree-container,
+    .profile-col.profile-info .category-tree {
+        max-height: calc(var(--profile-panel-max-height) - 80px); /* subtract header + padding approx. */
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* Ensure the other two columns show their content within the same height.
+       Their inner forms should scroll if needed. */
+    .profile-col.profile-db .form-content,
+    .profile-col.profile-danger .form-content {
+        max-height: calc(var(--profile-panel-max-height) - 110px);
+        overflow-y: auto;
+        padding-right: 6px; /* avoid hidden scrollbar overlapping content */
+    }
+
+    /* Reduce accent stripe so it doesn't steal too much width */
+    .profile-col::before {
+        width: 6px;
+    }
+}
+
+/* Desktop: force equal column widths and reduce accent stripe width to free space */
+@media (min-width: 900px) {
+    /* total horizontal gap between 3 columns is 2 * 32px = 64px, compute flex-basis accordingly */
+    .profile-col {
+        flex: 0 1 calc((100% - 64px) / 3);
+        min-width: 240px; /* avoid getting too small on narrow desktop windows */
+    }
+
+    /* Slightly increase inner padding so controls don't touch the stripe */
+    .profile-col {
+        padding-left: 18px;
+        padding-right: 18px;
+    }
+
+    /* Ensure the three panels are horizontally aligned and centered in large viewports */
+    #profile-columns {
+        justify-content: center;
+        align-items: stretch;
+    }
+}
+/* Mobile: stacked columns. The 'Kategorie' and 'Gruppe' cards should be only
+   as tall as their content (do not force equal height), the tree may be
+   taller but still bounded to a reasonable limit to avoid infinite pages. */
+@media (max-width: 899px) {
+    /* Remove desktop panel height constraints */
+    #profile-columns {
+        min-height: 0;
+    }
+    .profile-col {
+        max-height: none;
+        min-height: auto;
+        height: auto;
+        overflow: visible;
+    }
+
+    /* Left column tree can be taller but still limited to avoid extremely long pages */
+    .profile-col.profile-info .category-tree-container,
+    .profile-col.profile-info .category-tree {
+        max-height: 720px; /* generous but bounded */
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* The create-category and create-group cards should fit their content */
+    .profile-col.profile-db .form-content,
+    .profile-col.profile-danger .form-content {
+        max-height: none;
+        overflow: visible;
+    }
+}
+
+/* Optional: small visual hint for scrollable tree (subtle shadow at bottom) */
+.profile-col.profile-info .category-tree-container.scrollable::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 18px;
+    pointer-events: none;
+    background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(0,0,0,0.02));
+    border-radius: 0 0 12px 12px;
 }
