@@ -129,12 +129,84 @@ document.getElementById('importDbFile').onchange = async function(e) {
     const user = await window.supabase.auth.getUser();
     if (!user?.data?.user?.id) return showError('Nicht eingeloggt!', 'importExportMessage');
     let errorMsg = '';
+    // Standard: { categories: [...], groups: [...], questions: [...] }
     for (const table of ['questions', 'categories', 'groups']) {
         if (Array.isArray(importData[table])) {
             for (const row of importData[table]) {
-                row.owner = user.data.user.id;
-                const { error } = await window.supabase.from(table).upsert(row);
+                // Nur erlaubte Felder übernehmen (Whitelist)
+                let filteredRow = {};
+                if (table === 'questions') {
+                    // Erlaubte Felder für Fragen
+                    const allowed = ['question', 'answer', 'additionalInfo', 'type', 'difficulty', 'tags'];
+                    allowed.forEach(f => { if (row[f] !== undefined) filteredRow[f] = row[f]; });
+                } else if (table === 'categories') {
+                    // Erlaubte Felder für Kategorien
+                    const allowed = ['name', 'description', 'color'];
+                    allowed.forEach(f => { if (row[f] !== undefined) filteredRow[f] = row[f]; });
+                } else if (table === 'groups') {
+                    // Erlaubte Felder für Gruppen
+                    const allowed = ['name', 'description', 'category_id'];
+                    allowed.forEach(f => {
+                        if (row[f] !== undefined && row[f] !== '') filteredRow[f] = row[f];
+                    });
+                }
+                // Pflichtfelder ergänzen
+                filteredRow.owner = user.data.user.id;
+                // category_id ggf. ergänzen (bei Gruppen/Fragen, falls vorhanden)
+                if (table === 'groups' && row.category_id) filteredRow.category_id = row.category_id;
+                if (table === 'questions' && row.category_id) filteredRow.category_id = row.category_id;
+                const { error } = await window.supabase.from(table).upsert(filteredRow);
                 if (error) errorMsg += table + ': ' + error.message + '\n';
+            }
+        }
+    }
+    // Erweiterung: reine Array-Importe
+    if (Array.isArray(importData)) {
+        // Kategorien-Array: Enthält name, aber KEIN question/answer/category_id
+        if (
+            importData[0]?.name &&
+            !importData[0]?.question &&
+            !importData[0]?.answer &&
+            !importData[0]?.category_id
+        ) {
+            for (const row of importData) {
+                let filteredRow = {};
+                const allowed = ['name', 'description', 'color'];
+                allowed.forEach(f => { if (row[f] !== undefined) filteredRow[f] = row[f]; });
+                filteredRow.owner = user.data.user.id;
+                const { error } = await window.supabase.from('categories').upsert(filteredRow);
+                if (error) errorMsg += 'categories: ' + error.message + '\n';
+            }
+        }
+        // Gruppen-Array: Enthält name UND category_id, aber KEIN question/answer
+        else if (
+            importData[0]?.name &&
+            importData[0]?.category_id &&
+            !importData[0]?.question &&
+            !importData[0]?.answer
+        ) {
+            for (const row of importData) {
+                let filteredRow = {};
+                const allowed = ['name', 'description', 'category_id'];
+                allowed.forEach(f => { if (row[f] !== undefined && row[f] !== '') filteredRow[f] = row[f]; });
+                filteredRow.owner = user.data.user.id;
+                const { error } = await window.supabase.from('groups').upsert(filteredRow);
+                if (error) errorMsg += 'groups: ' + error.message + '\n';
+            }
+        }
+        // Fragen-Array: Enthält question UND answer
+        else if (
+            importData[0]?.question &&
+            importData[0]?.answer
+        ) {
+            for (const row of importData) {
+                let filteredRow = {};
+                const allowed = ['question', 'answer', 'additionalInfo', 'type', 'difficulty', 'tags'];
+                allowed.forEach(f => { if (row[f] !== undefined) filteredRow[f] = row[f]; });
+                filteredRow.owner = user.data.user.id;
+                if (row.category_id) filteredRow.category_id = row.category_id;
+                const { error } = await window.supabase.from('questions').upsert(filteredRow);
+                if (error) errorMsg += 'questions: ' + error.message + '\n';
             }
         }
     }
