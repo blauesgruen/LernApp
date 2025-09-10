@@ -3,10 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Registrieren - LernApp</title>
+    <title>Registrierung</title>
     <link rel="stylesheet" href="style.css">
-    <!-- Zentrales Logging-System laden -->
-    <script src="js/logger.js"></script>
+    <!-- Supabase JS einbinden -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+      // Supabase initialisieren (Daten sind jetzt echt!)
+      const SUPABASE_URL = 'https://yzyrvwmofyztwttgmyqn.supabase.co';
+      const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl6eXJ2d21vZnl6dHd0dGdteXFuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc0NjA2ODUsImV4cCI6MjA3MzAzNjY4NX0.OaFPV0q-0mf2LO4dFd7FEd-vNzRjA1nJPnEXHM3WiXw';
+      window.supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    </script>
 </head>
 <body>
     <!-- Einbindung des zentralen Headers -->
@@ -15,23 +21,20 @@
     <main>
         <section id="register">
             <h1>Registrieren</h1>
-            <form id="register-form">
-                <input type="text" id="username" name="username" placeholder="Benutzername" required>
-                
-                <input type="password" id="password" name="password" placeholder="Passwort" required>
-                
-                <input type="password" id="confirm-password" name="confirm-password" placeholder="Passwort bestätigen" required>
-                
+            <form id="registerForm">
+                <input type="email" id="registerEmail" placeholder="E-Mail" required>
+                <input type="password" id="registerPassword" placeholder="Passwort" required>
+                <input type="password" id="registerPasswordRepeat" placeholder="Passwort wiederholen" required>
                 <button type="submit" class="btn-primary">Registrieren</button>
             </form>
-            <p>Bereits einen Account? <a href="login.html">Login</a></p>
+            <div id="registerMessage"></div>
+            <p>Bereits registriert? <a href="login.html">Zum Login</a></p>
         </section>
     </main>
 
     <!-- Einbindung des zentralen Footers -->
     <div id="footer-container"></div>
 
-    <script src="js/auth.js"></script>
     <script src="js/notification.js"></script>
     <script>
         // Header und Footer dynamisch laden
@@ -71,70 +74,21 @@
         // Header und Footer laden
         loadHeaderAndFooter();
 
-        // Hashfunktion für lokale Nutzung (könnte in auth.js zentralisiert werden)
-        async function hashPassword(password) {
-            const encoder = new TextEncoder();
-            const data = encoder.encode(password);
-            const hash = await crypto.subtle.digest('SHA-256', data);
-            return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
-        }
-        
-        // Globale hashPassword-Funktion für die zentrale handleLogin-Funktion in auth.js
-        window.hashPassword = hashPassword;
+        // Globale Funktionen für Erfolg- und Fehlermeldungen
+        window.showSuccess = msg => document.getElementById('registerMessage').textContent = msg;
+        window.showError = msg => document.getElementById('registerMessage').textContent = msg;
 
-        document.getElementById('register-form').addEventListener('submit', async function(event) {
-            event.preventDefault(); // Verhindert das automatische Neuladen der Seite
-
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
-            const confirmPassword = document.getElementById('confirm-password').value;
-
-            if (password !== confirmPassword) {
-                showError('Passwörter stimmen nicht überein!');
+        // Registrierung-Handler mit Passwort-Vergleich
+        document.getElementById('registerForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('registerEmail').value;
+            const password = document.getElementById('registerPassword').value;
+            const passwordRepeat = document.getElementById('registerPasswordRepeat').value;
+            if (password !== passwordRepeat) {
+                showError('Die Passwörter stimmen nicht überein!');
                 return;
             }
-
-            // Passwort mit SHA-256 hashen
-            const hashedPassword = await hashPassword(password);
-
-            // Benutzerdaten speichern
-            const users = JSON.parse(localStorage.getItem('users')) || [];
-            
-            // Überprüfen, ob der Benutzername bereits existiert (case-insensitive)
-            if (users.some(user => user.username.toLowerCase() === username.toLowerCase())) {
-                showError('Dieser Benutzername ist bereits vergeben!');
-                return;
-            }
-            
-            // Neuen Benutzer hinzufügen
-            const newUser = { username, password: hashedPassword };
-            users.push(newUser);
-            localStorage.setItem('users', JSON.stringify(users));
-            
-            // Auch in der Storage-API speichern, falls verfügbar
-            if (window.saveData) {
-                try {
-                    // Vorhandene Benutzer laden
-                    const storedUsers = await window.loadData('users.json', []);
-                    
-                    // Prüfen, ob der Benutzer bereits existiert
-                    if (!storedUsers.some(user => user.username.toLowerCase() === username.toLowerCase())) {
-                        storedUsers.push(newUser);
-                        await window.saveData('users.json', storedUsers);
-                    }
-                } catch (error) {
-                    console.error('Fehler beim Speichern des Benutzers in der Storage-API:', error);
-                    // Auch bei Storage-API-Fehler fortfahren, da der Benutzer bereits in localStorage ist
-                }
-            }
-
-            showSuccess('Registrierung erfolgreich!');
-            
-            // Kurze Verzögerung für die Anzeige der Erfolgsmeldung
-            setTimeout(() => {
-                // Weiterleitung zur Login-Seite
-                window.location.href = 'login.html';
-            }, 1500);
+            await register(email, password);
         });
     </script>
 </body>

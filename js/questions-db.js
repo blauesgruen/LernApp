@@ -118,9 +118,9 @@ async function addQuestion(question) {
         question.createdAt = Date.now();
         
         // Benutzernamen hinzufügen
-        const currentUsername = localStorage.getItem('username');
-        if (currentUsername) {
-            question.createdBy = currentUsername;
+        const user = window.supabase.auth.getUser();
+        if (user) {
+            question.createdBy = user.email; // oder user.id
         } else {
             question.createdBy = 'Unbekannt';
         }
@@ -193,7 +193,7 @@ async function updateQuestion(questionId, updatedQuestion) {
 
 /**
  * Löscht eine Frage.
- * @param {string} questionId - Die ID der zu löschenden Frage.
+ * @param {string} questionId - Die ID der zu löschende Frage.
  * @returns {Promise<boolean>} Ein Promise, das zu True aufgelöst wird, wenn das Löschen erfolgreich war.
  */
 async function deleteQuestion(questionId) {
@@ -277,9 +277,9 @@ async function addCategory(category) {
         category.createdAt = Date.now();
         
         // Benutzernamen hinzufügen
-        const currentUsername = localStorage.getItem('username');
-        if (currentUsername) {
-            category.createdBy = currentUsername;
+        const user = window.supabase.auth.getUser();
+        if (user) {
+            category.createdBy = user.email; // oder user.id
         } else {
             category.createdBy = 'Unbekannt';
         }

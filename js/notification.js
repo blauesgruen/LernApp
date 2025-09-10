@@ -126,7 +126,8 @@ function showNotification(message, type = 'info', duration = 5000) {
  * @param {string} message - Die Fehlermeldung.
  * @param {number} duration - Anzeigedauer in Millisekunden (optional).
  */
-function showError(message, duration = 5000) {
+function showError(message, duration = 20000) {
+    console.error('Fehlermeldung:', message);
     showNotification(message, 'error', duration);
 }
 
@@ -135,7 +136,8 @@ function showError(message, duration = 5000) {
  * @param {string} message - Die Erfolgsmeldung.
  * @param {number} duration - Anzeigedauer in Millisekunden (optional).
  */
-function showSuccess(message, duration = 5000) {
+function showSuccess(message, duration = 20000) {
+    console.log('Erfolgsmeldung:', message);
     showNotification(message, 'success', duration);
 }
 

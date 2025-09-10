@@ -5,12 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - LernApp</title>
     <link rel="stylesheet" href="style.css">
+    <!-- Supabase JS einbinden -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+      // Supabase initialisieren (Daten sind jetzt echt!)
+      const SUPABASE_URL = 'https://yzyrvwmofyztwttgmyqn.supabase.co';
+      const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl6eXJ2d21vZnl6dHd0dGdteXFuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc0NjA2ODUsImV4cCI6MjA3MzAzNjY4NX0.OaFPV0q-0mf2LO4dFd7FEd-vNzRjA1nJPnEXHM3WiXw';
+      window.supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    </script>
     <!-- Sicherstellen, dass Font Awesome korrekt eingebunden ist -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
     <!-- Zentrales Logging-System laden -->
     <script src="js/logger.js"></script>
-    <!-- Standardbenutzer bei Bedarf erstellen -->
-    <script src="js/user-init.js"></script>
 </head>
 <body>
     <!-- Einbindung des zentralen Headers -->
@@ -19,32 +25,27 @@
     <main>
         <section id="login">
             <h1>Login</h1>
-            <form>
-                <input type="text" id="username" name="username" placeholder="Benutzername" required>
-                <input type="password" id="password" name="password" placeholder="Passwort" required>
+            <form id="loginForm">
+                <input type="email" id="loginEmail" placeholder="E-Mail" required>
+                <input type="password" id="loginPassword" placeholder="Passwort" required>
                 <button type="submit" class="btn-primary">Einloggen</button>
             </form>
             <p>Noch keinen Account? <a href="register.html">Registrieren</a></p>
             <div id="message-field"></div>
+            <div id="loginMessage"></div>
         </section>
     </main>
 
     <!-- Einbindung des zentralen Footers -->
     <div id="footer-container"></div>
 
-    <script src="js/auth.js"></script>
     <script src="js/notification.js"></script>
-    <script src="js/storage-loader.js"></script>
-    <script src="js/login-page.js"></script>
-    <script src="js/storage-test.js"></script>
     <script>
         // Header und Footer dynamisch laden
-        async function loadHeaderAndFooter() {
+        async function loadHeaderAndFooterAndInitLogin() {
             try {
-                // Header und Footer laden
                 document.getElementById('header-container').innerHTML = await (await fetch('partials/header.html')).text();
                 document.getElementById('footer-container').innerHTML = await (await fetch('partials/footer.html')).text();
-                
                 // Skripte aus dem Header auswerten
                 const headerScripts = document.getElementById('header-container').querySelectorAll('script');
                 for (const script of headerScripts) {
@@ -54,7 +55,6 @@
                         const s = document.createElement('script'); s.src = script.src; document.head.appendChild(s);
                     }
                 }
-
                 // Skripte aus dem Footer auswerten
                 const footerScripts = document.getElementById('footer-container').querySelectorAll('script');
                 for (const script of footerScripts) {
@@ -64,59 +64,50 @@
                         const s = document.createElement('script'); s.src = script.src; s.async = false; document.body.appendChild(s);
                     }
                 }
-
                 if (window.updateNavigation) { window.updateNavigation(); }
                 setTimeout(() => { try { if (window.updateStorageStatusIcon) window.updateStorageStatusIcon(); } catch (e) {} }, 50);
+                // Login-Logik erst nach Header laden initialisieren
+                initLoginLogic();
             } catch (error) {
                 console.error('Fehler beim Laden des Headers oder Footers:', error);
             }
         }
-        
-        // Header und Footer laden
-        loadHeaderAndFooter();
-
-        // Hashfunktion für lokale Nutzung (könnte in auth.js zentralisiert werden)
-        async function hashPassword(password) {
-            const encoder = new TextEncoder();
-            const data = encoder.encode(password);
-            const hash = await crypto.subtle.digest('SHA-256', data);
-            return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
-        }
-        
-        // Globale hashPassword-Funktion für die zentrale handleLogin-Funktion in auth.js
-        window.hashPassword = hashPassword;
-
-        // Form-Submission-Handler
-        document.addEventListener('DOMContentLoaded', function() {
-            const loginForm = document.querySelector('#login form');
-            
-            if (loginForm) {
-                loginForm.addEventListener('submit', async function(event) {
-                    event.preventDefault(); // Verhindert Standard-Formular-Absenden
-                    
-                    const username = document.getElementById('username').value;
-                    const password = document.getElementById('password').value;
-                    
-                    // Zentrale Login-Funktion aus auth.js aufrufen
-                    if (window.handleLogin) {
-                        await window.handleLogin(username, password);
-                    } else {
-                        // Fallback, falls die zentrale Funktion nicht verfügbar ist
-                        showError('Fehler: Login-Funktion nicht verfügbar.');
+        // Login-Logik initialisieren
+        function initLoginLogic() {
+            // Hashfunktion für lokale Nutzung (könnte in auth.js zentralisiert werden)
+            async function hashPassword(password) {
+                const encoder = new TextEncoder();
+                const data = encoder.encode(password);
+                const hash = await crypto.subtle.digest('SHA-256', data);
+                return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+            }
+            window.hashPassword = hashPassword;
+            document.addEventListener('DOMContentLoaded', function() {
+                const loginForm = document.querySelector('#login form');
+                if (loginForm) {
+                    loginForm.addEventListener('submit', async function(event) {
+                        event.preventDefault();
+                        const email = document.getElementById('loginEmail').value;
+                        const password = document.getElementById('loginPassword').value;
+                        if (window.login) {
+                            await window.login(email, password);
+                        } else {
+                            showError('Fehler: Login-Funktion nicht verfügbar.');
+                        }
+                    });
+                }
+                document.getElementById('login').addEventListener('keydown', function(event) {
+                    if (event.key === 'Enter') {
+                        const loginButton = document.querySelector('#login form button[type="submit"]');
+                        if (loginButton) {
+                            loginButton.click();
+                        }
                     }
                 });
-            }
-            
-            // Zusätzlicher Enter-Key-Handler
-            document.getElementById('login').addEventListener('keydown', function(event) {
-                if (event.key === 'Enter') {
-                    const loginButton = document.querySelector('#login form button[type="submit"]');
-                    if (loginButton) {
-                        loginButton.click(); // Simuliert Klick auf Submit-Button
-                    }
-                }
             });
-        });
+        }
+        // Starte alles
+        loadHeaderAndFooterAndInitLogin();
     </script>
 </body>
 </html>

@@ -6,7 +6,6 @@
     <title>LernApp</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.1/css/all.min.css">
     <link rel="stylesheet" href="css/fixed-layout.css">
-    <script src="js/storage-global.js"></script>
     <style>
         .app-logo-button {
             cursor: pointer; /* Change cursor to pointer to indicate clickability */
@@ -133,6 +132,8 @@
         </nav>
     </div>    
     <script src="js/notification.js"></script>
+    <!-- Zentrale Einbindung der Auth-Funktionen -->
+    <script src="js/auth.js"></script>
     <script>
         // Logs persistent machen, auch nach Logout
         window.handleLogout = function() {
@@ -157,8 +158,7 @@
                     localStorage.setItem('persistentLogs', logs);
                 }
                 log('localStorage nach Logout: ' + JSON.stringify(localStorage));
-                // Weiterleitung zur Startseite
-                window.location.href = 'index.html';
+                window.location.href = 'index.html'; // Weiterleitung zur Startseite wieder aktiviert
             } catch (error) {
                 console.error('Fehler beim Logout:', error);
             }

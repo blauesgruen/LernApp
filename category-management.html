@@ -82,10 +82,7 @@
 
     <div id="footer-container"></div>
 
-    <script src="js/auth.js"></script>
     <script src="js/notification.js"></script>
-    <script src="js/storage-loader.js"></script>
-    <script src="js/cleanup-categories.js"></script>
     <script>
         // Header und Footer dynamisch laden
         async function loadHeaderAndFooter() {
@@ -127,7 +124,6 @@
                 }
 
                 if (window.updateNavigation) { window.updateNavigation(); }
-                setTimeout(() => { try { if (window.updateStorageStatusIcon) window.updateStorageStatusIcon(); } catch (e) {} }, 50);
             } catch (error) {
                 console.error('Fehler beim Laden des Headers oder Footers:', error);
             }
