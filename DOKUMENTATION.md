@@ -209,6 +209,15 @@ Die folgenden Spalten sind derzeit in der Datenbankstruktur der App im Einsatz (
 
 Hinweis: Einige JS-Module normalisieren Feldnamen beim Zugriff (z. B. `category_id` → `categoryId`). Prüfe beim Schreiben von RLS-Policies die exakten Spaltennamen in deiner Supabase-Konsole.
 
+### IDs und Generierung
+
+Wichtig: Die App verwendet jetzt serverseitig generierte IDs (UUIDs), die von der Datenbank beim Insert erzeugt werden.
+- Die vorherige clientseitige ID-Generierung (temporäre `c-...` IDs) wurde entfernt, um Konsistenz und Kollisionen zu vermeiden.
+- Auswirkungen:
+   - Die UI wartet kurz auf die DB-Antwort, bevor sie die neue Zeile mit der endgültigen ID anzeigt.
+   - Offline-Erstellung ohne Verbindung wird dadurch nicht mehr unterstützt.
+   - Dies vereinfacht Backups, Migrationen und Integrationen, weil IDs jetzt einheitlich vom DB-Server stammen.
+
 1. **Supabase-Projekt anlegen**
    - Tabellen für Kategorien, Gruppen, Fragen, Statistiken erstellen (siehe oben)
    - Storage-Bucket für Bilder anlegen

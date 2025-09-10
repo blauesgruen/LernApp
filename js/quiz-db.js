@@ -91,8 +91,18 @@ async function saveCategories(categories) {
         return false;
     }
     try {
+        // Map client objects to DB columns and ensure required fields
+        const payload = categories.map(c => ({
+            id: c.id,
+            name: c.name,
+            description: c.description ?? c.desc ?? null,
+            maincategory: c.mainCategory ?? c.maincategory ?? c.main_category ?? null,
+            owner: c.owner ?? c.createdBy ?? c.created_by ?? null,
+            collaborators: c.collaborators ?? null,
+            created_at: c.createdAt ?? c.created_at ?? null
+        }));
         // Mehrere Kategorien als Batch speichern
-        const { error } = await window.supabase.from('categories').upsert(categories);
+        const { error } = await window.supabase.from('categories').upsert(payload);
         if (error) {
             console.error("Fehler beim Speichern der Kategorien:", error);
             return false;
@@ -122,17 +132,8 @@ async function createCategory(name, createdBy, mainCategory = MAIN_CATEGORY.TEXT
     }
 
     try {
-        // generate an id client-side if the DB has no default for id
-        let newId = null;
-        try {
-            if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-                newId = crypto.randomUUID();
-            }
-        } catch (e) { /* ignore */ }
-        if (!newId) newId = 'c-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,8);
-
+        // Insert and let the DB generate the id (DB should have a default/UUID)
         const { data, error } = await window.supabase.from('categories').insert({
-            id: newId,
             name,
             // DB column is `maincategory`
             maincategory: mainCategory,
@@ -208,7 +209,15 @@ async function saveGroups(groups) {
         return false;
     }
     try {
-        const { error } = await window.supabase.from('groups').upsert(groups);
+        // Map client objects to DB columns and ensure created_by/created_at exist
+        const payload = groups.map(g => ({
+            id: g.id,
+            name: g.name,
+            category_id: g.categoryId ?? g.category_id ?? null,
+            created_by: g.createdBy ?? g.created_by ?? null,
+            created_at: g.createdAt ?? g.created_at ?? new Date().toISOString()
+        }));
+        const { error } = await window.supabase.from('groups').upsert(payload);
         if (error) {
             console.error("Fehler beim Speichern der Gruppen:", error);
             return false;
@@ -250,7 +259,16 @@ async function createGroup(name, categoryId, createdBy) {
             return null;
         }
         
-        return data[0];
+        const g = data && data[0] ? data[0] : null;
+        if (!g) return null;
+        return {
+            id: g.id,
+            name: g.name,
+            categoryId: g.category_id ?? g.categoryId ?? null,
+            createdBy: g.created_by ?? g.createdBy ?? null,
+            createdAt: g.created_at ?? g.createdAt ?? null,
+            ...g
+        };
     } catch (error) {
         console.error("Fehler beim Erstellen der Gruppe:", error);
         return null;
@@ -314,9 +332,13 @@ async function deleteGroup(groupId) {
         return false;
     }
     try {
-        const { error } = await window.supabase.from('groups').delete().eq('id', groupId);
-        if (error) {
-            console.error('Fehler beim Löschen der Gruppe:', error);
+        const { data: delData, error: delErr } = await window.supabase.from('groups').delete().eq('id', groupId).select();
+        if (delErr) {
+            console.error('Fehler beim Löschen der Gruppe:', delErr);
+            return false;
+        }
+        if (!delData || delData.length === 0) {
+            console.warn('Löschen nicht durchgeführt: keine Zeile betroffen (mögliche RLS-Verweigerung oder falsche ID).');
             return false;
         }
         return true;
@@ -429,7 +451,20 @@ async function saveQuestions(questions) {
         return false;
     }
     try {
-        const { error } = await window.supabase.from('questions').upsert(questions);
+        // Map client objects to DB columns expected by the questions table
+        const payload = questions.map(q => ({
+            id: q.id,
+            text: q.text,
+            imageurl: q.imageUrl ?? q.imageurl ?? null,
+            options: q.options ?? null,
+            explanation: q.explanation ?? null,
+            categoryid: q.categoryId ?? q.categoryid ?? null,
+            groupid: q.groupId ?? q.groupid ?? null,
+            difficulty: q.difficulty ?? null,
+            created_by: q.createdBy ?? q.created_by ?? null,
+            created_at: q.createdAt ?? q.created_at ?? new Date().toISOString()
+        }));
+        const { error } = await window.supabase.from('questions').upsert(payload);
         if (error) {
             console.error("Fehler beim Speichern der Fragen:", error);
             return false;
@@ -473,8 +508,6 @@ async function createQuestion(questionData) {
             return null;
         }
         
-        // Effizientere ID-Generierung
-        const uniqueId = Date.now().toString(36) + Math.random().toString(36).substring(2, 5);
         
         // Prüfe und optimiere das Bild
         let imageUrl = "";
@@ -491,29 +524,40 @@ async function createQuestion(questionData) {
             }
         }
         
-        // Neue Frage erstellen
-        const newQuestion = {
-            id: `question-${uniqueId}`,
+        // Build DB payload and let the DB assign an id
+        const payload = {
             text: questionData.text,
-            imageUrl: imageUrl,
-            options: questionData.options.map(option => ({
-                id: `option-${uniqueId}-${Math.random().toString(36).substr(2, 3)}`,
-                text: option.text,
-                isCorrect: option.isCorrect
-            })),
-            explanation: questionData.explanation || "",
-            categoryId: questionData.categoryId,
-            groupId: questionData.groupId,
+            imageurl: imageUrl || null,
+            options: questionData.options ?? null,
+            explanation: questionData.explanation || null,
+            categoryid: questionData.categoryId,
+            groupid: questionData.groupId,
             difficulty: questionData.difficulty || 1,
-            createdBy: questionData.createdBy,
-            createdAt: Date.now()
+            created_by: questionData.createdBy || null,
+            created_at: new Date().toISOString()
         };
-        
-        // Zur Liste hinzufügen und speichern
-        questions.push(newQuestion);
-        const success = await saveQuestions(questions);
-        
-        return success ? newQuestion : null;
+
+        const { data: insertData, error: insertErr } = await window.supabase.from('questions').insert(payload).select();
+        if (insertErr) {
+            console.error('Fehler beim Erstellen der Frage (DB):', insertErr);
+            return null;
+        }
+        const q = insertData && insertData[0] ? insertData[0] : null;
+        if (!q) return null;
+        // normalize returned object to client shape
+        return {
+            id: q.id,
+            text: q.text,
+            imageUrl: q.imageurl ?? q.imageUrl ?? null,
+            options: q.options ?? null,
+            explanation: q.explanation ?? null,
+            categoryId: q.categoryid ?? q.categoryId ?? null,
+            groupId: q.groupid ?? q.groupId ?? null,
+            difficulty: q.difficulty ?? null,
+            createdBy: q.created_by ?? q.createdBy ?? null,
+            createdAt: q.created_at ?? q.createdAt ?? null,
+            ...q
+        };
     } catch (error) {
         console.error("Fehler beim Erstellen der Frage:", error);
         return null;
