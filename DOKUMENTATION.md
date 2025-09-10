@@ -67,7 +67,7 @@ Die LernApp ist eine interaktive Plattform, die Benutzern ermöglicht, Wissen du
 
 ---
 
-## Projektstruktur
+## Projektstruktur (Supabase-basiert)
 
 ```
 /LernApp
@@ -76,402 +76,193 @@ Die LernApp ist eine interaktive Plattform, die Benutzern ermöglicht, Wissen du
 ├── script.js           # Globale Skripte
 │
 ├── /js                 # JavaScript-Module
-│   ├── auth.js         # Login/Logout und Authentifizierung
+│   ├── auth.js         # Login/Logout und Authentifizierung (Supabase)
 │   ├── dashboard.js    # Benutzer-Dashboard
-│   ├── quiz/           # Quiz-Module
-│   │   ├── categories.js       # Logik für Kategorien
-│   │   ├── subcategories.js    # Logik für Unterkategorien
-│   │   ├── subgroups.js        # Logik für Untergruppen
-│   │   ├── questions.js        # Logik für Fragen und Antworten
-│   │   ├── quizEngine.js       # Quiz-Logik
-│   │   ├── navigation.js       # Navigation zwischen Ebenen
-│   │   ├── utils.js            # Hilfsfunktionen
+│   ├── quiz-db.js      # Quiz- und Fragenlogik (Supabase)
+│   ├── category-management.js # Kategorien- und Gruppenlogik (Supabase)
+│   ├── notification.js # Zentrales Benachrichtigungssystem
+│   ├── logger.js       # Zentrales Logging
+│   └── ...             # Weitere Module
 │
 ├── /css                # Bereichsspezifische Stile
 │   ├── dashboard.css   # Stile für das Dashboard
 │   ├── quiz.css        # Stile für den Quizbereich
+│   └── ...
 │
-├── /data               # Daten und Konfiguration
-│   ├── quizData.json   # JSON-Datei für die vom Benutzer erstellten Fragen und Antworten
-│   ├── users.json      # Benutzer-Datenbank
+├── /partials           # Zentrale HTML-Komponenten (Header, Footer)
+│   ├── header.html     # Dynamisch geladener Header
+│   ├── footer.html     # Dynamisch geladener Footer
+│   └── ...
 │
-└── README.md           # Dokumentation
+├── /data               # (Optional: Beispiel-JSONs für Migration, nicht produktiv)
+│   └── ...
+│
+└── DOKUMENTATION.md    # Technische Dokumentation
 ```
 
 ---
 
-## Erweiterte Anforderungen
+## Supabase als zentrale Datenbank
 
-### Speichertort
-- Der Benutzer soll ein Verzeichnis auswählen können, in dem alle Daten gespeichert werden.
-- Dieses Verzeichnis kann lokal oder ein Cloud-Verzeichnis (z. B. Dropbox) sein.
-- Die App soll die Daten in JSON-Dateien speichern, um sie plattformübergreifend nutzbar zu machen.
-- Änderungen an den Daten werden direkt in die JSON-Dateien geschrieben, um Synchronisation zu ermöglichen.
+Alle App-Daten werden in Supabase-Tabellen gespeichert. Es gibt keine lokalen JSON-Dateien mehr.
 
-### Modularität
-- Dateien sollen klein und modular gehalten werden.
-- Jede Funktionalität wird in separaten Modulen organisiert.
-- Gemeinsame Funktionen (z. B. Verzeichniswahl, Datenoperationen) werden zentral abgelegt.
+### Tabellenstruktur (Empfehlung)
 
-### Navigation im Quiz-Bereich
-- Der Quiz-Bereich wird in mehrere Ebenen unterteilt:
-  - Kategorie → Unterkategorie → Untergruppe → Fragen.
-- Die Navigation zwischen den Ebenen wird dynamisch und modular implementiert.
-- Die Datenstruktur für den Quiz-Bereich wird in einer JSON-Datei organisiert.
+**Kategorien**
+| Feld           | Typ      | Beschreibung                       |
+|----------------|----------|------------------------------------|
+| id             | UUID     | Primärschlüssel                    |
+| name           | TEXT     | Name der Kategorie                 |
+| owner          | UUID     | User-ID des Besitzers              |
+| collaborators  | JSONB    | Array von User-IDs (Mitbearbeiter) |
+| created_at     | TIMESTAMP| Erstellungsdatum                   |
 
----
+**Gruppen**
+| id             | UUID     | Primärschlüssel                    |
+| name           | TEXT     | Name der Gruppe                    |
+| category_id    | UUID     | Verweis auf Kategorie              |
+| created_by     | UUID     | User-ID des Erstellers             |
+| created_at     | TIMESTAMP| Erstellungsdatum                   |
 
-## Nächste Schritte
-1. **Login/Logout-System**: Implementierung der Authentifizierung.
-2. **Quiz-Bereich**: Erstellung der Navigation und Datenstruktur.
-3. **Statistik-Bereich**: Anzeige von Fortschritten.
-4. **Admin-Bereich**: Verwaltung von Benutzern und Inhalten.
+**Fragen**
+| id             | UUID     | Primärschlüssel                    |
+| text           | TEXT     | Fragetext                          |
+| image_url      | TEXT     | Bild-URL (Supabase Storage)        |
+| options        | JSONB    | Antwortoptionen (Array)            |
+| explanation    | TEXT     | Erklärung zur Antwort              |
+| category_id    | UUID     | Verweis auf Kategorie              |
+| group_id       | UUID     | Verweis auf Gruppe                 |
+| difficulty     | INT      | Schwierigkeitsgrad                 |
+| created_by     | UUID     | User-ID des Erstellers             |
+| created_at     | TIMESTAMP| Erstellungsdatum                   |
 
----
-
-## Hinweise
-- **Modularität**: Jede Funktionalität wird in separaten Dateien organisiert.
-- **Wiederverwendbarkeit**: Gemeinsame Funktionen werden zentral abgelegt.
-- **Sicherheit**: Fokus auf sichere Datenverarbeitung und -speicherung.
-
----
-
-## Responsives Design
-- Die App wurde für mobile Geräte optimiert.
-- Media Queries wurden hinzugefügt, um sicherzustellen, dass die Navigation, der Header und der Admin-Button auf kleineren Bildschirmen korrekt angezeigt werden.
-- Der Header bleibt linksbündig, während der Admin-Button rechts positioniert bleibt.
-
-### Zentrale Header- und Footer-Komponenten
-- Der Header und Footer wurden zentralisiert und werden dynamisch in die Seiten geladen.
-- Die Ladestrategie wurde verbessert, um sicherzustellen, dass JavaScript im Header korrekt ausgeführt wird:
-  ```javascript
-  async function loadHeaderAndFooter() {
-      try {
-          // Header und Footer laden
-          document.getElementById('header-container').innerHTML = await (await fetch('partials/header.html')).text();
-          document.getElementById('footer-container').innerHTML = await (await fetch('partials/footer.html')).text();
-          
-          // Skripte aus dem Header auswerten
-          const headerScripts = document.getElementById('header-container').querySelectorAll('script');
-          for (const script of headerScripts) {
-              if (script.innerText) {
-                  eval(script.innerText);
-              }
-          }
-          
-          // Explizit die Navigation aktualisieren
-          if (window.updateNavigation) {
-              window.updateNavigation();
-          }
-      } catch (error) {
-          console.error('Fehler beim Laden des Headers oder Footers:', error);
-      }
-  }
-  ```
-- Änderungen an diesen Komponenten wirken sich automatisch auf alle Seiten aus.
-
-### Profilseite
-- Die Profilseite wurde mit einem kompakteren, zweispaltigen Layout neu gestaltet.
-- Die linke Spalte enthält Funktionen zur Bearbeitung des Benutzerprofils und zum Ändern des Passworts.
-- Die rechte Spalte enthält die "Gefahrenzone" mit Optionen zum Löschen von Daten und des Kontos.
-- Das Design ist responsiv und wechselt auf kleineren Bildschirmen zu einem einspaltigen Layout.
-- Eingabefelder wurden optimiert, um die korrekte Box-Sizing-Strategie zu verwenden (`box-sizing: border-box`).
-
-### Sicherheitsabfragen
-- Für kritische Aktionen wie das Löschen von Daten oder des Kontos wurden modale Dialoge mit Sicherheitsabfragen implementiert.
-- Die modalen Dialoge sind zentriert und responsiv gestaltet.
-- Klare Warnmeldungen informieren den Benutzer über die Konsequenzen der Aktionen.
-
-### Technische Herausforderungen
-- Probleme mit Flexbox und der dynamischen Einbindung von Header und Footer wurden gelöst.
-- Das korrekte Ausführen von JavaScript in dynamisch geladenen Header-Elementen wurde implementiert.
-- Die Konsistenz des App-Logo-Buttons über alle Seiten hinweg wurde sichergestellt.
-- Zusätzliche CSS-Regeln wurden hinzugefügt, um Layout-Überlappungen zu vermeiden.
-- Ein robustes Fehlerbehandlungssystem mit try-catch-Blöcken und detailliertem Logging wurde implementiert.
-
-### App-Logo-Button
-- Der App-Logo-Button wurde so konfiguriert, dass er dynamisch auf den Login-Status des Benutzers reagiert.
-  - Wenn der Benutzer eingeloggt ist, führt der Button zur `dashboard.html`.
-  - Wenn der Benutzer nicht eingeloggt ist, führt der Button zur `index.html`.
-- Die Konfiguration erfolgt durch die globale `window.updateNavigation`-Funktion im Header.
-- Diese Funktion wird automatisch nach dem Laden des Headers auf allen Seiten ausgeführt.
-- Für dynamisch geladene Header wurde ein spezieller Mechanismus implementiert, der sicherstellt, dass die Verlinkung konsistent funktioniert.
-- Styling:
-  - Das Icon des Buttons ist immer blau.
-  - Der Text des Buttons ist immer schwarz.
-- Diese Änderungen wurden implementiert, um eine konsistente Benutzererfahrung auf allen Seiten zu gewährleisten.
-
-### Sichtbarkeit der Menü-Punkte
-- Die Sichtbarkeit der Menü-Punkte wird dynamisch basierend auf dem Login-Status des Benutzers gesteuert.
-  - **Admin-Button**: Wird nur angezeigt, wenn der Benutzer nicht eingeloggt ist.
-  - **User-Buttons**: Werden nur angezeigt, wenn der Benutzer eingeloggt ist.
-- Diese Logik wird durch JavaScript implementiert und überprüft den `loggedIn`-Status im `localStorage`.
-
-### Login und Login-Status
-- Der Login-Status des Benutzers wird im `localStorage` unter dem Schlüssel `loggedIn` gespeichert.
-  - **Wert `true`**: Benutzer ist eingeloggt.
-  - **Wert `false`**: Benutzer ist nicht eingeloggt.
-- Beim Logout werden alle Daten im `localStorage` gelöscht, mit Ausnahme der persistenten Logs (`persistentLogs`).
-- Nach dem Logout wird der Benutzer automatisch zur Startseite (`index.html`) weitergeleitet.
+**Statistiken**
+| id             | UUID     | Primärschlüssel                    |
+| user_id        | UUID     | User-ID                            |
+| question_stats | JSONB    | Statistiken pro Frage              |
+| quiz_stats     | JSONB    | Statistiken pro Quiz               |
+| updated_at     | TIMESTAMP| Letzte Aktualisierung              |
 
 ---
 
-## Datenbank und Speicherort
+## Kollaboratives Arbeiten: Rollen und Rechte
 
-Die LernApp bietet eine flexible Speicherkonfiguration für die Fragendatenbank und Benutzerstatistiken:
+- Jede Kategorie hat einen **Owner** (Ersteller/Admin) und eine Liste von **Mitbearbeitern** ("Collaborators", max. ca. 20 User pro Kategorie empfohlen).
+- Der Owner ist automatisch Admin der Kategorie und kann weitere Nutzer als Mitbearbeiter einladen oder entfernen.
+- Die Einladung erfolgt über die UI (z.B. per E-Mail-Adresse oder Username). Die App prüft, ob der eingeladene Nutzer existiert und fügt ihn zur Collaborators-Liste hinzu.
+- Nur der Owner kann die Collaborators-Liste bearbeiten (hinzufügen/entfernen).
+- Mitbearbeiter können die Kategorie, Gruppen und Fragen bearbeiten, aber keine weiteren Nutzer einladen oder entfernen.
+- Die Rechte werden in der App und im Backend geprüft (Supabase Row-Level Security).
+- Änderungen sind für alle Collaborators und den Owner in Echtzeit sichtbar.
 
-#### Speicherort-Konfiguration
-- Benutzer können einen benutzerdefinierten Pfad für die Speicherung der Fragenbank festlegen.
-- Die App unterstützt die Auswahl eines Ordners über den nativen Dateibrowser des Betriebssystems.
-- Ein gemeinsamer Pfad auf verschiedenen Geräten (z.B. in Dropbox) ermöglicht es, die gleichen Fragen auf all Ihren Geräten zu verwenden.
-- Nur beim ersten Login eines Benutzers wird der Dialog zur Auswahl des Speicherorts angezeigt.
-- Bei späteren Logins wird automatisch der gespeicherte Speicherort verwendet.
-- Wurde kein benutzerdefinierter Speicherort festgelegt, wird ohne weitere Nachfrage der Standardspeicherort verwendet.
-- Der Speicherort kann jederzeit über das Benutzerprofil geändert werden.
-- Jeder Benutzer hat seinen eigenen Speicherort, der nach dem Login automatisch geladen wird.
+**Empfohlene Felder in der Tabelle `categories`:**
+| Feld           | Typ      | Beschreibung                       |
+|----------------|----------|------------------------------------|
+| owner          | UUID     | User-ID des Admins                 |
+| collaborators  | JSONB    | Array von User-IDs (max. 20)       |
 
-#### Funktionen für den Speicherort
-- **isFileSystemAccessSupported()**: Überprüft, ob der Browser die File System Access API unterstützt.
-- **openDirectoryPicker()**: Öffnet den nativen Dateibrowser-Dialog zur Auswahl eines Ordners.
-- **getDirectoryHandle(username)**: Versucht, auf den konfigurierten Ordner zuzugreifen, ohne einen Dialog anzuzeigen.
-- **isStoragePathConfigured(username)**: Überprüft, ob ein Speicherort für den angegebenen Benutzer konfiguriert wurde.
-- **getStoragePath(username)**: Gibt den konfigurierten Speicherort für den angegebenen Benutzer zurück.
-- **setStoragePath(path, username)**: Setzt einen neuen Speicherort für den angegebenen Benutzer.
-- **resetStoragePath(username)**: Setzt den Speicherort für den angegebenen Benutzer auf den Standardpfad zurück.
-- **verifyStoragePath()**: Prüft, ob der konfigurierte Speicherort existiert und zugänglich ist.
+**Workflow:**
+1. Owner erstellt Kategorie und ist automatisch Admin.
+2. Owner lädt bis zu 20 Mitbearbeiter ein (UI: "Kollegen einladen").
+3. Eingeladene Nutzer erhalten Zugriff und können Inhalte bearbeiten.
+4. Nur Owner kann die Collaborators-Liste verwalten.
+5. Mitbearbeiter können Inhalte bearbeiten, aber keine weiteren Nutzer einladen.
+6. Änderungen werden in Echtzeit synchronisiert.
 
-#### Persistenter Dateisystem-Zugriff
-Die LernApp verwendet eine erweiterte Technik, um DirectoryHandles über Seitenaufrufe hinweg zu persistieren:
-
-- **IndexedDB-Speicherung**: Verzeichnis-Handles werden in der IndexedDB gespeichert, um sie zwischen Seitenaufrufen und sogar nach Browser-Neustarts beizubehalten.
-- **Automatische Wiederherstellung**: Beim Laden der Seite werden gespeicherte Handles automatisch geladen und validiert.
-- **Berechtigungsmanagement**: Die App kümmert sich automatisch um die Anforderung und Erneuerung von Berechtigungen.
-- **Benutzerfreundliche Benachrichtigungen**: Statt automatischer Dialoge zeigt die App benutzerfreundliche Benachrichtigungen, wenn eine Benutzerinteraktion erforderlich ist.
-- **Erweiterte Wiederherstellungsversuche**: Die App implementiert mehrere Fallback-Mechanismen, um DirectoryHandles bei Seitenwechseln zu erhalten.
-
-#### Problembehandlung für DirectoryHandle-Persistenz
-
-#### Problembehandlung für DirectoryHandle-Persistenz
-
-Die LernApp verwaltet den Speicherort-Zugriff vollautomatisch. Sollte trotzdem einmal eine Meldung wie "Dateisystem-API wird unterstützt, aber kein DirectoryHandle vorhanden" erscheinen, bietet die App folgende benutzerfreundliche Lösungen:
-
-1. **Verbesserte automatische Wiederherstellung**: Die App implementiert jetzt ein mehrstufiges Wiederherstellungssystem, das automatisch verschiedene Methoden versucht, um den Dateizugriff ohne Benutzerinteraktion wiederherzustellen.
-
-2. **Intelligente Fallback-Mechanismen**: Wenn eine Wiederherstellungsmethode fehlschlägt, versucht die App automatisch alternative Ansätze zur Wiedererlangung des Zugriffs.
-
-3. **Benutzerfreundliche Benachrichtigung**: Nur wenn alle automatischen Wiederherstellungsversuche fehlschlagen, erscheint eine Benachrichtigung mit einem klaren "Speicherort neu auswählen"-Button.
-
-4. **Speicherort im Profil**: Im Benutzerprofil kann der Speicherort jederzeit über einen einfachen Dialog neu festgelegt werden.
-
-5. **Alternativer Standardspeicher**: Die Option "Standardspeicherort verwenden" im Profil stellt sicher, dass die Daten immer lokal im Browser gespeichert werden, ohne dass ein Dateisystemzugriff nötig ist.
-
-Diese Tools sind speziell dafür entwickelt, die persistente Speicherung von DirectoryHandles zu unterstützen und Probleme bei der Beibehaltung von Dateisystem-Berechtigungen zwischen Seitenaufrufen zu beheben.
-- **storeDirectoryHandle(handle)**: Speichert ein Verzeichnis-Handle in IndexedDB für spätere Verwendung.
-- **loadDirectoryHandle()**: Lädt ein gespeichertes Verzeichnis-Handle aus IndexedDB.
-- **verifyPermission(handle)**: Prüft und fordert Berechtigungen für ein Verzeichnis-Handle an.
-- **restoreDirectoryHandle()**: Stellt ein gespeichertes Verzeichnis-Handle wieder her und validiert die Berechtigungen.
-- **openAndPersistDirectoryPicker()**: Öffnet den Dateibrowser und speichert das ausgewählte Handle automatisch.
-- **forceRestoreDirectoryHandle()**: Erweiterte Wiederherstellungsmethode für DirectoryHandles mit zusätzlichen Fallback-Mechanismen.
-- **autoRepairDirectoryHandle()**: Neue Funktion, die mehrere Wiederherstellungsmethoden automatisch nacheinander versucht.
-
-#### Debugging des Dateisystem-Zugriffs
-Die LernApp bietet spezielle Debugging-Tools für den Dateisystem-Zugriff:
-
-- **debugPersistentStorage()**: Führt eine vollständige Diagnose des Dateisystem-Zugriffs durch und zeigt den Status der DirectoryHandle-Persistenz.
-- **clearStoredDirectoryHandle()**: Löscht ein gespeichertes DirectoryHandle für einen Neustart der Speicherkonfiguration.
-- **testFileAccess()**: Testet den Dateisystem-Zugriff durch Schreiben einer Testdatei und zeigt das Ergebnis im Log.
-- **debugDirectoryHandleStatus()**: Zeigt den aktuellen Status des DirectoryHandle-Objekts und der zugehörigen Flags.
-
-Diese Tools können über die Browser-Konsole aufgerufen werden und sind besonders nützlich bei der Diagnose von Problemen mit der Dateisystem-Persistenz zwischen Seitenaufrufen. Die Tools verwenden das zentrale Logging-System, um konsistente und leicht verfolgbare Ausgaben zu erzeugen.
-
-### Zentrales Logging-System
-
-Die LernApp implementiert ein zentrales Logging-System, das in allen Modulen verwendet wird, um konsistente und leicht nachverfolgbare Log-Ausgaben zu ermöglichen:
-
-#### Funktionen des Logging-Systems
-- **Zentralisierte Logs**: Alle Logs werden über einen zentralen Logger ausgegeben, um eine einheitliche Formatierung zu gewährleisten.
-- **Log-Level**: Unterstützung verschiedener Log-Level (info, warn, error) mit entsprechender visueller Differenzierung.
-- **Zeitstempel**: Automatische Hinzufügung von Zeitstempeln zu allen Log-Einträgen.
-- **Persistente Logs**: Optionale Speicherung wichtiger Logs für spätere Diagnose.
-- **Rekursionsschutz**: Verhinderung von rekursiven Logging-Ketten, die zu Endlosschleifen führen könnten.
-
-#### Verwendung in Modulen
-Jedes Modul verwendet das zentrale Logging-System mit einem einheitlichen Adapter-Pattern:
-
-```javascript
-// Adapter für zentrales Logging
-const log = window.logger ? window.logger.info.bind(window.logger) : console.log;
-const warn = window.logger ? window.logger.warn.bind(window.logger) : console.warn;
-const error = window.logger ? window.logger.error.bind(window.logger) : console.error;
-```
-
-Dies erlaubt eine konsistente Logging-Ausgabe über alle Module hinweg, auch wenn der zentrale Logger nicht verfügbar ist (Fallback auf console-Methoden).
-
-### Breadcrumb-Navigation
-
-Die LernApp verfügt über eine intuitive Breadcrumb-Navigation, die es den Benutzern ermöglicht, ihren aktuellen Standort in der Anwendung zu erkennen und einfach zu vorherigen Ebenen zurückzukehren:
-
-#### Funktionen und Eigenschaften
-- Hierarchische Navigation: Zeigt den vollständigen Pfad von der Startseite bis zur aktuellen Ansicht an.
-- Responsive Design: Passt sich automatisch an verschiedene Bildschirmgrößen an.
-- Klickbare Pfadeinträge: Ermöglicht die direkte Navigation zu übergeordneten Ebenen.
-- Persistente Zustandsspeicherung: Behält den Navigationspfad auch bei Seitenneuladen bei.
-
-#### Implementierung
-- Die Breadcrumb-Navigation ist in der Datei `header.html` definiert und über das globale Objekt `window.breadcrumbs` zugänglich.
-- Die Navigation wird auf verschiedenen Seiten dynamisch aktualisiert:
-  - **Quiz-Spieler**: Zeigt den Pfad "Quiz → Kategorie → Gruppe → Frage X/Y → Ergebnis" an.
-  - **Kategorie-Verwaltung**: Zeigt den Pfad "Verwaltung → Kategorien & Gruppen" an.
-  - **Fragen-Erstellung**: Zeigt den Pfad "Verwaltung → Fragen erstellen" an.
-  - **Dashboard**: Zeigt keine Breadcrumbs an, da es die Startseite ist.
-
-#### API-Methoden
-- **breadcrumbs.set(path)**: Setzt einen neuen Navigationspad.
-- **breadcrumbs.add(label, url)**: Fügt einen neuen Eintrag zum bestehenden Pfad hinzu.
-- **breadcrumbs.navigateTo(index)**: Navigiert zu einem bestimmten Eintrag im Pfad.
-- **breadcrumbs.clear()**: Entfernt alle Breadcrumbs.
-- **breadcrumbs.updateVisibility()**: Aktualisiert die Sichtbarkeit der Breadcrumb-Navigation.
-
-### Automatisches Quiz-System
-
-Die LernApp generiert automatisch Quizze aus den eingepflegten Fragen:
-
-- **Dynamische Fragenerstellung**: Benutzer müssen nur die richtige Antwort eingeben, falsche Antworten werden automatisch aus anderen Fragen übernommen
-- **Zufällige Auswahl**: Das System wählt Fragen zufällig aus der Datenbank basierend auf Kategorie und Gruppe
-- **Keine Wiederholungen**: Innerhalb eines Quiz werden Fragen nicht wiederholt
-- **Gemischte Antworten**: Die Reihenfolge der Antwortoptionen wird für jede Frage neu gemischt
-- **Automatische Quiz-Typzuordnung**: Fragen werden automatisch dem passenden Quiz-Typ zugeordnet
-
-#### Fragen erstellen
-
-1. Wähle eine Kategorie und Gruppe
-2. Gib den Fragetext ein
-3. Optional kannst du ein Bild hinzufügen
-4. Gib die richtige Antwort ein
-5. Füge eine optionale Erklärung hinzu
-
-Das System ergänzt automatisch die falschen Antwortoptionen aus dem Pool aller anderen richtigen Antworten und ordnet die Fragen automatisch dem entsprechenden Quiz-Typ zu.
-
-#### Erstellen von Fragen
-Die App ermöglicht die Erstellung von Fragen mit:
-- Fragetexten
-- Optionalen Bildern
-- Vier Antwortoptionen (eine davon als richtig markiert)
-- Optionalen Erklärungstexten, die nach der Beantwortung angezeigt werden
-- Schwierigkeitsgraden zur späteren Filterung
-
-#### Quiz-Anpassungen
-- Anzahl der Fragen kann vom Benutzer bestimmt werden
-- Zwei verschiedene Quiz-Typen sind verfügbar:
-  - **Textfragen**: Zeigt den Fragentext an, Bilder werden ausgeblendet
-  - **Bilderquiz**: Zeigt nur Bilder an, ohne begleitenden Fragetext
-- Fragen werden automatisch dem passenden Quiz-Typ zugeordnet
-- Fragen und Antworten werden für jeden Quiz-Durchlauf neu gemischt
-
-#### Fragendatenbank
-- Die Fragenbank unterstützt Multiple-Choice-Fragen mit mehreren Antwortoptionen.
-- Jede Frage kann mit einem Bild oder einer Erklärung versehen werden.
-- Fragen sind in Kategorien organisiert, die vom Benutzer erstellt und verwaltet werden können.
-- Standardkategorien werden beim ersten Start automatisch erstellt.
-
-#### Datenstruktur
-
-1. **Fragen**:
-   ```javascript
-   {
-     id: string,            // Eindeutige ID der Frage
-     text: string,          // Fragetext
-     imageUrl: string,      // Optional: URL zu einem Bild (kann auch Data-URL sein)
-     options: [             // Array mit Antwortoptionen
-       {
-         id: string,        // Eindeutige ID der Antwortoption
-         text: string,      // Text der Antwortoption
-         isCorrect: boolean // Ob die Antwort richtig ist
-       }
-     ],
-     explanation: string,   // Optional: Erklärung der richtigen Antwort
-     categoryId: string,    // Kategorie-ID
-     difficulty: number,    // Schwierigkeitsgrad (1-5)
-     createdBy: string,     // Benutzername des Erstellers
-     createdAt: number      // Zeitstempel der Erstellung
-   }
-   ```
-
-2. **Kategorien**:
-   ```javascript
-   {
-     id: string,            // Eindeutige ID der Kategorie
-     name: string,          // Name der Kategorie
-     createdBy: string,     // Benutzername des Erstellers
-     createdAt: number      // Zeitstempel der Erstellung
-   }
-   ```
-
-3. **Statistiken**:
-   ```javascript
-   {
-     userId: string,        // Benutzername
-     questionStats: {       // Statistiken pro Frage
-       [questionId]: {
-         correct: number,   // Anzahl der richtigen Antworten
-         incorrect: number, // Anzahl der falschen Antworten
-         lastAnswered: number // Zeitstempel der letzten Beantwortung
-       }
-     },
-     quizStats: [           // Statistiken pro Quiz-Durchlauf
-       {
-         date: number,      // Zeitstempel des Quiz-Durchlaufs
-         categoryId: string, // Kategorie des Quiz
-         totalQuestions: number, // Gesamtzahl der Fragen
-         correctAnswers: number, // Anzahl der richtigen Antworten
-         timeSpent: number  // Benötigte Zeit in Sekunden
-       }
-     ]
-   }
-   ```
-
-#### Implementierung
-- Das System bietet zwei Speichermethoden:
-  1. **File System Access API**: In unterstützten Browsern (Chrome, Edge, etc.) können Benutzer direkt auf ihr Dateisystem zugreifen und einen Ordner auswählen.
-  2. **LocalStorage**: Als Fallback wird `localStorage` verwendet, um die Daten persistent im Browser zu speichern.
-- Die Datenpfade werden so konstruiert, dass sie mit echten Dateisystempfaden kompatibel sind.
-- Alle Speicherfunktionen sind asynchron gestaltet, um die verschiedenen Backends einheitlich zu unterstützen.
-- Die Implementierung prüft die Verfügbarkeit der APIs und bietet sinnvolle Fallbacks und Fehlermeldungen.
-
-# Speicherverwaltung in der LernApp
-
-Die LernApp verwendet ein hybrides Speichersystem, das sowohl lokale Speicherung im Browser als auch optionales Speichern in einem vom Nutzer gewählten Verzeichnis unterstützt.
-
-## Lokale Speicherung
-- Standardmäßig werden alle Daten (Kategorien, Gruppen, Fragen, Nutzer, etc.) lokal im Browser gespeichert.
-- Verwendete Technologien: IndexedDB und localStorage.
-- Die Daten sind persistent und stehen auch nach einem Neustart des Browsers zur Verfügung.
-
-## Externer Speicherort (DirectoryHandle)
-- Nutzer können einen Speicherort (Ordner) auswählen, in dem die Daten zusätzlich als Dateien abgelegt werden.
-- Die Speicherung erfolgt dann parallel: lokal im Browser und im gewählten Verzeichnis.
-- Die Berechtigungen für den Zugriff auf das Verzeichnis werden über die File System Access API verwaltet.
-
-## Synchronisation
-- Die App bietet eine zentrale Synchronisationsfunktion, die lokale und externe Daten abgleicht.
-- Änderungen werden automatisch in beide Speicherorte geschrieben, sobald ein externer Speicherort festgelegt ist.
-- Die Synchronisation kann manuell oder automatisch angestoßen werden.
-- Konflikte werden nach dem Prinzip "letzte Änderung gewinnt" behandelt.
-
-## Globale Storage-Funktionen
-- Alle relevanten Storage-Funktionen sind zentral in `js/storage-global.js` definiert und werden global bereitgestellt (z.B. `window.loadData`, `window.saveData`, `window.syncStorage`).
-- Die Funktionen erkennen automatisch, ob ein externer Speicherort vorhanden ist und speichern entsprechend doppelt.
-- Die Synchronisation kann über `window.syncStorage()` ausgelöst werden.
-
-## Typische Abläufe
-- Beim ersten Login wird nur lokal gespeichert.
-- Nach Auswahl eines Speicherorts werden alle neuen und geänderten Daten auch im Verzeichnis gespeichert.
-- Die Synchronisation sorgt dafür, dass beide Speicherorte konsistent bleiben.
-
-## Hinweise
-- Die Speicherung im externen Verzeichnis ist optional und erfordert die Zustimmung des Nutzers.
-- Die App prüft und fordert Berechtigungen automatisch an.
-- Die Storage-Logik ist modular und kann einfach erweitert werden.
+**Hinweis:**
+- Die maximale Anzahl von Collaborators kann in der App und im Backend limitiert werden (z.B. 20).
+- Die UI sollte die Verwaltung der Collaborators übersichtlich und einfach gestalten (z.B. Liste mit Entfernen-Button, Einladungsfeld).
+- Die Rechte werden bei jedem Schreibzugriff geprüft.
 
 ---
-Letzte Aktualisierung: 09.09.2025
+
+## Schritt-für-Schritt Umsetzung
+
+1. **Supabase-Projekt anlegen**
+   - Tabellen für Kategorien, Gruppen, Fragen, Statistiken erstellen (siehe oben)
+   - Storage-Bucket für Bilder anlegen
+
+2. **Supabase-Client in der App einbinden**
+   - Supabase-JS-Client in allen relevanten Modulen verwenden
+   - Authentifizierung und Rechteprüfung zentral in `auth.js`
+
+3. **Migration der Daten**
+   - Bestehende lokale JSON-Daten (falls vorhanden) einmalig in die Supabase-Tabellen importieren
+   - Danach keine lokalen JSONs mehr verwenden
+
+4. **Kollaborations-Logik implementieren**
+   - UI für Mitbearbeiter-Verwaltung in Kategorie-Management
+   - Backend prüft Berechtigungen bei jedem Schreibzugriff
+   - Echtzeit-Updates über Supabase Realtime
+
+5. **Bilder-Upload über Supabase Storage**
+   - Bilder werden beim Erstellen von Fragen direkt in Supabase Storage hochgeladen
+   - Die Bild-URL wird in der Frage gespeichert
+
+6. **App-Logik anpassen**
+   - Alle Datenoperationen (CRUD) laufen über Supabase
+   - Keine lokalen JSON-Dateien mehr
+   - Fehlerbehandlung und Logging zentral
+
+---
+
+## Vorteile
+- Zentrale, sichere und kollaborative Datenhaltung
+- Echtzeit-Synchronisation für alle Nutzer
+- Komfortable Verwaltung von Mitbearbeitern
+- Skalierbar und plattformunabhängig
+
+---
+
+## Hinweise für Entwickler
+- Alle Datenoperationen laufen über Supabase-Tabellen und Storage
+- Die App ist vollständig cloudbasiert
+- Kollaboration und Rechteverwaltung sind direkt im Datenmodell abgebildet
+- Die UI muss die Mitbearbeiter-Funktionen und Echtzeit-Updates unterstützen
+
+# LernApp – Technische Dokumentation (Stand: 10.09.2025)
+
+## Architektur & Technologie
+- **Frontend:** Vanilla HTML, CSS, JavaScript (ES6+), Bootstrap für UI
+- **Backend:** Supabase (Auth, Datenhaltung, Storage)
+- **Design:** Responsive-first, moderne JS-Syntax, deutsche Kommentare
+
+## Zentrale Funktionen
+- Multiple-Choice-Fragen-System
+- Admin-Interface für Fragen/Kategorien
+- Kategorien- und Gruppenmanagement
+- Bildunterstützung für Fragen
+- Supabase-basierte Userverwaltung und Authentifizierung
+- Zentrales Logging und Benachrichtigungssystem
+
+## Wichtige Änderungen (2025)
+- **Lokale Storage-/Backup-/Filesystem-Logik entfernt**
+    - Alle alten JS-, CSS-, und HTML-Dateien für localStorage, Backups, Diagnosen, Migration, Pfadwahl etc. wurden gelöscht
+    - Keine lokale User-Initialisierung mehr (user-init.js entfernt)
+    - Keine Speicherpfad-/Speichermodul-Funktionen mehr
+    - Alle Einbindungen und UI-Reste zu Storage/Backup entfernt
+- **Supabase übernimmt alle User-, Daten- und Backup-Funktionen**
+    - Login/Logout/Registrierung laufen zentral über Supabase
+    - Weiterleitungen nach Login/Logout sind wieder aktiviert
+    - Backups werden direkt über Supabase Storage abgewickelt
+
+## Aktuelle Struktur
+- **js/**: Nur noch zentrale App-Logik (auth.js, quiz-db.js, category-management.js, etc.)
+- **css/**: UI-Styles, keine Storage-/Backup-Styles mehr
+- **partials/**: Header und Footer, zentrale Einbindung der globalen JS-Funktionen
+- **data/**: JSON-Daten für Fragen, Kategorien, Gruppen
+- **docs/**: Diese Dokumentation
+
+## Hinweise für Entwickler
+- Alle User- und Auth-Logik ist zentral in auth.js und Supabase
+- Keine lokale Speicherung oder Migration mehr nötig
+- Fehler-/Erfolgsmeldungen laufen über notification.js und logger.js
+- Weiterleitungen nach Login/Logout sind in auth.js und header.html geregelt
+- UI ist vollständig responsive und modular
+
+## Migration/Legacy
+- Alle alten Storage-/Backup-/Filesystem-Funktionen und Dateien sind entfernt
+- Die App ist jetzt vollständig cloudbasiert und zentralisiert
+
+---
+Letzte Änderung: Automatische Bereinigung und Umstellung auf Supabase-only (10.09.2025)

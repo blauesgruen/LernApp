@@ -53,22 +53,36 @@ async function initializeDatabase() {
  * @returns {Promise<Array>} Array mit allen Kategorien
  */
 async function loadCategories() {
-    try {
-        return await window.loadData("categories.json", []);
-    } catch (error) {
-        console.error("Fehler beim Laden der Kategorien:", error);
+    if (!window.supabase) {
+        console.error('Supabase-Client ist nicht verfügbar.');
         return [];
     }
+    const { data, error } = await window.supabase.from('categories').select('*');
+    if (error) {
+        console.error('Fehler beim Laden der Kategorien:', error);
+        return [];
+    }
+    return data;
 }
 
 /**
- * Speichert alle Kategorien
+ * Speichert eine Kategorie in Supabase
  * @param {Array} categories - Array mit allen Kategorien
  * @returns {Promise<boolean>} True, wenn erfolgreich gespeichert
  */
 async function saveCategories(categories) {
+    if (!window.supabase) {
+        console.error('Supabase-Client ist nicht verfügbar.');
+        return false;
+    }
     try {
-        return await window.saveData("categories.json", categories);
+        // Mehrere Kategorien als Batch speichern
+        const { error } = await window.supabase.from('categories').upsert(categories);
+        if (error) {
+            console.error("Fehler beim Speichern der Kategorien:", error);
+            return false;
+        }
+        return true;
     } catch (error) {
         console.error("Fehler beim Speichern der Kategorien:", error);
         return false;
@@ -83,28 +97,29 @@ async function saveCategories(categories) {
  * @returns {Promise<object|null>} Die erstellte Kategorie oder null bei Fehler
  */
 async function createCategory(name, mainCategory = MAIN_CATEGORY.TEXT, createdBy) {
+    if (!window.supabase) {
+        console.error('Supabase-Client ist nicht verfügbar.');
+        return null;
+    }
     if (!name) {
         console.error("Name der Kategorie ist erforderlich.");
         return null;
     }
 
     try {
-        const categories = await loadCategories();
-        
-        // Neue Kategorie erstellen
-        const newCategory = {
-            id: `category-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        const { data, error } = await window.supabase.from('categories').insert({
             name,
-            mainCategory,
-            createdBy,
-            createdAt: Date.now()
-        };
+            owner: createdBy,
+            collaborators: [createdBy],
+            created_at: new Date().toISOString()
+        }).select();
         
-        // Zur Liste hinzufügen und speichern
-        categories.push(newCategory);
-        const success = await saveCategories(categories);
+        if (error) {
+            console.error('Fehler beim Erstellen der Kategorie:', error);
+            return null;
+        }
         
-        return success ? newCategory : null;
+        return data[0];
     } catch (error) {
         console.error("Fehler beim Erstellen der Kategorie:", error);
         return null;
@@ -116,22 +131,35 @@ async function createCategory(name, mainCategory = MAIN_CATEGORY.TEXT, createdBy
  * @returns {Promise<Array>} Array mit allen Gruppen
  */
 async function loadGroups() {
-    try {
-        return await window.loadData("groups.json", []);
-    } catch (error) {
-        console.error("Fehler beim Laden der Gruppen:", error);
+    if (!window.supabase) {
+        console.error('Supabase-Client ist nicht verfügbar.');
         return [];
     }
+    const { data, error } = await window.supabase.from('groups').select('*');
+    if (error) {
+        console.error('Fehler beim Laden der Gruppen:', error);
+        return [];
+    }
+    return data;
 }
 
 /**
- * Speichert alle Gruppen
+ * Speichert Gruppen in Supabase
  * @param {Array} groups - Array mit allen Gruppen
  * @returns {Promise<boolean>} True, wenn erfolgreich gespeichert
  */
 async function saveGroups(groups) {
+    if (!window.supabase) {
+        console.error('Supabase-Client ist nicht verfügbar.');
+        return false;
+    }
     try {
-        return await window.saveData("groups.json", groups);
+        const { error } = await window.supabase.from('groups').upsert(groups);
+        if (error) {
+            console.error("Fehler beim Speichern der Gruppen:", error);
+            return false;
+        }
+        return true;
     } catch (error) {
         console.error("Fehler beim Speichern der Gruppen:", error);
         return false;
@@ -146,28 +174,29 @@ async function saveGroups(groups) {
  * @returns {Promise<object|null>} Die erstellte Gruppe oder null bei Fehler
  */
 async function createGroup(name, categoryId, createdBy) {
+    if (!window.supabase) {
+        console.error('Supabase-Client ist nicht verfügbar.');
+        return null;
+    }
     if (!name || !categoryId) {
         console.error("Name und Kategorie-ID sind erforderlich.");
         return null;
     }
 
     try {
-        const groups = await loadGroups();
-        
-        // Neue Gruppe erstellen
-        const newGroup = {
-            id: `group-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        const { data, error } = await window.supabase.from('groups').insert({
             name,
-            categoryId,
-            createdBy,
-            createdAt: Date.now()
-        };
+            category_id: categoryId,
+            created_by: createdBy,
+            created_at: new Date().toISOString()
+        }).select();
         
-        // Zur Liste hinzufügen und speichern
-        groups.push(newGroup);
-        const success = await saveGroups(groups);
+        if (error) {
+            console.error('Fehler beim Erstellen der Gruppe:', error);
+            return null;
+        }
         
-        return success ? newGroup : null;
+        return data[0];
     } catch (error) {
         console.error("Fehler beim Erstellen der Gruppe:", error);
         return null;
@@ -175,26 +204,39 @@ async function createGroup(name, categoryId, createdBy) {
 }
 
 /**
- * Lädt alle Fragen
+ * Lädt alle Fragen aus Supabase
  * @returns {Promise<Array>} Array mit allen Fragen
  */
 async function loadQuestions() {
-    try {
-        return await window.loadData("questions.json", []);
-    } catch (error) {
-        console.error("Fehler beim Laden der Fragen:", error);
+    if (!window.supabase) {
+        console.error('Supabase-Client ist nicht verfügbar.');
         return [];
     }
+    const { data, error } = await window.supabase.from('questions').select('*');
+    if (error) {
+        console.error('Fehler beim Laden der Fragen:', error);
+        return [];
+    }
+    return data;
 }
 
 /**
- * Speichert alle Fragen
+ * Speichert Fragen in Supabase
  * @param {Array} questions - Array mit allen Fragen
  * @returns {Promise<boolean>} True, wenn erfolgreich gespeichert
  */
 async function saveQuestions(questions) {
+    if (!window.supabase) {
+        console.error('Supabase-Client ist nicht verfügbar.');
+        return false;
+    }
     try {
-        return await window.saveData("questions.json", questions);
+        const { error } = await window.supabase.from('questions').upsert(questions);
+        if (error) {
+            console.error("Fehler beim Speichern der Fragen:", error);
+            return false;
+        }
+        return true;
     } catch (error) {
         console.error("Fehler beim Speichern der Fragen:", error);
         return false;
@@ -207,6 +249,10 @@ async function saveQuestions(questions) {
  * @returns {Promise<object|null>} Die erstellte Frage oder null bei Fehler
  */
 async function createQuestion(questionData) {
+    if (!window.supabase) {
+        console.error('Supabase-Client ist nicht verfügbar.');
+        return null;
+    }
     if (!questionData || !questionData.text || !questionData.categoryId || !questionData.groupId) {
         console.error("Unvollständige Fragendaten.");
         return null;
@@ -370,7 +416,7 @@ async function getQuizQuestions(categoryId, groupId = null, count = 10) {
                 // Die richtige Antwort
                 const correctAnswer = question.options[0].text;
                 
-                // Alle potenziell falschen Antworten (andere richtige Antworten)
+                // Alle potenziell falsche Antworten (andere richtige Antworten)
                 const possibleWrongAnswers = allCorrectAnswers.filter(text => text !== correctAnswer);
                 
                 // Zufällig 3 falsche Antworten auswählen
@@ -445,37 +491,32 @@ function shuffleArray(array) {
 
 // Statistikfunktionen
 async function saveStatistics(userId, questionId, isCorrect) {
+    if (!window.supabase) {
+        console.error('Supabase-Client ist nicht verfügbar.');
+        return false;
+    }
     try {
-        // Statistiken laden
-        const stats = await window.loadData("statistics.json", {});
-        
-        // Benutzerstatistiken initialisieren, falls nicht vorhanden
-        if (!stats[userId]) {
-            stats[userId] = {
-                questionStats: {},
-                quizStats: []
-            };
+        // Hole aktuelle Statistik
+        const { data, error } = await window.supabase.from('statistics').select('*').eq('user_id', userId).single();
+        let stats = data || { user_id: userId, question_stats: {}, quiz_stats: [] };
+        // Initialisiere Frage-Statistik
+        if (!stats.question_stats) stats.question_stats = {};
+        if (!stats.question_stats[questionId]) {
+            stats.question_stats[questionId] = { correct: 0, incorrect: 0, lastAnswered: 0 };
         }
-        
-        // Fragenstatistik aktualisieren
-        if (!stats[userId].questionStats[questionId]) {
-            stats[userId].questionStats[questionId] = {
-                correct: 0,
-                incorrect: 0,
-                lastAnswered: 0
-            };
-        }
-        
-        const questionStat = stats[userId].questionStats[questionId];
         if (isCorrect) {
-            questionStat.correct++;
+            stats.question_stats[questionId].correct++;
         } else {
-            questionStat.incorrect++;
+            stats.question_stats[questionId].incorrect++;
         }
-        questionStat.lastAnswered = Date.now();
-        
-        // Statistiken speichern
-        return await window.saveData("statistics.json", stats);
+        stats.question_stats[questionId].lastAnswered = Date.now();
+        // Speichere Statistik
+        const { error: upsertError } = await window.supabase.from('statistics').upsert([stats]);
+        if (upsertError) {
+            console.error("Fehler beim Speichern der Statistik:", upsertError);
+            return false;
+        }
+        return true;
     } catch (error) {
         console.error("Fehler beim Speichern der Statistik:", error);
         return false;
@@ -483,31 +524,113 @@ async function saveStatistics(userId, questionId, isCorrect) {
 }
 
 async function saveQuizResult(userId, categoryId, totalQuestions, correctAnswers, timeSpent) {
+    if (!window.supabase) {
+        console.error('Supabase-Client ist nicht verfügbar.');
+        return false;
+    }
     try {
-        // Statistiken laden
-        const stats = await window.loadData("statistics.json", {});
-        
-        // Benutzerstatistiken initialisieren, falls nicht vorhanden
-        if (!stats[userId]) {
-            stats[userId] = {
-                questionStats: {},
-                quizStats: []
-            };
-        }
-        
-        // Quiz-Statistik hinzufügen
-        stats[userId].quizStats.push({
+        // Hole aktuelle Statistik
+        const { data, error } = await window.supabase.from('statistics').select('*').eq('user_id', userId).single();
+        let stats = data || { user_id: userId, question_stats: {}, quiz_stats: [] };
+        if (!stats.quiz_stats) stats.quiz_stats = [];
+        stats.quiz_stats.push({
             date: Date.now(),
             categoryId,
             totalQuestions,
             correctAnswers,
             timeSpent
         });
-        
-        // Statistiken speichern
-        return await window.saveData("statistics.json", stats);
+        // Speichere Statistik
+        const { error: upsertError } = await window.supabase.from('statistics').upsert([stats]);
+        if (upsertError) {
+            console.error("Fehler beim Speichern des Quiz-Ergebnisses:", upsertError);
+            return false;
+        }
+        return true;
     } catch (error) {
         console.error("Fehler beim Speichern des Quiz-Ergebnisses:", error);
+        return false;
+    }
+}
+
+/**
+ * Fügt einen Mitbearbeiter zur Kategorie hinzu
+ * @param {string} categoryId - ID der Kategorie
+ * @param {string} userId - User-ID des Mitbearbeiters
+ * @returns {Promise<boolean>} True, wenn erfolgreich
+ */
+async function addCollaborator(categoryId, userId) {
+    if (!window.supabase) {
+        console.error('Supabase-Client ist nicht verfügbar.');
+        return false;
+    }
+    if (!categoryId || !userId) {
+        console.error("Kategorie-ID und User-ID sind erforderlich.");
+        return false;
+    }
+    try {
+        // Aktuelle Collaborators laden
+        const { data, error } = await window.supabase.from('categories').select('collaborators').eq('id', categoryId).single();
+        if (error || !data) {
+            console.error('Fehler beim Laden der Kategorie:', error);
+            return false;
+        }
+        let collaborators = Array.isArray(data.collaborators) ? data.collaborators : [];
+        if (collaborators.includes(userId)) {
+            console.warn('User ist bereits Collaborator.');
+            return true;
+        }
+        collaborators.push(userId);
+        // Update in Supabase
+        const { error: updateError } = await window.supabase.from('categories').update({ collaborators }).eq('id', categoryId);
+        if (updateError) {
+            console.error('Fehler beim Hinzufügen des Collaborators:', updateError);
+            return false;
+        }
+        return true;
+    } catch (err) {
+        console.error('Fehler in addCollaborator:', err);
+        return false;
+    }
+}
+
+/**
+ * Entfernt einen Mitbearbeiter aus der Kategorie
+ * @param {string} categoryId - ID der Kategorie
+ * @param {string} userId - User-ID des Mitbearbeiters
+ * @returns {Promise<boolean>} True, wenn erfolgreich
+ */
+async function removeCollaborator(categoryId, userId) {
+    if (!window.supabase) {
+        console.error('Supabase-Client ist nicht verfügbar.');
+        return false;
+    }
+    if (!categoryId || !userId) {
+        console.error("Kategorie-ID und User-ID sind erforderlich.");
+        return false;
+    }
+    try {
+        // Aktuelle Collaborators laden
+        const { data, error } = await window.supabase.from('categories').select('collaborators').eq('id', categoryId).single();
+        if (error || !data) {
+            console.error('Fehler beim Laden der Kategorie:', error);
+            return false;
+        }
+        let collaborators = Array.isArray(data.collaborators) ? data.collaborators : [];
+        if (!collaborators.includes(userId)) {
+            console.warn('User ist kein Collaborator.');
+            return true;
+        }
+        collaborators = collaborators.filter(id => id !== userId);
+        // Update in Supabase
+        const { error: updateError } = await window.supabase.from('categories').update({ collaborators }).eq('id', categoryId);
+        if (updateError) {
+            console.error('Fehler beim Entfernen des Collaborators:', updateError);
+            return false;
+        }
+        return true;
+    } catch (err) {
+        console.error('Fehler in removeCollaborator:', err);
         return false;
     }
 }
@@ -524,7 +647,9 @@ window.quizDB = {
     createQuestion,
     getQuizQuestions,
     saveStatistics,
-    saveQuizResult
+    saveQuizResult,
+    addCollaborator,
+    removeCollaborator
 };
 
 // Datenbank beim Laden initialisieren

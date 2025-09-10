@@ -11,7 +11,9 @@ if (typeof window.logMessage !== 'function') {
     };
 }
 
-// Supabase-Client initialisieren (Beispiel)
+// Supabase-Client nur hier initialisieren!
+// Entfernt: const supabase = window.supabase || window.createClient?.(SUPABASE_URL, SUPABASE_KEY);
+// Verwende nur die globale Instanz:
 const supabase = window.supabase;
 
 /**
@@ -71,13 +73,18 @@ window.logout = async function() {
 /**
  * Registrierung (Supabase)
  */
-window.register = async function(email, password) {
+window.register = async function(email, password, nickname) {
     try {
         const { data, error } = await supabase.auth.signUp({ email, password });
         if (error) {
             logMessage('❌ Registrierung fehlgeschlagen: ' + error.message, 'error');
             showError('Registrierung fehlgeschlagen: ' + error.message);
             return null;
+        }
+        // Nickname nach erfolgreichem SignUp speichern
+        if (data.user && nickname) {
+            // Nickname im Profil speichern (Supabase v2: updateUser)
+            await supabase.auth.updateUser({ data: { nickname } });
         }
         logMessage('✅ Registrierung erfolgreich für: ' + email);
         showSuccess('Registrierung erfolgreich! Bitte bestätigen Sie Ihre E-Mail.');
@@ -102,6 +109,30 @@ window.setLoginStatus = function(status) {
 window.clearLoginStatus = function() {
     localStorage.removeItem('loggedIn');
 }
+
+// Supabase-Login-Status prüfen und Weiterleitung steuern
+async function checkLoginAndRedirect() {
+    const { data, error } = await window.supabase.auth.getUser();
+    const loggedIn = !!data?.user;
+    const path = window.location.pathname;
+    // Seiten, die nur für nicht eingeloggte User sind
+    const guestPages = ['/index.html', '/login.html', '/register.html', '/'];
+    if (loggedIn && guestPages.includes(path)) {
+        window.location.href = 'dashboard.html';
+        return;
+    }
+    // Seiten, die Login erfordern
+    const protectedPages = [
+        '/profile.html', '/dashboard.html', '/quiz-player.html', '/question-creator.html', '/category-management.html', '/file-tools.html', '/storage-diagnostics.html'
+    ];
+    if (!loggedIn && protectedPages.includes(path)) {
+        window.location.href = 'index.html';
+        return;
+    }
+    // Header-Buttons und User-Info steuern
+    if (window.showUserButtons) window.showUserButtons(loggedIn, data?.user);
+}
+window.addEventListener('DOMContentLoaded', checkLoginAndRedirect);
 
 // Verknüpfe den UI-Button mit der zentralen Logging-Funktion
 window.showLogs = function() {

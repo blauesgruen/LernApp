@@ -680,3 +680,6 @@ async function nextQuestion() {
         }
     }
 });
+
+// Die lokale Speicherung und JSON-Logik wurde entfernt.
+// Die Quiz-Player-Logik nutzt jetzt Supabase für alle Datenoperationen.

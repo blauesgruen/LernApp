@@ -169,3 +169,6 @@ importDataToLocalStorage().then(result => {
     console.log('Import abgeschlossen');
     console.log('Bitte die Seite neu laden, um die Änderungen zu sehen');
 });
+
+// Diese Datei ist jetzt leer, da alle Storage- und JSON-Funktionen entfernt wurden.
+// Die Daten werden vollständig über Supabase verwaltet.

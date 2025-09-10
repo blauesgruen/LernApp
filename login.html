@@ -41,7 +41,33 @@
 
     <script src="js/notification.js"></script>
     <script>
-        // Header und Footer dynamisch laden
+        // Globale Funktionen für Erfolg- und Fehlermeldungen
+        window.showSuccess = msg => {
+            const el = document.getElementById('loginMessage');
+            if (el) { el.textContent = msg; el.style.color = 'green'; }
+        };
+        window.showError = msg => {
+            const el = document.getElementById('loginMessage');
+            if (el) { el.textContent = msg; el.style.color = 'red'; }
+        };
+
+        // Login-Logik initialisieren
+        function initLoginLogic() {
+            const loginForm = document.getElementById('loginForm');
+            if (loginForm) {
+                loginForm.addEventListener('submit', async function(event) {
+                    event.preventDefault();
+                    const email = document.getElementById('loginEmail').value;
+                    const password = document.getElementById('loginPassword').value;
+                    if (window.login) {
+                        await window.login(email, password);
+                    } else {
+                        showError('Fehler: Login-Funktion nicht verfügbar.');
+                    }
+                });
+            }
+        }
+        // Header und Footer laden und dann Login-Logik initialisieren
         async function loadHeaderAndFooterAndInitLogin() {
             try {
                 document.getElementById('header-container').innerHTML = await (await fetch('partials/header.html')).text();
@@ -66,48 +92,13 @@
                 }
                 if (window.updateNavigation) { window.updateNavigation(); }
                 setTimeout(() => { try { if (window.updateStorageStatusIcon) window.updateStorageStatusIcon(); } catch (e) {} }, 50);
-                // Login-Logik erst nach Header laden initialisieren
                 initLoginLogic();
             } catch (error) {
                 console.error('Fehler beim Laden des Headers oder Footers:', error);
             }
         }
-        // Login-Logik initialisieren
-        function initLoginLogic() {
-            // Hashfunktion für lokale Nutzung (könnte in auth.js zentralisiert werden)
-            async function hashPassword(password) {
-                const encoder = new TextEncoder();
-                const data = encoder.encode(password);
-                const hash = await crypto.subtle.digest('SHA-256', data);
-                return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
-            }
-            window.hashPassword = hashPassword;
-            document.addEventListener('DOMContentLoaded', function() {
-                const loginForm = document.querySelector('#login form');
-                if (loginForm) {
-                    loginForm.addEventListener('submit', async function(event) {
-                        event.preventDefault();
-                        const email = document.getElementById('loginEmail').value;
-                        const password = document.getElementById('loginPassword').value;
-                        if (window.login) {
-                            await window.login(email, password);
-                        } else {
-                            showError('Fehler: Login-Funktion nicht verfügbar.');
-                        }
-                    });
-                }
-                document.getElementById('login').addEventListener('keydown', function(event) {
-                    if (event.key === 'Enter') {
-                        const loginButton = document.querySelector('#login form button[type="submit"]');
-                        if (loginButton) {
-                            loginButton.click();
-                        }
-                    }
-                });
-            });
-        }
         // Starte alles
-        loadHeaderAndFooterAndInitLogin();
+        document.addEventListener('DOMContentLoaded', loadHeaderAndFooterAndInitLogin);
     </script>
 </body>
 </html>

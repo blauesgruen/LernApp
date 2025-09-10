@@ -132,7 +132,6 @@
         </nav>
     </div>    
     <script src="js/notification.js"></script>
-    <!-- Zentrale Einbindung der Auth-Funktionen -->
     <script src="js/auth.js"></script>
     <script>
         // Logs persistent machen, auch nach Logout
@@ -431,6 +430,26 @@
 
             const headerRight = document.querySelector('.header-right');
             headerRight.appendChild(logContainer);
+        };
+
+        // Zeige/verstecke User-Buttons im Header und zeige User-Info
+        window.showUserButtons = function(show, user) {
+            const userButtons = document.getElementById('user-buttons');
+            if (userButtons) {
+                userButtons.style.display = show ? 'flex' : 'none';
+            }
+            // User-Info im Header anzeigen
+            let info = '';
+            if (show && user) {
+                info = `<span id="header-user-info" style="margin-left:12px;font-size:1rem;color:#1976d2;">${user.user_metadata?.nickname || user.email} (${user.email})</span>`;
+            }
+            let infoEl = document.getElementById('header-user-info');
+            if (!infoEl && userButtons) {
+                infoEl = document.createElement('span');
+                infoEl.id = 'header-user-info';
+                userButtons.parentNode.appendChild(infoEl);
+            }
+            if (infoEl) infoEl.innerHTML = info;
         };
     </script>
 </body>

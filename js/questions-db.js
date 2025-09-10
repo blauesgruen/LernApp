@@ -512,3 +512,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 });
+
+// Diese Datei ist jetzt leer, da alle Storage- und JSON-Funktionen entfernt wurden.
+// Die Quiz-Datenbank wird vollständig über Supabase verwaltet.

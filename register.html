@@ -25,6 +25,7 @@
                 <input type="email" id="registerEmail" placeholder="E-Mail" required>
                 <input type="password" id="registerPassword" placeholder="Passwort" required>
                 <input type="password" id="registerPasswordRepeat" placeholder="Passwort wiederholen" required>
+                <input type="text" id="registerNickname" placeholder="Nickname" required>
                 <button type="submit" class="btn-primary">Registrieren</button>
             </form>
             <div id="registerMessage"></div>
@@ -84,11 +85,16 @@
             const email = document.getElementById('registerEmail').value;
             const password = document.getElementById('registerPassword').value;
             const passwordRepeat = document.getElementById('registerPasswordRepeat').value;
+            const nickname = document.getElementById('registerNickname').value;
+            if (!nickname || nickname.trim().length < 2) {
+                showError('Bitte geben Sie einen Nickname mit mindestens 2 Zeichen an!');
+                return;
+            }
             if (password !== passwordRepeat) {
                 showError('Die Passwörter stimmen nicht überein!');
                 return;
             }
-            await register(email, password);
+            await register(email, password, nickname);
         });
     </script>
 </body>

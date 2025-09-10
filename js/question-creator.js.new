@@ -383,3 +383,6 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('answer-0').value = '';
     }
 });
+
+// Die lokale Speicherung und JSON-Logik wurde entfernt.
+// Die Frage-Erstellung nutzt jetzt Supabase für alle Datenoperationen.

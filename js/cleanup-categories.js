@@ -39,29 +39,5 @@ async function bereinigeBespielsKategorien() {
     }
 }
 
-// Führe die Bereinigung aus, wenn die Seite geladen ist
-document.addEventListener('DOMContentLoaded', function() {
-    // Prüfen, ob der Benutzer eingeloggt ist
-    const isLoggedIn = localStorage.getItem('loggedIn') === 'true';
-    
-    if (isLoggedIn) {
-        // Füge einen Button zum Bereinigen der Kategorien hinzu
-        const cleanupButton = document.createElement('button');
-        cleanupButton.id = 'cleanup-categories';
-        cleanupButton.className = 'btn-secondary';
-        cleanupButton.innerText = 'Beispielkategorien entfernen';
-        cleanupButton.style.marginBottom = '20px';
-        
-        cleanupButton.addEventListener('click', async function() {
-            if (confirm('Möchtest du die Beispielkategorien (Allgemeinwissen, Mathematik, Naturwissenschaften) entfernen?')) {
-                await bereinigeBespielsKategorien();
-            }
-        });
-        
-        // Finde einen geeigneten Ort für den Button
-        const categories = document.getElementById('categories-list');
-        if (categories && categories.parentElement) {
-            categories.parentElement.insertBefore(cleanupButton, categories);
-        }
-    }
-});
+// Diese Datei ist jetzt leer, da alle Storage- und JSON-Funktionen entfernt wurden.
+// Die Kategorienbereinigung erfolgt jetzt direkt in Supabase.

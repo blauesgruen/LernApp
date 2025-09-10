@@ -16,6 +16,13 @@ const groupCategorySelect = document.getElementById('group-category');
 const groupNameInput = document.getElementById('group-name');
 const filterCategoryInput = document.getElementById('filter-category');
 
+// Hilfsfunktion: aktuellen User holen
+async function getCurrentUserId() {
+    const { data, error } = await window.supabase.auth.getUser();
+    if (error || !data?.user) return null;
+    return data.user.id;
+}
+
 // Initialisierung
 initializePage();
 
@@ -24,23 +31,17 @@ if (categoryForm) {
     categoryForm.addEventListener('submit', async function(e) {
         e.preventDefault();
         const name = categoryNameInput.value.trim();
-        const mainCategory = "any";
         if (!name) {
             showError('Bitte gib einen Namen für die Kategorie ein.');
             return;
         }
-        // Hole den aktuellen User aus Supabase
-        const user = window.supabase.auth.getUser();
-        if (!user) {
+        const ownerId = await getCurrentUserId();
+        if (!ownerId) {
             showError('Du bist nicht eingeloggt.');
             return;
         }
         try {
-            const newCategory = await window.quizDB.createCategory(
-                name,
-                mainCategory,
-                user.email // oder user.id, je nach Datenmodell
-            );
+            const newCategory = await window.quizDB.createCategory(name, ownerId);
             if (newCategory) {
                 showSuccess(`Kategorie "${name}" wurde erfolgreich erstellt.`);
                 categoryNameInput.value = '';
@@ -70,18 +71,13 @@ if (groupForm) {
             showError('Bitte gib einen Namen für die Gruppe ein.');
             return;
         }
-        // Hole den aktuellen User aus Supabase
-        const user = window.supabase.auth.getUser();
-        if (!user) {
+        const userId = await getCurrentUserId();
+        if (!userId) {
             showError('Du bist nicht eingeloggt.');
             return;
         }
         try {
-            const newGroup = await window.quizDB.createGroup(
-                name,
-                categoryId,
-                user.email // oder user.id, je nach Datenmodell
-            );
+            const newGroup = await window.quizDB.createGroup(name, categoryId, userId);
             if (newGroup) {
                 showSuccess(`Gruppe "${name}" wurde erfolgreich erstellt.`);
                 groupNameInput.value = '';
@@ -245,7 +241,7 @@ async function updateCategorySelects() {
             groupCategorySelect.appendChild(groupOption);
         });
     } catch (error) {
-        console.error('Fehler beim Aktualisieren der Kategorie-Auswahlfelder:', error);
+        console.error('Fehler beim Aktualisieren der Kategorie-Auswahlfeldern:', error);
         showError('Fehler beim Laden der Kategorien.');
     }
 }

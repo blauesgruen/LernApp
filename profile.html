@@ -3,301 +3,56 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mein Profil - LernApp</title>
+    <title>Profil - LernApp</title>
     <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.1/css/all.min.css">
-    <!-- Zentrales Logging-System laden -->
-    <script src="js/logger.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+      const SUPABASE_URL = 'https://yzyrvwmofyztwttgmyqn.supabase.co';
+      const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl6eXJ2d21vZnl6dHd0dGdteXFuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc0NjA2ODUsImV4cCI6MjA3MzAzNjY4NX0.OaFPV0q-0mf2LO4dFd7FEd-vNzRjA1nJPnEXHM3WiXw';
+      window.supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    </script>
 </head>
 <body>
     <div id="header-container"></div>
-
     <main>
-        <section id="profile-section">
+        <section id="profile">
             <h1>Mein Profil</h1>
-            
-            <div class="profile-card">
-                <div class="profile-header">
-                    <i class="fas fa-user-circle profile-icon"></i>
-                    <div id="username-display">Benutzername</div>
-                </div>
-                
-                <div class="profile-content">
-                    <div class="profile-grid">
-                        <!-- Linke Spalte -->
-                        <div class="profile-column">
-                            <div class="profile-group">
-                                <h2>Profil bearbeiten</h2>
-                                <form id="profile-form">
-                                    <div class="form-group">
-                                        <label for="new-username">Neuer Benutzername:</label>
-                                        <input type="text" id="new-username" name="new-username" placeholder="Neuen Benutzernamen eingeben">
-                                    </div>
-                                    <button type="button" id="update-username-btn" class="btn-primary">Aktualisieren</button>
-                                </form>
-                            </div>
-
-                            <div class="profile-group">
-                                <h2>Passwort ändern</h2>
-                                <form id="password-form">
-                                    <div class="form-group">
-                                        <label for="current-password">Aktuelles Passwort:</label>
-                                        <input type="password" id="current-password" name="current-password" required>
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="new-password">Neues Passwort:</label>
-                                        <input type="password" id="new-password" name="new-password" required>
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="confirm-password">Passwort bestätigen:</label>
-                                        <input type="password" id="confirm-password" name="confirm-password" required>
-                                    </div>
-                                    <button type="button" id="change-password-btn" class="btn-primary">Ändern</button>
-                                </form>
-                            </div>
-                        </div>
-                        
-                        <!-- Rechte Spalte -->
-                        <div class="profile-column">
-                            <div class="profile-group">
-                                <h2>Datenbank-Speicherort</h2>
-                                <form id="storage-path-form">
-                                    <div class="form-group">
-                                        <label>Aktueller Speicherort: <span id="current-storage-path">Standard</span></label>
-                                        <button type="button" id="browse-storage-path-btn" class="btn-primary" style="margin-top: 10px; width: 100%;">
-                                            <i class="fas fa-folder-open"></i> Ordner auswählen
-                                        </button>
-                                    </div>
-                                    <div class="form-info">
-                                        <p>Ein gemeinsamer Pfad auf verschiedenen Geräten (z.B. in Dropbox) ermöglicht dir, 
-                                        die gleichen Fragen auf all deinen Geräten zu verwenden.</p>
-                                    </div>
-                                    <button type="button" id="migrate-storage-btn" class="btn-primary" style="margin-top: 10px; width: 100%;">
-                                        <i class="fas fa-exchange-alt"></i> Daten in neuen Ordner verschieben
-                                    </button>
-                                    <button type="button" id="reset-storage-path-btn" class="btn-secondary" style="margin-top: 10px;">Auf Standard zurücksetzen</button>
-                                </form>
-                            </div>
-
-                            <div class="profile-group">
-                                <h2>Datensicherung</h2>
-                                <form id="backup-form">
-                                    <div class="form-group">
-                                        <button type="button" id="create-backup-btn" class="btn-primary" style="margin-top: 10px; width: 100%;">
-                                            <i class="fas fa-save"></i> Vollständiges Backup erstellen
-                                        </button>
-                                        <button type="button" id="list-backups-btn" class="btn-secondary" style="margin-top: 10px; width: 100%;">
-                                            <i class="fas fa-list"></i> Vorhandene Backups anzeigen
-                                        </button>
-                                    </div>
-                                    <div class="form-info">
-                                        <p>Erstelle regelmäßige Sicherungen deiner Daten, um Verluste zu vermeiden. 
-                                        Backups werden im Unterordner "backups" gespeichert.</p>
-                                    </div>
-                                </form>
-                            </div>
-
-                            <div class="profile-group danger-zone">
-                                <h2>Gefahrenzone</h2>
-                                
-                                <div class="danger-action">
-                                    <button type="button" id="delete-questions-btn" class="btn-warning">
-                                        <i class="fas fa-trash-alt"></i> Alle meine Fragen löschen
-                                    </button>
-                                    <p class="danger-description">Löscht alle deine erstellten Fragen und Antworten. Diese Aktion kann nicht rückgängig gemacht werden!</p>
-                                </div>
-                                
-                                <div class="danger-action">
-                                    <button type="button" id="delete-categories-btn" class="btn-warning">
-                                        <i class="fas fa-trash-alt"></i> Alle meine Kategorien löschen
-                                    </button>
-                                    <p class="danger-description">Löscht alle deine erstellten Kategorien. Diese Aktion kann nicht rückgängig gemacht werden!</p>
-                                </div>
-                                
-                                <div class="danger-action">
-                                    <button type="button" id="delete-groups-btn" class="btn-warning">
-                                        <i class="fas fa-trash-alt"></i> Alle meine Gruppen löschen
-                                    </button>
-                                    <p class="danger-description">Löscht alle deine erstellten Gruppen. Diese Aktion kann nicht rückgängig gemacht werden!</p>
-                                </div>
-                                
-                                <div class="danger-action">
-                                    <button type="button" id="delete-account-btn" class="btn-danger">
-                                        <i class="fas fa-user-slash"></i> Mein Konto löschen
-                                    </button>
-                                    <p class="danger-description">Löscht dein Konto und alle damit verbundenen Daten. Diese Aktion kann nicht rückgängig gemacht werden!</p>
-                                </div>
-                            </div>
-                        </div>
+            <div id="profile-columns">
+                <div class="profile-col profile-info">
+                    <h2>Profil</h2>
+                    <div class="profile-user-info">
+                        <span id="profile-user-nickname"></span>
+                        <span id="profile-user-email"></span>
                     </div>
+                    <label for="nickname">Nickname:</label>
+                    <input type="text" id="nickname" placeholder="Nickname">
+                    <button id="saveNickname" class="btn-primary">Speichern</button>
+                    <div id="nicknameMessage"></div>
+                </div>
+                <div class="profile-col profile-db">
+                    <h2>Datenbank</h2>
+                    <label for="newPassword">Neues Passwort:</label>
+                    <input type="password" id="newPassword" placeholder="Neues Passwort">
+                    <input type="password" id="newPasswordRepeat" placeholder="Passwort wiederholen">
+                    <button id="changePassword" class="btn-primary">Passwort ändern</button>
+                    <div id="passwordMessage"></div>
+                    <button id="exportDb" class="btn-secondary" style="margin-top:18px;">Exportieren</button>
+                    <input type="file" id="importDbFile" style="display:none">
+                    <button id="importDb" class="btn-secondary">Importieren</button>
+                    <div id="importExportMessage"></div>
+                </div>
+                <div class="profile-col profile-danger">
+                    <h2>Gefahrenbereich</h2>
+                    <button id="deleteDb" class="btn-danger">Datenbank löschen</button>
+                    <div id="deleteDbMessage"></div>
+                    <button id="deleteAccount" class="btn-danger">Account löschen</button>
+                    <div id="deleteAccountMessage"></div>
                 </div>
             </div>
         </section>
     </main>
-
     <div id="footer-container"></div>
-
-    <!-- Modals für Sicherheitsabfragen -->
-    <div id="delete-questions-modal" class="modal">
-        <div class="modal-content">
-            <span class="close-modal">&times;</span>
-            <h2>Fragen löschen</h2>
-            <p>Bist du sicher, dass du alle deine Fragen und Antworten löschen möchtest? Diese Aktion kann nicht rückgängig gemacht werden!</p>
-            <div class="modal-buttons">
-                <button id="cancel-delete-questions" class="btn-secondary">Abbrechen</button>
-                <button id="confirm-delete-questions" class="btn-danger">Ja, alle Fragen löschen</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="delete-account-modal" class="modal">
-        <div class="modal-content">
-            <span class="close-modal">&times;</span>
-            <h2>Konto löschen</h2>
-            <p>Bist du sicher, dass du dein Konto löschen möchtest? Alle deine Daten werden dauerhaft gelöscht. Diese Aktion kann nicht rückgängig gemacht werden!</p>
-            <div class="modal-buttons">
-                <button id="cancel-delete-account" class="btn-secondary">Abbrechen</button>
-                <button id="confirm-delete-account" class="btn-danger">Ja, mein Konto löschen</button>
-            </div>
-        </div>
-    </div>
-    
-    <div id="delete-categories-modal" class="modal">
-        <div class="modal-content">
-            <span class="close-modal">&times;</span>
-            <h2>Kategorien löschen</h2>
-            <p>Bist du sicher, dass du alle deine Kategorien löschen möchtest? Diese Aktion kann nicht rückgängig gemacht werden!</p>
-            <div class="modal-buttons">
-                <button id="cancel-delete-categories" class="btn-secondary">Abbrechen</button>
-                <button id="confirm-delete-categories" class="btn-danger">Ja, alle Kategorien löschen</button>
-            </div>
-        </div>
-    </div>
-    
-    <div id="delete-groups-modal" class="modal">
-        <div class="modal-content">
-            <span class="close-modal">&times;</span>
-            <h2>Gruppen löschen</h2>
-            <p>Bist du sicher, dass du alle deine Gruppen löschen möchtest? Diese Aktion kann nicht rückgängig gemacht werden!</p>
-            <div class="modal-buttons">
-                <button id="cancel-delete-groups" class="btn-secondary">Abbrechen</button>
-                <button id="confirm-delete-groups" class="btn-danger">Ja, alle Gruppen löschen</button>
-            </div>
-        </div>
-    </div>
-    
-    <div id="migrate-storage-modal" class="modal">
-        <div class="modal-content">
-            <span class="close-modal">&times;</span>
-            <h2>Daten verschieben</h2>
-            <p>Dies wird alle deine Daten vom aktuellen Speicherort in einen neuen Ordner verschieben. Dazu musst du einen neuen Zielordner auswählen.</p>
-            <div id="migration-progress" style="display: none;">
-                <h3>Migration läuft...</h3>
-                <div class="progress-bar-container">
-                    <div id="migration-progress-bar" class="progress-bar"></div>
-                </div>
-                <p id="migration-status">Vorbereitung...</p>
-            </div>
-            <div class="modal-buttons">
-                <button id="cancel-migrate-storage" class="btn-secondary">Abbrechen</button>
-                <button id="confirm-migrate-storage" class="btn-primary">Zielordner auswählen</button>
-            </div>
-        </div>
-    </div>
-    
-    <div id="backup-modal" class="modal">
-        <div class="modal-content">
-            <span class="close-modal">&times;</span>
-            <h2>Datensicherung</h2>
-            <p>Ein vollständiges Backup aller deiner Daten wird erstellt. Dies kann einen Moment dauern.</p>
-            <div id="backup-progress" style="display: none;">
-                <h3>Backup wird erstellt...</h3>
-                <div class="progress-bar-container">
-                    <div id="backup-progress-bar" class="progress-bar"></div>
-                </div>
-                <p id="backup-status">Vorbereitung...</p>
-            </div>
-            <div class="modal-buttons">
-                <button id="cancel-backup" class="btn-secondary">Abbrechen</button>
-                <button id="confirm-backup" class="btn-primary">Backup erstellen</button>
-            </div>
-        </div>
-    </div>
-    
-    <div id="backups-list-modal" class="modal">
-        <div class="modal-content modal-large">
-            <span class="close-modal">&times;</span>
-            <h2>Vorhandene Backups</h2>
-            <div id="backups-list-container">
-                <p>Lade Backups...</p>
-            </div>
-            <div class="modal-buttons">
-                <button id="close-backups-list" class="btn-secondary">Schließen</button>
-                <button id="cleanup-old-backups" class="btn-warning">Alte Backups bereinigen</button>
-            </div>
-        </div>
-    </div>
-
     <script src="js/notification.js"></script>
-    <script>
-        // Header und Footer dynamisch laden
-        async function loadHeaderAndFooter() {
-            try {
-                // Header und Footer laden
-                document.getElementById('header-container').innerHTML = await (await fetch('partials/header.html')).text();
-                document.getElementById('footer-container').innerHTML = await (await fetch('partials/footer.html')).text();
-                
-                // Skripte aus dem Header auswerten
-                const headerScripts = document.getElementById('header-container').querySelectorAll('script');
-                for (const script of headerScripts) {
-                    if (script.innerText) {
-                        eval(script.innerText);
-                    } else if (script.src) {
-                        const s = document.createElement('script');
-                        s.src = script.src;
-                        document.head.appendChild(s);
-                    }
-                }
-                
-                // Skripte aus dem Footer auswerten (wichtig, weil innerHTML <script> nicht automatisch ausgeführt wird)
-                const footerScripts = document.getElementById('footer-container').querySelectorAll('script');
-                for (const script of footerScripts) {
-                    if (script.innerText) {
-                        try { eval(script.innerText); } catch (e) { console.error('Fehler beim Ausführen eines Footer-inline-scripts:', e); }
-                    } else if (script.src) {
-                        const s = document.createElement('script');
-                        s.src = script.src;
-                        // Setze async=false um die Reihenfolge zu erhalten
-                        s.async = false;
-                        document.body.appendChild(s);
-                    }
-                }
-
-                // Explizit die Navigation aktualisieren, wenn nötig
-                if (window.updateNavigation) {
-                    // Die updateNavigation-Funktion hat bereits Throttling-Schutz
-                    window.updateNavigation();
-                }
-
-                // Falls das Storage-Status-Skript eine globale Aktualisierungsfunktion anbietet, rufe sie auf
-                setTimeout(() => {
-                    try {
-                        if (window.updateStorageStatusIcon) {
-                            window.updateStorageStatusIcon();
-                        } else if (window.updateStorageStatus) {
-                            window.updateStorageStatus();
-                        }
-                    } catch (e) {
-                        // kein Problem, nur optionales Update
-                    }
-                }, 50);
-            } catch (error) {
-                console.error('Fehler beim Laden des Headers oder Footers:', error);
-            }
-        }
-        
-        // Header und Footer laden
-        loadHeaderAndFooter();
-    </script>
+    <script src="js/profile.js"></script>
 </body>
 </html>

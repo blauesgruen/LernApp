@@ -87,33 +87,6 @@ class Logger {
         const logEntry = { timestamp: isoTimestamp, type, message };
 
         try {
-            // Logs in localStorage abrufen und aktualisieren
-            const existingLogs = JSON.parse(localStorage.getItem('persistentLogs')) || [];
-
-            // Doppelte Einträge vermeiden (Strenge Prüfung mit Zeitfenster)
-            // Prüfen, ob es in den letzten 2 Sekunden einen identischen Log gibt
-            const now = Date.now();
-            const isDuplicate = existingLogs.some(log => {
-                // Vergleich mit Zeitstempel und genauer Prüfung auf doppelte Einträge
-                if (log.message === message && log.type === type) {
-                    // Konvertiere ISO-String zurück zu Millisekunden für präzisen Zeitvergleich
-                    const logTime = new Date(log.timestamp).getTime();
-                    return (now - logTime) < 2000; // Innerhalb der letzten 2 Sekunden
-                }
-                return false;
-            });
-            
-            if (!isDuplicate) {
-                existingLogs.push(logEntry);
-
-                // Älteste Logs entfernen, wenn die maximale Kapazität erreicht wird
-                while (JSON.stringify(existingLogs).length > 50000) { // 50KB Speicher für Logs
-                    existingLogs.shift();
-                }
-
-                localStorage.setItem('persistentLogs', JSON.stringify(existingLogs));
-            }
-
             // Logs immer in der Konsole ausgeben, mit reduziertem Zeitstempelformat (hh:mm)
             console[type](`[${displayTimestamp}] ${type.toUpperCase()}: ${message}`);
             
@@ -131,31 +104,7 @@ class Logger {
                 }
             }
         } catch (error) {
-            if (error.name === 'QuotaExceededError') {
-                try {
-                    // Versuche, den localStorage zu reduzieren
-                    const existingLogs = JSON.parse(localStorage.getItem('persistentLogs')) || [];
-                    
-                    // Lösche die Hälfte der Logs auf einmal, um nicht erneut in eine Rekursion zu geraten
-                    const halfLength = Math.floor(existingLogs.length / 2);
-                    if (halfLength > 0) {
-                        const reducedLogs = existingLogs.slice(halfLength);
-                        localStorage.setItem('persistentLogs', JSON.stringify(reducedLogs));
-                        console.warn(`Speicherplatz reduziert: ${existingLogs.length - reducedLogs.length} Logs entfernt`);
-                    } else {
-                        // Falls keine Logs mehr zu entfernen sind, lösche alle persistentLogs
-                        localStorage.removeItem('persistentLogs');
-                        console.warn('Speicherplatz erschöpft: Alle persistenten Logs wurden gelöscht');
-                    }
-                    
-                    // Logge direkt in der Konsole, ohne erneuten Versuch, um Rekursion zu vermeiden
-                    console[type](`[${timestamp}] ${type.toUpperCase()}: ${message} (Nicht persistent gespeichert)`);
-                } catch (innerError) {
-                    console.error('Kritischer Fehler beim Bereinigen des Logspeichers:', innerError);
-                }
-            } else {
-                console.error('Fehler beim Logging:', error);
-            }
+            console.error('Fehler beim Logging:', error);
         }
     }
     
@@ -192,7 +141,7 @@ class Logger {
     }
     
     /**
-     * Trace-Nachricht loggen (detaillierteste Stufe)
+     * Trace-Nachricht loggen (detailliertste Stufe)
      * @param {string} message - Trace-Nachricht
      */
     trace(message) {
@@ -230,34 +179,6 @@ class Logger {
     setButtonLogsDisabled(disabled) {
         this.buttonLogsDisabled = disabled;
         this.info(`Button-Logs ${disabled ? 'deaktiviert' : 'aktiviert'}`);
-    }
-    
-    /**
-     * Alle Logs aus dem Speicher abrufen
-     * @returns {Array} Array mit allen Logs
-     */
-    getAllLogs() {
-        return JSON.parse(localStorage.getItem('persistentLogs')) || [];
-    }
-    
-    /**
-     * Logs nach Typ filtern
-     * @param {string} type - Log-Typ (error, warn, info, debug, trace)
-     * @returns {Array} Gefilterte Logs
-     */
-    getLogsByType(type) {
-        const logs = this.getAllLogs();
-        return logs.filter(log => log.type === type);
-    }
-    
-    /**
-     * Logs nach Text filtern
-     * @param {string} text - Zu suchender Text
-     * @returns {Array} Gefilterte Logs
-     */
-    searchLogs(text) {
-        const logs = this.getAllLogs();
-        return logs.filter(log => log.message.toLowerCase().includes(text.toLowerCase()));
     }
 }
 
@@ -314,3 +235,6 @@ window.logWarn = logger.warn.bind(logger);
 window.logInfo = logger.info.bind(logger);
 window.logDebug = logger.debug.bind(logger);
 window.logTrace = logger.trace.bind(logger);
+
+// Die lokale Speicherung und JSON-Logik wurde entfernt.
+// Die Logger-Funktionen nutzen jetzt Supabase für alle relevanten Datenoperationen.
