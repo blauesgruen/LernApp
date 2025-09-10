@@ -21,64 +21,55 @@
         <section id="category-management-section">
             <h1>Kategorien & Gruppen verwalten</h1>
             
-            <div class="category-layout">
+            <div id="profile-columns">
                 <!-- Linke Spalte: Kategorie-Baum -->
-                <div class="category-tree-column">
-                    <div class="management-card">
-                        <h2>Kategorien</h2>
-                        <div class="category-tree-container">
-                            <div id="category-tree" class="category-tree">
-                                <p class="loading-info">Kategorien werden geladen...</p>
+                <div class="profile-col profile-info">
+                    <h2>Kategorien</h2>
+                    <div class="category-tree-container">
+                        <div id="category-tree" class="category-tree">
+                            <p class="loading-info">Kategorien werden geladen...</p>
+                        </div>
+                    </div>
+                    <!-- Versteckte Felder für die ausgewählte Kategorie -->
+                    <input type="hidden" id="selected-category-id">
+                </div>
+                <!-- Mittlere Spalte: Kategorie erstellen -->
+                <div class="profile-col profile-db">
+                    <h2>Kategorie erstellen</h2>
+                    <form id="category-form" class="full-height-form">
+                        <div class="form-content">
+                            <div class="form-group">
+                                <label for="category-name">Name:</label>
+                                <input type="text" id="category-name" required placeholder="z.B. Geschichte" style="width:90%;margin-left:auto;margin-right:auto;display:block;">
+                            </div>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="submit" class="btn-primary" style="width:90%;margin-left:auto;margin-right:auto;display:block;">Kategorie erstellen</button>
+                        </div>
+                    </form>
+                </div>
+                <!-- Rechte Spalte: Gruppen erstellen -->
+                <div class="profile-col profile-danger">
+                    <h2>Gruppe erstellen</h2>
+                    <form id="group-form" class="full-height-form">
+                        <div class="form-content">
+                            <div class="form-group">
+                                <label for="group-category">Kategorie:</label>
+                                <select id="group-category" required style="width:90%;margin-left:auto;margin-right:auto;display:block;">
+                                    <option value="">-- Kategorie wählen --</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="group-name">Name:</label>
+                                <input type="text" id="group-name" required placeholder="z.B. Mittelalter" style="width:90%;margin-left:auto;margin-right:auto;display:block;">
                             </div>
                         </div>
                         
-                        <!-- Versteckte Felder für die ausgewählte Kategorie -->
-                        <input type="hidden" id="selected-category-id">
-                    </div>
-                </div>
-                
-                <!-- Mittlere Spalte: Kategorie erstellen -->
-                <div class="category-creator-column">
-                    <div class="management-card">
-                        <h2>Kategorie erstellen</h2>
-                        <form id="category-form" class="full-height-form">
-                            <div class="form-content">
-                                <div class="form-group">
-                                    <label for="category-name">Name:</label>
-                                    <input type="text" id="category-name" required placeholder="z.B. Geschichte">
-                                </div>
-                            </div>
-
-                            <div class="form-actions">
-                                <button type="submit" class="btn-primary">Kategorie erstellen</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-                
-                <!-- Rechte Spalte: Gruppen erstellen -->
-                <div class="group-creator-column">
-                    <div class="management-card">
-                        <h2>Gruppe erstellen</h2>
-                        <form id="group-form" class="full-height-form">
-                            <div class="form-content">
-                                <div class="form-group">
-                                    <label for="group-category">Kategorie:</label>
-                                    <select id="group-category" required>
-                                        <option value="">-- Kategorie wählen --</option>
-                                    </select>
-                                </div>
-                                <div class="form-group">
-                                    <label for="group-name">Name:</label>
-                                    <input type="text" id="group-name" required placeholder="z.B. Mittelalter">
-                                </div>
-                            </div>
-                            
-                            <div class="form-actions">
-                                <button type="submit" class="btn-primary">Gruppe erstellen</button>
-                            </div>
-                        </form>
-                    </div>
+                        <div class="form-actions">
+                            <button type="submit" class="btn-primary" style="width:90%;margin-left:auto;margin-right:auto;display:block;">Gruppe erstellen</button>
+                        </div>
+                    </form>
                 </div>
             </div>
             

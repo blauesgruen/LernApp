@@ -304,3 +304,26 @@ async function loadGroups() {
         groupsList.innerHTML = '<p class="error-text">Fehler beim Laden der Gruppen.</p>';
     }
 }
+
+/**
+ * Setzt die Breite und Zentrierung für alle Formularelemente nachträglich per JS
+ */
+function setFormElementWidths() {
+    const elements = [
+        ...document.querySelectorAll('.profile-col .form-group input'),
+        ...document.querySelectorAll('.profile-col .form-group select'),
+        ...document.querySelectorAll('.profile-col .form-actions button'),
+        ...document.querySelectorAll('.category-card .form-group input'),
+        ...document.querySelectorAll('.category-card .form-group select'),
+        ...document.querySelectorAll('.category-card .form-actions button')
+    ];
+    elements.forEach(el => {
+        el.style.width = '90%';
+        el.style.marginLeft = 'auto';
+        el.style.marginRight = 'auto';
+        el.style.display = 'block';
+        el.style.boxSizing = 'border-box';
+    });
+}
+
+document.addEventListener('DOMContentLoaded', setFormElementWidths);
