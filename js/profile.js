@@ -16,21 +16,53 @@ async function loadNickname() {
     }
 }
 
-async function saveNickname() {
-    const nickname = document.getElementById('nickname').value;
-    if (!nickname || nickname.length < 2) {
-        showError('Bitte geben Sie einen Nickname mit mindestens 2 Zeichen an!', 'nicknameMessage');
-        return;
+// Nickname speichern und in Supabase als display_name aktualisieren
+const saveNicknameBtn = document.getElementById('saveNickname');
+saveNicknameBtn.addEventListener('click', async function() {
+    const nicknameInput = document.getElementById('nickname');
+    const nickname = nicknameInput.value.trim();
+    const newPassword = document.getElementById('newPassword').value;
+    const newPasswordRepeat = document.getElementById('newPasswordRepeat').value;
+    let message = '';
+    let success = true;
+    // Nickname ändern
+    if (nickname) {
+        const { error } = await supabase.auth.updateUser({ data: { display_name: nickname } });
+        if (error) {
+            message += 'Fehler beim Nickname: ' + error.message + '\n';
+            success = false;
+        } else {
+            document.getElementById('profile-user-nickname').textContent = 'Nickname: ' + nickname;
+        }
     }
-    const { error } = await window.supabase.auth.updateUser({ data: { nickname } });
-    if (error) {
-        showError('Fehler beim Speichern: ' + error.message, 'nicknameMessage');
+    // Passwort ändern
+    if (newPassword || newPasswordRepeat) {
+        if (!newPassword || newPassword.length < 6) {
+            message += 'Mindestens 6 Zeichen für das Passwort!\n';
+            success = false;
+        } else if (newPassword !== newPasswordRepeat) {
+            message += 'Die Passwörter stimmen nicht überein!\n';
+            success = false;
+        } else {
+            const { error } = await supabase.auth.updateUser({ password: newPassword });
+            if (error) {
+                message += 'Fehler beim Passwort: ' + error.message + '\n';
+                success = false;
+            } else {
+                message += 'Passwort geändert.\n';
+            }
+        }
+    }
+    if (success) {
+        document.getElementById('nicknameMessage').textContent = 'Änderungen erfolgreich gespeichert.';
+        document.getElementById('nicknameMessage').style.color = 'green';
+        document.getElementById('passwordMessage').textContent = '';
     } else {
-        showSuccess('Nickname gespeichert!', 'nicknameMessage');
+        document.getElementById('nicknameMessage').textContent = message.trim();
+        document.getElementById('nicknameMessage').style.color = 'red';
+        document.getElementById('passwordMessage').textContent = '';
     }
-}
-
-document.getElementById('saveNickname').onclick = saveNickname;
+});
 loadNickname();
 
 // User-Info im Profil anzeigen
@@ -53,23 +85,6 @@ document.getElementById('deleteDb').onclick = async function() {
     }
     if (errorMsg) showError('Fehler beim Löschen: ' + errorMsg, 'deleteDbMessage');
     else showSuccess('Datenbank erfolgreich gelöscht!', 'deleteDbMessage');
-};
-
-// Passwort ändern
-document.getElementById('changePassword').onclick = async function() {
-    const newPassword = document.getElementById('newPassword').value;
-    const newPasswordRepeat = document.getElementById('newPasswordRepeat').value;
-    if (!newPassword || newPassword.length < 6) {
-        showError('Mindestens 6 Zeichen!', 'passwordMessage');
-        return;
-    }
-    if (newPassword !== newPasswordRepeat) {
-        showError('Die Passwörter stimmen nicht überein!', 'passwordMessage');
-        return;
-    }
-    const { error } = await window.supabase.auth.updateUser({ password: newPassword });
-    if (error) showError('Fehler: ' + error.message, 'passwordMessage');
-    else showSuccess('Passwort geändert!', 'passwordMessage');
 };
 
 // Account löschen

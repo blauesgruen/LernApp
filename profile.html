@@ -17,25 +17,25 @@
     <main>
         <section id="profile">
             <h1>Mein Profil</h1>
+            <div class="profile-user-info" style="margin-bottom: 18px;">
+                <span id="profile-user-nickname"></span>
+                <span id="profile-user-email"></span>
+            </div>
             <div id="profile-columns">
                 <div class="profile-col profile-info">
                     <h2>Profil</h2>
-                    <div class="profile-user-info">
-                        <span id="profile-user-nickname"></span>
-                        <span id="profile-user-email"></span>
-                    </div>
+                    <!-- Eingabefelder und Button, keine Anzeige von Nickname/Email mehr hier -->
                     <label for="nickname">Nickname:</label>
                     <input type="text" id="nickname" placeholder="Nickname">
+                    <label for="newPassword" style="margin-top:18px;">Neues Passwort:</label>
+                    <input type="password" id="newPassword" placeholder="Neues Passwort">
+                    <input type="password" id="newPasswordRepeat" placeholder="Passwort wiederholen">
                     <button id="saveNickname" class="btn-primary">Speichern</button>
                     <div id="nicknameMessage"></div>
+                    <div id="passwordMessage"></div>
                 </div>
                 <div class="profile-col profile-db">
                     <h2>Datenbank</h2>
-                    <label for="newPassword">Neues Passwort:</label>
-                    <input type="password" id="newPassword" placeholder="Neues Passwort">
-                    <input type="password" id="newPasswordRepeat" placeholder="Passwort wiederholen">
-                    <button id="changePassword" class="btn-primary">Passwort ändern</button>
-                    <div id="passwordMessage"></div>
                     <button id="exportDb" class="btn-secondary" style="margin-top:18px;">Exportieren</button>
                     <input type="file" id="importDbFile" style="display:none">
                     <button id="importDb" class="btn-secondary">Importieren</button>
