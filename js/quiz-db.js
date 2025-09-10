@@ -62,7 +62,22 @@ async function loadCategories() {
         console.error('Fehler beim Laden der Kategorien:', error);
         return [];
     }
-    return data;
+    // Normalize keys to camelCase expected by the app
+    try {
+        return data.map(c => ({
+            id: c.id,
+            name: c.name,
+            description: c.description ?? c.desc ?? '',
+            mainCategory: c.main_category ?? c.mainCategory ?? null,
+            createdBy: c.created_by ?? c.createdBy ?? (c.owner ?? null),
+            createdAt: c.created_at ?? c.createdAt ?? null,
+            // preserve other fields
+            ...c
+        }));
+    } catch (mapErr) {
+        console.warn('Warnung: Fehler beim Normalisieren der Kategorienfelder, Rückgabe der Rohdaten', mapErr);
+        return data;
+    }
 }
 
 /**
@@ -140,7 +155,23 @@ async function loadGroups() {
         console.error('Fehler beim Laden der Gruppen:', error);
         return [];
     }
-    return data;
+    // Normalize field names coming from Postgres (snake_case) to the app's expected camelCase
+    try {
+        return data.map(g => ({
+            // keep id and name as-is
+            id: g.id,
+            name: g.name,
+            // map common snake_case columns to camelCase used in the UI
+            categoryId: g.category_id ?? g.categoryId ?? null,
+            createdBy: g.created_by ?? g.createdBy ?? null,
+            createdAt: g.created_at ?? g.createdAt ?? null,
+            // include any additional fields so callers can still access them if needed
+            ...g
+        }));
+    } catch (mapErr) {
+        console.warn('Warnung: Fehler beim Normalisieren der Gruppenfelder, Rückgabe der Rohdaten', mapErr);
+        return data;
+    }
 }
 
 /**
