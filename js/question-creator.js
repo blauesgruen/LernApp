@@ -32,6 +32,22 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Initialisierung
     initializePage();
+
+    // Helper: Map client-side question object to DB columns (canonical snake_case)
+    function mapQuestionForDb(q) {
+        return {
+            text: q.question ?? q.text ?? null,
+            answer: q.answer ?? null,
+            additional_info: q.additionalInfo ?? q.additional_info ?? null,
+            type: q.type ?? null,
+            difficulty: q.difficulty ?? null,
+            tags: q.tags ?? null,
+            imageurl: q.imageUrl ?? q.imageurl ?? null,
+            category_id: q.categoryId ?? q.category_id ?? null,
+            group_id: q.group_id ?? q.groupId ?? null,
+            owner: q.owner ?? q.createdBy ?? null
+        };
+    }
     
     // Supabase-konforme Frage-Erstellung und Anzeige
     if (questionForm) {
@@ -81,7 +97,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const originalButtonText = submitButton.innerHTML;
                 submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Wird gespeichert...';
                 submitButton.disabled = true;
-                const { error } = await window.supabase.from('questions').insert([questionData]);
+                const { error } = await window.supabase.from('questions').insert([ mapQuestionForDb(questionData) ]);
                 if (!error) {
                     showSuccess('Frage wurde erfolgreich erstellt!');
                     resetForm();
@@ -362,7 +378,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const originalButtonText = submitButton.innerHTML;
                 submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Wird gespeichert...';
                 submitButton.disabled = true;
-                const { error } = await window.supabase.from('questions').insert([questionData]);
+                const { error } = await window.supabase.from('questions').insert([ mapQuestionForDb(questionData) ]);
                 if (!error) {
                     showSuccess('Frage wurde erfolgreich erstellt!');
                     resetForm();
@@ -738,7 +754,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const originalButtonText = submitButton.innerHTML;
                 submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Wird gespeichert...';
                 submitButton.disabled = true;
-                const { error } = await window.supabase.from('questions').insert([questionData]);
+                const { error } = await window.supabase.from('questions').insert([ mapQuestionForDb(questionData) ]);
                 if (!error) {
                     showSuccess('Frage wurde erfolgreich erstellt!');
                     resetForm();
@@ -1019,7 +1035,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const originalButtonText = submitButton.innerHTML;
                 submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Wird gespeichert...';
                 submitButton.disabled = true;
-                const { error } = await window.supabase.from('questions').insert([questionData]);
+                const { error } = await window.supabase.from('questions').insert([ mapQuestionForDb(questionData) ]);
                 if (!error) {
                     showSuccess('Frage wurde erfolgreich erstellt!');
                     resetForm();
@@ -1395,7 +1411,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const originalButtonText = submitButton.innerHTML;
                 submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Wird gespeichert...';
                 submitButton.disabled = true;
-                const { error } = await window.supabase.from('questions').insert([questionData]);
+                const { error } = await window.supabase.from('questions').insert([ mapQuestionForDb(questionData) ]);
                 if (!error) {
                     showSuccess('Frage wurde erfolgreich erstellt!');
                     resetForm();
@@ -1676,7 +1692,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const originalButtonText = submitButton.innerHTML;
                 submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Wird gespeichert...';
                 submitButton.disabled = true;
-                const { error } = await window.supabase.from('questions').insert([questionData]);
+                const { error } = await window.supabase.from('questions').insert([ mapQuestionForDb(questionData) ]);
                 if (!error) {
                     showSuccess('Frage wurde erfolgreich erstellt!');
                     resetForm();
@@ -2052,7 +2068,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const originalButtonText = submitButton.innerHTML;
                 submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Wird gespeichert...';
                 submitButton.disabled = true;
-                const { error } = await window.supabase.from('questions').insert([questionData]);
+                const { error } = await window.supabase.from('questions').insert([ mapQuestionForDb(questionData) ]);
                 if (!error) {
                     showSuccess('Frage wurde erfolgreich erstellt!');
                     resetForm();
@@ -2333,7 +2349,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const originalButtonText = submitButton.innerHTML;
                 submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Wird gespeichert...';
                 submitButton.disabled = true;
-                const { error } = await window.supabase.from('questions').insert([questionData]);
+                const { error } = await window.supabase.from('questions').insert([ mapQuestionForDb(questionData) ]);
                 if (!error) {
                     showSuccess('Frage wurde erfolgreich erstellt!');
                     resetForm();

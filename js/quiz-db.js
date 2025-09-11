@@ -32,6 +32,38 @@ const DEFAULT_CATEGORIES = [
     }
 ];
 
+// mapToDb: use global helper if present, otherwise local fallback
+function mapToDb(table, obj) {
+    try {
+        if (window.mapToDb && typeof window.mapToDb === 'function') {
+            return window.mapToDb(table, obj);
+        }
+    } catch (e) {
+        // ignore and fall back to local implementation
+    }
+    if (!obj || typeof obj !== 'object') return obj;
+    const out = {};
+    for (const k of Object.keys(obj)) {
+        const v = obj[k];
+        switch (k) {
+            case 'categoryId': out['category_id'] = v; break;
+            case 'groupId': out['group_id'] = v; break;
+            case 'createdBy': out['created_by'] = v; break;
+            case 'createdAt': out['created_at'] = v; break;
+            case 'imageUrl': out['imageurl'] = v; break;
+            case 'additionalInfo': out['additionalinfo'] = v; break;
+            case 'owner': out['owner'] = v; break;
+            case 'collaborators': out['collaborators'] = v; break;
+            case 'name': out['name'] = v; break;
+            case 'description': out['description'] = v; break;
+            case 'id': out['id'] = v; break;
+            default:
+                out[k] = v;
+        }
+    }
+    return out;
+}
+
 /**
  * Initialisiert die Datenbank bei der ersten Benutzung
  */
@@ -102,7 +134,7 @@ async function saveCategories(categories) {
             created_at: c.createdAt ?? c.created_at ?? null
         }));
         // Mehrere Kategorien als Batch speichern
-        const { error } = await window.supabase.from('categories').upsert(payload);
+    const { error } = await window.supabase.from('categories').upsert(window.mapToDb('categories', payload));
         if (error) {
             console.error("Fehler beim Speichern der Kategorien:", error);
             return false;
@@ -131,12 +163,8 @@ async function createCategory(name, owner, description = '', collaborators = [])
         return null;
     }
     try {
-        const { data, error } = await window.supabase.from('categories').insert({
-            name,
-            description,
-            owner,
-            collaborators
-        }).select();
+    const payload = mapToDb('categories', { name, description, owner, collaborators });
+    const { data, error } = await window.supabase.from('categories').insert(window.mapToDb('categories', payload)).select();
         if (error) {
             console.error('Fehler beim Erstellen der Kategorie:', error);
             return null;
@@ -200,7 +228,7 @@ async function saveGroups(groups) {
             created_by: g.createdBy ?? g.created_by ?? null,
             created_at: g.createdAt ?? g.created_at ?? new Date().toISOString()
         }));
-        const { error } = await window.supabase.from('groups').upsert(payload);
+    const { error } = await window.supabase.from('groups').upsert(window.mapToDb('groups', payload));
         if (error) {
             console.error("Fehler beim Speichern der Gruppen:", error);
             return false;
@@ -229,12 +257,9 @@ async function createGroup(name, category_id, owner, collaborators = []) {
         return null;
     }
     try {
-        const { data, error } = await window.supabase.from('groups').insert({
-            name,
-            category_id,
-            owner,
-            collaborators
-        }).select();
+        // ensure payload uses canonical DB column names
+        const payload = mapToDb('groups', { name, category_id, owner, collaborators });
+    const { data, error } = await window.supabase.from('groups').insert(window.mapToDb('groups', payload)).select();
             if (error) {
                 console.error('Fehler beim Erstellen der Gruppe:', error);
                 return null;
@@ -275,7 +300,7 @@ async function updateGroup(groupId, updates) {
         if (typeof updates.name !== 'undefined') payload.name = updates.name;
         if (typeof updates.categoryId !== 'undefined') payload.category_id = updates.categoryId;
 
-        const { data, error } = await window.supabase.from('groups').update(payload).eq('id', groupId).select();
+    const { data, error } = await window.supabase.from('groups').update(window.mapToDb('groups', payload)).eq('id', groupId).select();
         if (error) {
             console.error('Fehler beim Aktualisieren der Gruppe:', error);
             return null;
@@ -343,7 +368,7 @@ async function updateCategory(categoryId, updates) {
         if (typeof updates.description !== 'undefined') payload.description = updates.description;
     if (typeof updates.mainCategory !== 'undefined') payload.maincategory = updates.mainCategory;
 
-        const { data, error } = await window.supabase.from('categories').update(payload).eq('id', categoryId).select();
+    const { data, error } = await window.supabase.from('categories').update(window.mapToDb('categories', payload)).eq('id', categoryId).select();
         if (error) {
             console.error('Fehler beim Aktualisieren der Kategorie:', error);
             return null;
@@ -375,43 +400,40 @@ async function deleteCategory(categoryId) {
     }
     if (!categoryId) return false;
     try {
-        // Prüfe, ob Fragen vorhanden sind.
-        // Verschiedene DB-Schemas können unterschiedliche Spaltennamen verwenden;
-        // versuche mehrere mögliche Spaltennamen, damit eine fehlende Spalte
-        // (SQL 42703) nicht zu einem Abbruch führt.
-        let questions = null;
+        // Fragen hängen an Gruppen; prüfe stattdessen, ob Gruppen in dieser Kategorie existieren.
+        let groups = null;
         let qErr = null;
-    const columnCandidates = ['category_id', 'categoryid', 'categoryId'];
-        for (const col of columnCandidates) {
-            try {
-                const resp = await window.supabase.from('questions').select('id').eq(col, categoryId).limit(1);
-                if (resp.error) {
-                    // Wenn die Spalte nicht existiert (Postgres 42703), probiere die nächste Variante
-                    if (resp.error.code === '42703' || (resp.error.message && resp.error.message.includes('does not exist'))) {
-                        continue;
+        const safeCategoryId = (categoryId === null || categoryId === undefined) ? '' : String(categoryId).trim();
+        try {
+            // Fast path: check canonical groups.category_id
+            const grpResp = await window.supabase.from('groups').select('id').filter('category_id', 'eq', safeCategoryId).limit(1);
+            if (grpResp && grpResp.error) {
+                // Wenn die kanonische Spalte fehlt oder ein Fehler auftritt, versuche alternative Spaltennamen
+                console.warn('deleteCategory: canonical groups.category_id filter failed, trying alternatives:', grpResp.error);
+                const altCols = ['categoryid', 'categoryId', 'category'];
+                let found = false;
+                for (const c of altCols) {
+                    try {
+                        const altResp = await window.supabase.from('groups').select('id').filter(c, 'eq', safeCategoryId).limit(1);
+                        if (altResp && !altResp.error) { groups = altResp.data || []; found = true; break; }
+                    } catch (e) {
+                        console.warn('deleteCategory: alternative groups column check failed for', c, e);
                     }
-                    qErr = resp.error;
-                    break;
                 }
-                questions = resp.data || [];
-                break; // erfolgreiche Abfrage
-            } catch (err) {
-                // Falls die Client-Bibliothek eine Exception wirft, prüfe die Fehlermeldung
-                qErr = err;
-                if (err && err.message && err.message.includes('does not exist')) {
-                    // Fehler aufgrund fehlender Spalte — nächste Spaltenvariante versuchen
-                    qErr = null;
-                    continue;
-                }
-                break;
+                if (!found) qErr = grpResp.error;
+            } else {
+                groups = (grpResp && grpResp.data) ? grpResp.data : [];
             }
+        } catch (err) {
+            console.warn('deleteCategory: unexpected error during groups existence check:', err);
+            qErr = err;
         }
         if (qErr) {
-            console.error('Fehler beim Prüfen der Fragen zur Kategorie:', qErr);
+            console.error('Fehler beim Prüfen vorhandener Gruppen zur Kategorie:', qErr);
             return false;
         }
-        if (questions && questions.length > 0) {
-            showError('Diese Kategorie kann nicht gelöscht werden, da ihr noch Fragen zugeordnet sind.');
+        if (groups && groups.length > 0) {
+            showError('Diese Kategorie kann nicht gelöscht werden, da noch Gruppen in ihr vorhanden sind.');
             return false;
         }
 
@@ -428,6 +450,92 @@ async function deleteCategory(categoryId) {
         return true;
     } catch (error) {
         console.error('Fehler beim Löschen der Kategorie:', error);
+        return false;
+    }
+}
+
+/**
+ * Löscht Kategorie inkl. aller Gruppen und Fragen (destructive cascade).
+ * Diese Funktion sollte nur nach ausdrücklicher Bestätigung durch den Nutzer aufgerufen werden.
+ */
+async function cascadeDeleteCategory(categoryId) {
+    if (!window.supabase) {
+        console.error('Supabase-Client ist nicht verfügbar.');
+        return false;
+    }
+    if (!categoryId) return false;
+    try {
+        // Lade Gruppen der Kategorie
+        const { data: groups, error: gErr } = await window.supabase.from('groups').select('id').eq('category_id', categoryId);
+        if (gErr) {
+            console.error('Fehler beim Laden der Gruppen für Cascade-Delete:', gErr);
+            return false;
+        }
+        const groupIds = (groups || []).map(g => g.id).filter(Boolean);
+
+        // Lösche alle Fragen, die zu diesen Gruppen gehören
+        if (groupIds.length > 0) {
+            const { error: qErr } = await window.supabase.from('questions').delete().in('group_id', groupIds);
+            if (qErr) {
+                console.error('Fehler beim Löschen der Fragen während Cascade-Delete:', qErr);
+                return false;
+            }
+            // Lösche Gruppen
+            const { error: delGroupErr } = await window.supabase.from('groups').delete().in('id', groupIds);
+            if (delGroupErr) {
+                console.error('Fehler beim Löschen der Gruppen während Cascade-Delete:', delGroupErr);
+                return false;
+            }
+        }
+
+        // Zum Schluss die Kategorie löschen
+        const { data: delData, error: delErr } = await window.supabase.from('categories').delete().eq('id', categoryId).select();
+        if (delErr) {
+            console.error('Fehler beim Löschen der Kategorie (Cascade):', delErr);
+            return false;
+        }
+        if (!delData || delData.length === 0) {
+            console.warn('Cascade-Delete: keine Kategorie-Zeile gelöscht (mögliche RLS-Verweigerung).');
+            return false;
+        }
+        return true;
+    } catch (err) {
+        console.error('Fehler im Cascade-Delete:', err);
+        return false;
+    }
+}
+
+/**
+ * Löscht eine Gruppe und alle zugehörigen Fragen (destructive cascade)
+ * @param {string} groupId
+ * @returns {Promise<boolean>}
+ */
+async function cascadeDeleteGroup(groupId) {
+    if (!window.supabase) {
+        console.error('Supabase-Client ist nicht verfügbar.');
+        return false;
+    }
+    if (!groupId) return false;
+    try {
+        // Lösche Fragen, die zu dieser Gruppe gehören
+        const { error: qErr } = await window.supabase.from('questions').delete().in('group_id', [groupId]);
+        if (qErr) {
+            console.error('Fehler beim Löschen der Fragen für Gruppe:', qErr);
+            return false;
+        }
+        // Lösche die Gruppe
+        const { data: delData, error: delErr } = await window.supabase.from('groups').delete().eq('id', groupId).select();
+        if (delErr) {
+            console.error('Fehler beim Löschen der Gruppe:', delErr);
+            return false;
+        }
+        if (!delData || delData.length === 0) {
+            console.warn('CascadeDeleteGroup: keine Gruppe gelöscht (mögliche RLS-Verweigerung).');
+            return false;
+        }
+        return true;
+    } catch (err) {
+        console.error('Fehler in cascadeDeleteGroup:', err);
         return false;
     }
 }
@@ -452,7 +560,9 @@ if (typeof window !== 'undefined') {
             updateGroup,
             deleteGroup,
             updateCategory,
-            deleteCategory
+            deleteCategory,
+            // destructive, explicit cascade delete (must be called after user confirmation)
+            cascadeDeleteCategory
             // weitere Funktionen können hier bei Bedarf ergänzt werden
         };
         console.log('quizDB: API attached to window.quizDB');
@@ -497,7 +607,7 @@ async function saveQuestions(questions) {
             created_by: q.createdBy ?? q.created_by ?? null,
             created_at: q.createdAt ?? q.created_at ?? new Date().toISOString()
         }));
-        const { error } = await window.supabase.from('questions').upsert(payload);
+    const { error } = await window.supabase.from('questions').upsert(window.mapToDb('questions', payload));
         if (error) {
             console.error("Fehler beim Speichern der Fragen:", error);
             return false;
@@ -571,7 +681,7 @@ async function createQuestion(questionData) {
             created_at: new Date().toISOString()
         };
 
-        const { data: insertData, error: insertErr } = await window.supabase.from('questions').insert(payload).select();
+    const { data: insertData, error: insertErr } = await window.supabase.from('questions').insert(window.mapToDb('questions', payload)).select();
         if (insertErr) {
             console.error('Fehler beim Erstellen der Frage (DB):', insertErr);
             return null;
@@ -788,7 +898,7 @@ async function saveStatistics(userId, questionId, isCorrect) {
         }
         stats.question_stats[questionId].lastAnswered = Date.now();
         // Speichere Statistik
-        const { error: upsertError } = await window.supabase.from('statistics').upsert([stats]);
+    const { error: upsertError } = await window.supabase.from('statistics').upsert(window.mapToDb('statistics', [stats]));
         if (upsertError) {
             console.error("Fehler beim Speichern der Statistik:", upsertError);
             return false;
@@ -818,7 +928,7 @@ async function saveQuizResult(userId, categoryId, totalQuestions, correctAnswers
             timeSpent
         });
         // Speichere Statistik
-        const { error: upsertError } = await window.supabase.from('statistics').upsert([stats]);
+    const { error: upsertError } = await window.supabase.from('statistics').upsert(window.mapToDb('statistics', [stats]));
         if (upsertError) {
             console.error("Fehler beim Speichern des Quiz-Ergebnisses:", upsertError);
             return false;
@@ -859,7 +969,7 @@ async function addCollaborator(categoryId, userId) {
         }
         collaborators.push(userId);
         // Update in Supabase
-        const { error: updateError } = await window.supabase.from('categories').update({ collaborators }).eq('id', categoryId);
+    const { error: updateError } = await window.supabase.from('categories').update(window.mapToDb('categories', { collaborators })).eq('id', categoryId);
         if (updateError) {
             console.error('Fehler beim Hinzufügen des Collaborators:', updateError);
             return false;
@@ -900,7 +1010,7 @@ async function removeCollaborator(categoryId, userId) {
         }
         collaborators = collaborators.filter(id => id !== userId);
         // Update in Supabase
-        const { error: updateError } = await window.supabase.from('categories').update({ collaborators }).eq('id', categoryId);
+    const { error: updateError } = await window.supabase.from('categories').update(window.mapToDb('categories', { collaborators })).eq('id', categoryId);
         if (updateError) {
             console.error('Fehler beim Entfernen des Collaborators:', updateError);
             return false;
@@ -929,8 +1039,10 @@ window.quizDB = Object.assign(window.quizDB || {}, {
     createGroup,
     updateGroup,
     deleteGroup,
+    cascadeDeleteGroup,
     updateCategory,
     deleteCategory,
+    cascadeDeleteCategory,
     saveStatistics,
     saveQuizResult,
     addCollaborator,

@@ -155,10 +155,39 @@ document.getElementById('importDbFile').onchange = async function(e) {
                 }
                 // Pflichtfelder ergänzen
                 filteredRow.owner = user.data.user.id;
-                // category_id ggf. ergänzen (bei Gruppen/Fragen, falls vorhanden)
-                if (table === 'groups' && row.category_id) filteredRow.category_id = row.category_id;
-                if (table === 'questions' && row.category_id) filteredRow.category_id = row.category_id;
-                const { error } = await window.supabase.from(table).upsert(filteredRow);
+                // Map to canonical DB columns before upsert
+                function mapImportRowToDb(t, r) {
+                    if (t === 'questions') {
+                        return {
+                            question: r.question ?? r.text ?? null,
+                            answer: r.answer ?? null,
+                            additionalinfo: r.additionalInfo ?? r.additionalinfo ?? null,
+                            type: r.type ?? null,
+                            difficulty: r.difficulty ?? null,
+                            tags: r.tags ?? null,
+                            imageurl: r.imageurl ?? r.imageUrl ?? null,
+                            category_id: r.category_id ?? r.categoryId ?? null,
+                            owner: r.owner ?? null
+                        };
+                    }
+                    if (t === 'groups') {
+                        return {
+                            name: r.name ?? null,
+                            description: r.description ?? null,
+                            category_id: r.category_id ?? r.categoryId ?? null,
+                            owner: r.owner ?? null
+                        };
+                    }
+                    // categories
+                    return {
+                        name: r.name ?? null,
+                        description: r.description ?? null,
+                        color: r.color ?? null,
+                        owner: r.owner ?? null
+                    };
+                }
+                const dbRow = mapImportRowToDb(table, filteredRow);
+                const { error } = await window.supabase.from(table).upsert(window.mapToDb(table, dbRow));
                 if (error) errorMsg += table + ': ' + error.message + '\n';
             }
         }
@@ -177,7 +206,13 @@ document.getElementById('importDbFile').onchange = async function(e) {
                 const allowed = ['name', 'description', 'color'];
                 allowed.forEach(f => { if (row[f] !== undefined) filteredRow[f] = row[f]; });
                 filteredRow.owner = user.data.user.id;
-                const { error } = await window.supabase.from('categories').upsert(filteredRow);
+                const { error } = await window.supabase.from('categories').upsert(window.mapToDb('categories', {
+                    name: filteredRow.name,
+                    description: filteredRow.description,
+                    color: filteredRow.color,
+                    owner: filteredRow.owner,
+                    collaborators: filteredRow.collaborators
+                }));
                 if (error) errorMsg += 'categories: ' + error.message + '\n';
             }
         }
@@ -193,7 +228,12 @@ document.getElementById('importDbFile').onchange = async function(e) {
                 const allowed = ['name', 'description', 'category_id'];
                 allowed.forEach(f => { if (row[f] !== undefined && row[f] !== '') filteredRow[f] = row[f]; });
                 filteredRow.owner = user.data.user.id;
-                const { error } = await window.supabase.from('groups').upsert(filteredRow);
+                const { error } = await window.supabase.from('groups').upsert(window.mapToDb('groups', {
+                    name: filteredRow.name,
+                    description: filteredRow.description,
+                    category_id: filteredRow.category_id ?? filteredRow.categoryId ?? null,
+                    owner: filteredRow.owner
+                }));
                 if (error) errorMsg += 'groups: ' + error.message + '\n';
             }
         }
@@ -208,7 +248,17 @@ document.getElementById('importDbFile').onchange = async function(e) {
                 allowed.forEach(f => { if (row[f] !== undefined) filteredRow[f] = row[f]; });
                 filteredRow.owner = user.data.user.id;
                 if (row.category_id) filteredRow.category_id = row.category_id;
-                const { error } = await window.supabase.from('questions').upsert(filteredRow);
+                const { error } = await window.supabase.from('questions').upsert(window.mapToDb('questions', {
+                    question: filteredRow.question ?? filteredRow.text ?? null,
+                    answer: filteredRow.answer ?? null,
+                    additionalinfo: filteredRow.additionalInfo ?? filteredRow.additionalinfo ?? null,
+                    type: filteredRow.type ?? null,
+                    difficulty: filteredRow.difficulty ?? null,
+                    tags: filteredRow.tags ?? null,
+                    imageurl: filteredRow.imageurl ?? filteredRow.imageUrl ?? null,
+                    category_id: filteredRow.category_id ?? filteredRow.categoryId ?? null,
+                    owner: filteredRow.owner
+                }));
                 if (error) errorMsg += 'questions: ' + error.message + '\n';
             }
         }
@@ -278,7 +328,7 @@ if (document.getElementById('importGroupsBtn')) {
                         debugData.push(JSON.parse(JSON.stringify(filteredGroup)));
                         // Nur wenn Name und Kategorie vorhanden sind, senden
                         if (filteredGroup.name && filteredGroup.category_id) {
-                            const { error, data: supaResp } = await window.supabase.from('groups').upsert(filteredGroup);
+                            const { error, data: supaResp } = await window.supabase.from('groups').upsert(window.mapToDb('groups', filteredGroup));
                             if (error) {
                                 errorMsg += error.message + '\n';
                                 console.error('Supabase Error:', error, 'Gesendete Daten:', filteredGroup, 'Response:', supaResp);
@@ -344,7 +394,7 @@ if (document.getElementById('importQuestionsBtn')) {
                             for (const groupId of foundGroups) {
                                 let filteredQuestion = { ...filteredQuestionBase, group_id: groupId };
                                 debugData.push(JSON.parse(JSON.stringify(filteredQuestion)));
-                                const { error } = await window.supabase.from('questions').upsert(filteredQuestion);
+                                const { error } = await window.supabase.from('questions').upsert(window.mapToDb('questions', filteredQuestion));
                                 if (error) {
                                     errorMsg += error.message + '\n';
                                     console.error('Supabase Error:', error, 'Gesendete Daten:', filteredQuestion);
@@ -418,7 +468,7 @@ if (document.getElementById('importCategoriesBtn')) {
                         if (category.description !== undefined) filteredCategory.description = category.description;
                         filteredCategory.owner = user.data.user.id;
                         if (category.collaborators) filteredCategory.collaborators = category.collaborators;
-                        const { error } = await window.supabase.from('categories').upsert(filteredCategory);
+                        const { error } = await window.supabase.from('categories').upsert(window.mapToDb('categories', filteredCategory));
                         if (error) {
                             errorMsg += error.message + '\n';
                         } else {

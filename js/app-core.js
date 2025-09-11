@@ -3,6 +3,26 @@
 //             <script src="js/app-core.js"></script>
 
 // 1. Supabase-Initialisierung
+// 0. Zentraler Logger (Fallback): stellt sicher, dass window.logConsole
+// vor allen frühen Aufrufen existiert. Eine ausführlichere Implementierung
+// weiter unten wurde entfernt, um Duplikate zu vermeiden.
+if (typeof window.logConsole !== 'function') {
+    window.logConsole = function(msg, type = 'log') {
+        try {
+            var output = (typeof msg === 'object') ? JSON.stringify(msg) : msg;
+        } catch (e) {
+            var output = msg;
+        }
+        switch(type) {
+            case 'error': console.error(output); break;
+            case 'warn': console.warn(output); break;
+            case 'info': console.info(output); break;
+            case 'debug': console.debug(output); break;
+            default: console.log(output);
+        }
+    };
+}
+
 function initSupabase() {
     // If a client already exists on window, prefer it (backwards compatibility with pages that created a client inline)
     if (window.supabaseClient) {
@@ -26,15 +46,15 @@ function initSupabase() {
     const url = 'https://yzyrvwmofyztwttgmyqn.supabase.co';
     const key = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl6eXJ2d21vZnl6dHd0dGdteXFuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc0NjA2ODUsImV4cCI6MjA3MzAzNjY4NX0.OaFPV0q-0mf2LO4dFd7FEd-vNzRjA1nJPnEXHM3WiXw';
     try {
-        window.supabaseClient = window.supabase.createClient(url, key);
-        console.log('Supabase-Client initialisiert.');
+    window.supabaseClient = window.supabase.createClient(url, key);
+    window.logConsole('Supabase-Client initialisiert.', 'info');
         // Backwards compatibility: some modules expect `window.supabase` to be the client
         // If `window.supabase.from` is not a function (i.e. `window.supabase` is the library),
         // point `window.supabase` to the initialized client so older calls work.
         try {
-            if (typeof window.supabase.from !== 'function') {
+                if (typeof window.supabase.from !== 'function') {
                 window.supabase = window.supabaseClient;
-                console.log('Supabase-Client als `window.supabase` gesetzt (Abwärtskompatibilität).');
+                window.logConsole('Supabase-Client als `window.supabase` gesetzt (Abwärtskompatibilität).', 'info');
             }
         } catch (compatErr) {
             // ignore
@@ -56,8 +76,34 @@ if (!window.storage) {
         getUsername: function() { return this.getItem('username'); },
         setUsername: function(name) { this.setItem('username', name); }
     };
-    console.log('storage adapter initialized (fallback to localStorage)');
+    window.logConsole('storage adapter initialized (fallback to localStorage)', 'info');
 }
+
+// Globaler Helper: map client-friendly keys to canonical DB column names (snake_case)
+// Wird von Modulen verwendet, die Payloads an Supabase senden.
+window.mapToDb = function(table, obj) {
+    if (!obj || typeof obj !== 'object') return obj;
+    const out = {};
+    for (const k of Object.keys(obj)) {
+        const v = obj[k];
+        switch (k) {
+            case 'categoryId': out['category_id'] = v; break;
+            case 'groupId': out['group_id'] = v; break;
+            case 'createdBy': out['created_by'] = v; break;
+            case 'createdAt': out['created_at'] = v; break;
+            case 'imageUrl': out['imageurl'] = v; break;
+            case 'additionalInfo': out['additionalinfo'] = v; break;
+            case 'owner': out['owner'] = v; break;
+            case 'collaborators': out['collaborators'] = v; break;
+            case 'name': out['name'] = v; break;
+            case 'description': out['description'] = v; break;
+            case 'id': out['id'] = v; break;
+            default:
+                out[k] = v;
+        }
+    }
+    return out;
+};
 
 // Load header/footer central helper so pages can call it once
 window.loadHeaderFooter = function() {
@@ -154,7 +200,7 @@ window.showError = function(msg) {
     } else {
         alert('Fehler: ' + msg);
     }
-    console.error(msg);
+    window.logConsole(msg, 'error');
 };
 window.showSuccess = function(msg) {
     if (window.logger) window.logger.log(msg, 'success');
@@ -163,15 +209,15 @@ window.showSuccess = function(msg) {
     } else {
         alert('Erfolg: ' + msg);
     }
-    console.log(msg);
+    window.logConsole(msg, 'info');
 };
 window.logInfo = function(msg) {
     if (window.logger) window.logger.log(msg, 'info');
-    console.log(msg);
+    window.logConsole(msg, 'info');
 };
 window.logDebug = function(msg) {
     if (window.logger) window.logger.log(msg, 'debug');
-    console.debug(msg);
+    window.logConsole(msg, 'debug');
 };
 
 // 8. Zentrale Konsolen-Ausgabe

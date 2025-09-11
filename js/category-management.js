@@ -479,36 +479,141 @@ document.getElementById('edit-item-form').addEventListener('submit', async funct
     }
 });
 
-// handle delete
-document.getElementById('edit-item-delete').addEventListener('click', async function() {
-    const type = document.getElementById('edit-item-type').value;
-    const id = document.getElementById('edit-item-id').value;
+// handle delete: use delegated click handler so it works even if the button is created later
+async function handleEditItemDelete() {
+    const type = document.getElementById('edit-item-type')?.value;
+    const id = document.getElementById('edit-item-id')?.value;
+    if (!type || !id) return;
     try {
-        const confirmed = await (window.helpers && typeof window.helpers.confirmDialog === 'function'
-            ? window.helpers.confirmDialog('Löschen bestätigen', 'Wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.', 'Löschen', 'Abbrechen')
-            : Promise.resolve(confirm('Wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.')));
-        if (!confirmed) return;
+        try { closeEditModal(); } catch (e) { /* ignore */ }
 
-        // optimistic delete: remove from DOM first and restore on failure
-        let removedNode = null;
-        if (type === 'category') {
-            const catEl = categoryTree.querySelector(`.tree-item-category[data-id="${id}"]`);
-            if (catEl) { removedNode = catEl; const next = catEl.nextElementSibling; catEl.parentNode.removeChild(catEl); if (next && next.classList.contains('tree-group-container')) { next.parentNode.removeChild(next); removedNode._sibling = next; } }
-            const ok = await window.quizDB.deleteCategory(id);
-            if (ok) showSuccess('Kategorie gelöscht.'); else { showError('Löschen fehlgeschlagen.'); if (removedNode) { const ref = categoryTree.querySelector('.tree-item') || null; categoryTree.insertBefore(removedNode, ref); if (removedNode._sibling) categoryTree.insertBefore(removedNode._sibling, removedNode.nextSibling); } }
-        } else if (type === 'group') {
-            const gEl = categoryTree.querySelector(`.tree-item-group[data-id="${id}"]`);
-            let parent = null, next = null;
-            if (gEl) { parent = gEl.parentNode; next = gEl.nextElementSibling; removedNode = gEl; parent.removeChild(gEl); }
-            const ok = await window.quizDB.deleteGroup(id);
-            if (ok) showSuccess('Gruppe gelöscht.'); else { showError('Löschen fehlgeschlagen.'); if (removedNode && parent) { parent.insertBefore(removedNode, next); } }
+        if (!document.getElementById('cascade-delete-modal')) {
+            // full-screen overlay with centered dialog to ensure visibility above all content
+            const modalHtml = `
+            <div id="cascade-delete-modal" role="dialog" aria-hidden="true" style="display:none;position:fixed;inset:0;z-index:2147483646;">
+                <div class="modal-backdrop" style="position:absolute;inset:0;background:rgba(0,0,0,0.45);"></div>
+                <div class="modal-panel" role="document" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:#fff;color:#222;max-width:640px;width:90%;border-radius:8px;padding:18px;box-shadow:0 8px 32px rgba(0,0,0,0.3);">
+                    <h2 id="cascade-delete-title" style="margin-top:0;font-size:18px;">Löschen bestätigen</h2>
+                    <p id="cascade-delete-body" style="margin:10px 0;color:#333;"></p>
+                    <div class="modal-actions" style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;">
+                        <button id="cascade-delete-cancel" class="btn" style="background:#eee;border:1px solid #ccc;padding:8px 12px;border-radius:6px;">Abbrechen</button>
+                        <button id="cascade-delete-confirm" class="btn btn-danger" style="background:#d9534f;color:#fff;border:none;padding:8px 12px;border-radius:6px;">Löschen</button>
+                    </div>
+                </div>
+            </div>`;
+            const div = document.createElement('div'); div.innerHTML = modalHtml; document.body.appendChild(div.firstElementChild);
+            document.getElementById('cascade-delete-cancel').addEventListener('click', () => {
+                const m = document.getElementById('cascade-delete-modal'); if (m) { m.style.display='none'; m.setAttribute('aria-hidden','true'); }
+            });
+            document.getElementById('cascade-delete-confirm').addEventListener('click', async () => {
+                const m = document.getElementById('cascade-delete-modal');
+                const t = m?.dataset?.type;
+                const entityId = m?.dataset?.entityId;
+                if (!t || !entityId) {
+                    if (m) { m.style.display='none'; m.setAttribute('aria-hidden','true'); }
+                    return;
+                }
+                try {
+                    document.getElementById('cascade-delete-confirm').disabled = true;
+                    if (t === 'category') {
+                        const ok = await window.quizDB.cascadeDeleteCategory(entityId);
+                        if (ok) showSuccess('Kategorie und zugehörige Inhalte gelöscht.'); else showError('Löschen fehlgeschlagen.');
+                    } else if (t === 'group') {
+                        const ok = await window.quizDB.cascadeDeleteGroup(entityId);
+                        if (ok) showSuccess('Gruppe und zugehörige Fragen gelöscht.'); else showError('Löschen fehlgeschlagen.');
+                    }
+                } catch (e) {
+                    console.error('Cascade delete error', e); showError('Fehler beim Löschen.');
+                } finally {
+                    if (m) { m.style.display='none'; m.setAttribute('aria-hidden','true'); }
+                    document.getElementById('cascade-delete-confirm').disabled = false;
+                    await loadCategoryTree(); await updateCategorySelects();
+                }
+            });
         }
-        closeEditModal();
-        await loadCategoryTree();
-        await updateCategorySelects();
+
+        const modal = document.getElementById('cascade-delete-modal');
+        const body = document.getElementById('cascade-delete-body');
+        if (type === 'category') {
+            document.getElementById('cascade-delete-title').textContent = 'Kategorie löschen';
+            body.innerHTML = 'Beim Löschen dieser Kategorie werden alle zugehörigen Gruppen und deren Fragen unwiderruflich entfernt. Möchtest du fortfahren?';
+            modal.dataset.type = 'category';
+            modal.dataset.entityId = id;
+        } else if (type === 'group') {
+            document.getElementById('cascade-delete-title').textContent = 'Gruppe löschen';
+            body.innerHTML = 'Beim Löschen dieser Gruppe werden alle zugehörigen Fragen unwiderruflich entfernt. Möchtest du fortfahren?';
+            modal.dataset.type = 'group';
+            modal.dataset.entityId = id;
+        } else {
+            modal.style.display = 'none'; modal.setAttribute('aria-hidden','true');
+            return;
+        }
+        modal.style.display = 'block'; modal.setAttribute('aria-hidden','false');
     } catch (err) {
-        console.error('Fehler beim Löschen:', err);
-        showError('Fehler beim Löschen.');
+        console.error('Fehler beim Anzeigen des Lösch-Dialogs:', err);
+        showError('Fehler beim Anzeigen des Lösch-Dialogs.');
+    }
+}
+
+// delegated click so it works even if the edit modal button is added later
+document.addEventListener('click', function(e) {
+    const btn = e.target.closest && e.target.closest('#edit-item-delete');
+    if (btn) {
+        e.preventDefault();
+        handleEditItemDelete();
+    }
+});
+
+// delegated handlers for modal confirm/cancel to guarantee responsiveness
+document.addEventListener('click', function(e) {
+    // confirm
+    const c = e.target.closest && e.target.closest('#cascade-delete-confirm');
+    if (c) {
+        e.preventDefault();
+        (async function(){
+            const m = document.getElementById('cascade-delete-modal');
+            if (!m) return;
+            const t = m.dataset?.type;
+            const entityId = m.dataset?.entityId;
+            if (!t || !entityId) { m.style.display='none'; m.setAttribute('aria-hidden','true'); return; }
+            try {
+                c.disabled = true;
+                if (t === 'category') {
+                    const ok = await window.quizDB.cascadeDeleteCategory(entityId);
+                    if (ok) showSuccess('Kategorie und zugehörige Inhalte gelöscht.'); else showError('Löschen fehlgeschlagen.');
+                } else if (t === 'group') {
+                    const ok = await window.quizDB.cascadeDeleteGroup(entityId);
+                    if (ok) showSuccess('Gruppe und zugehörige Fragen gelöscht.'); else showError('Löschen fehlgeschlagen.');
+                }
+            } catch (err) {
+                console.error('Cascade delete error (delegated)', err); showError('Fehler beim Löschen.');
+            } finally {
+                if (m) { m.style.display='none'; m.setAttribute('aria-hidden','true'); }
+                try { c.disabled = false; } catch(e){}
+                await loadCategoryTree(); await updateCategorySelects();
+            }
+        })();
+        return;
+    }
+    // cancel
+    const x = e.target.closest && e.target.closest('#cascade-delete-cancel');
+    if (x) {
+        e.preventDefault();
+        const m = document.getElementById('cascade-delete-modal'); if (m) { m.style.display='none'; m.setAttribute('aria-hidden','true'); }
+        return;
+    }
+});
+
+// Fallback: if the button exists at load time, attach direct listener as well
+document.addEventListener('DOMContentLoaded', function() {
+    try {
+        const btn = document.getElementById('edit-item-delete');
+        if (btn && !btn._hasDirectDeleteHandler) {
+            btn.addEventListener('click', function(e) { e.preventDefault(); handleEditItemDelete(); });
+            btn._hasDirectDeleteHandler = true;
+        }
+    } catch (e) {
+        console.warn('Could not attach direct delete handler', e);
     }
 });
 
