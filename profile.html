@@ -40,6 +40,22 @@
                     <input type="file" id="importDbFile" style="display:none">
                     <button id="importDb" class="btn-secondary">Importieren</button>
                     <div id="importExportMessage"></div>
+                    <!-- Gruppen-Importbereich direkt hier integriert -->
+                    <div class="import-section" style="margin-top:24px;">
+                        <h3>Gruppen importieren</h3>
+                        <label for="importCategorySelect">Kategorie auswählen:</label>
+                        <select id="importCategorySelect"></select>
+                        <input type="file" id="importGroupsFile" accept=".json">
+                        <button id="importGroupsBtn" class="btn-secondary">Gruppen importieren</button>
+                        <div id="importGroupsStatus"></div>
+                    </div>
+                    <!-- Fragen-Importbereich: Gruppenauswahl entfernt, nur noch Datei-Upload und Button -->
+                    <div class="import-section" style="margin-top:24px;">
+                        <h3>Fragen importieren</h3>
+                        <input type="file" id="importQuestionsFile" accept=".json">
+                        <button id="importQuestionsBtn" class="btn-secondary">Fragen importieren</button>
+                        <div id="importQuestionsStatus"></div>
+                    </div>
                 </div>
                 <div class="profile-col profile-danger">
                     <h2>Gefahrenbereich</h2>
@@ -48,14 +64,6 @@
                     <button id="deleteAccount" class="btn-danger">Account löschen</button>
                     <div id="deleteAccountMessage"></div>
                 </div>
-            </div>
-            <div class="import-section">
-              <h3>Gruppen importieren</h3>
-              <label for="importCategorySelect">Kategorie wählen:</label>
-              <select id="importCategorySelect"></select>
-              <input type="file" id="importGroupsFile" accept=".json">
-              <button id="importGroupsBtn">Gruppen importieren</button>
-              <div id="importGroupsStatus"></div>
             </div>
         </section>
     </main>

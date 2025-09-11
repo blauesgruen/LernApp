@@ -306,3 +306,42 @@ Wichtig: Die App verwendet jetzt serverseitig generierte IDs (UUIDs), die von de
 
 ---
 Letzte Änderung: Automatische Bereinigung und Umstellung auf Supabase-only (10.09.2025)
+
+# LernApp - Projekt-spezifische Anweisungen (Stand: 11.09.2025)
+
+## Supabase Tabellenstruktur (aktualisiert)
+
+### categories
+- id (uuid, Primärschlüssel)
+- name (Text, Pflichtfeld)
+- description (Text, optional)
+- owner (uuid, Pflichtfeld)
+- collaborators (uuid[] oder Text[], optional)
+
+### groups
+- id (uuid, Primärschlüssel)
+- name (Text, Pflichtfeld)
+- category_id (uuid, Pflichtfeld, Fremdschlüssel auf categories.id)
+- owner (uuid, Pflichtfeld)
+- collaborators (uuid[] oder Text[], optional)
+
+### questions
+- id (uuid, Primärschlüssel, automatisch von Supabase generiert)
+- question (Text, Pflichtfeld)
+- answer (Text, Pflichtfeld)
+- additionalinfo (Text, optional, aus JSON-Feld additionalInfo gemappt)
+- group_id (uuid, optional, Fremdschlüssel auf groups.id, wird über tags ermittelt)
+- owner (uuid, Pflichtfeld)
+- collaborators (uuid[] oder Text[], optional)
+
+**Hinweis:**
+- Nur diese Felder dürfen beim Import/Export verwendet werden.
+- Die Import-Logik muss alle Felder korrekt abbilden und keine anderen Felder senden.
+- Das Feld `id` wird nicht gesetzt, sondern von Supabase generiert.
+- Alle anderen Felder wie `type`, `difficulty`, etc. werden ignoriert.
+- Die Doku und der Code müssen immer synchron gehalten werden.
+
+## Kollaborations-/Freigabe-Konzept
+- Das Feld `collaborators` enthält User-IDs oder Team-IDs, die Zugriff auf den jeweiligen Datensatz haben.
+- RLS-Policies müssen so gestaltet sein, dass Einträge für `owner` und alle in `collaborators` sichtbar/bearbeitbar sind.
+- Die Freigabe ist damit einheitlich und flexibel für alle Nutzer und Teams.

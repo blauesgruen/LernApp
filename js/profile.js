@@ -214,10 +214,154 @@ document.getElementById('importDbFile').onchange = async function(e) {
     else showSuccess('Import erfolgreich!', 'importExportMessage');
 };
 
-// Hilfsfunktionen für Meldungen
-function showSuccess(msg, id) {
-    const el = document.getElementById(id); if (el) { el.textContent = msg; el.style.color = 'green'; }
+// Kategorien für Dropdown laden
+async function loadCategoryOptions() {
+    const user = await window.supabase.auth.getUser();
+    if (!user?.data?.user?.id) return;
+    const { data, error } = await window.supabase.from('categories').select('id, name').eq('owner', user.data.user.id);
+    var select = document.getElementById('importCategorySelect');
+    if (!select) return;
+    select.innerHTML = '';
+    if (data) {
+        data.forEach(function(cat) {
+            var opt = document.createElement('option');
+            opt.value = cat.id;
+            opt.textContent = cat.name;
+            select.appendChild(opt);
+        });
+    }
 }
-function showError(msg, id) {
-    const el = document.getElementById(id); if (el) { el.textContent = msg; el.style.color = 'red'; }
+if (document.getElementById('importCategorySelect')) loadCategoryOptions();
+
+// Hilfsfunktion für UUID
+function generateUUID() {
+    // RFC4122 Version 4
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+}
+// Gruppen-Import-Button
+if (document.getElementById('importGroupsBtn')) {
+    document.getElementById('importGroupsBtn').addEventListener('click', function() {
+        var fileInput = document.getElementById('importGroupsFile');
+        var statusDiv = document.getElementById('importGroupsStatus');
+        var select = document.getElementById('importCategorySelect');
+        if (!fileInput.files.length) {
+            statusDiv.textContent = 'Bitte eine Gruppen-JSON auswählen.';
+            return;
+        }
+        var categoryId = select.value;
+        if (!categoryId) {
+            statusDiv.textContent = 'Bitte eine Kategorie auswählen.';
+            return;
+        }
+        Array.from(fileInput.files).forEach(function(file) {
+            var reader = new FileReader();
+            reader.onload = async function(e) {
+                try {
+                    var data = JSON.parse(e.target.result);
+                    const user = await window.supabase.auth.getUser();
+                    let errorMsg = '';
+                    let debugData = [];
+                    for (const group of data) {
+                        // Nur erlaubte Felder, keine leeren Werte, UUID generieren
+                        let filteredGroup = {};
+                        filteredGroup.id = generateUUID();
+                        if (typeof group.name === 'string' && group.name.trim() !== '') filteredGroup.name = group.name.trim();
+                        // description entfernt, da nicht im Supabase-Schema
+                        filteredGroup.category_id = categoryId;
+                        filteredGroup.owner = user.data.user.id;
+                        debugData.push(JSON.parse(JSON.stringify(filteredGroup)));
+                        // Nur wenn Name und Kategorie vorhanden sind, senden
+                        if (filteredGroup.name && filteredGroup.category_id) {
+                            const { error, data: supaResp } = await window.supabase.from('groups').upsert(filteredGroup);
+                            if (error) {
+                                errorMsg += error.message + '\n';
+                                console.error('Supabase Error:', error, 'Gesendete Daten:', filteredGroup, 'Response:', supaResp);
+                            } else {
+                                console.log('Supabase Insert OK:', filteredGroup, 'Response:', supaResp);
+                            }
+                        } else {
+                            console.warn('Gruppe übersprungen (fehlende Felder):', filteredGroup);
+                        }
+                    }
+                    if (errorMsg) statusDiv.textContent = 'Fehler: ' + errorMsg + '\nDaten gesendet: ' + JSON.stringify(debugData, null, 2);
+                    else statusDiv.textContent = 'Import erfolgreich!';
+                } catch (err) {
+                    statusDiv.textContent = 'Fehler beim Import: ' + file.name;
+                    console.error('Import-Fehler:', err);
+                }
+            };
+            reader.readAsText(file);
+        });
+    });
+}
+// Fragen-Import: Nur Supabase-Schema-Felder übernehmen
+if (document.getElementById('importQuestionsBtn')) {
+    document.getElementById('importQuestionsBtn').addEventListener('click', function() {
+        var fileInput = document.getElementById('importQuestionsFile');
+        var statusDiv = document.getElementById('importQuestionsStatus');
+        if (!fileInput.files.length) {
+            statusDiv.textContent = 'Bitte eine Fragen-JSON auswählen.';
+            return;
+        }
+        Array.from(fileInput.files).forEach(function(file) {
+            var reader = new FileReader();
+            reader.onload = async function(e) {
+                try {
+                    var data = JSON.parse(e.target.result);
+                    const user = await window.supabase.auth.getUser();
+                    let errorMsg = '';
+                    let importedCount = 0;
+                    let debugData = [];
+                    // Hole alle Gruppen einmal für den User
+                    const { data: groups } = await window.supabase
+                        .from('groups')
+                        .select('id, name')
+                        .eq('owner', user.data.user.id);
+                    for (const question of data) {
+                        // Nur Felder aus Supabase-Schema übernehmen
+                        let filteredQuestionBase = {};
+                        filteredQuestionBase.question = question.question;
+                        filteredQuestionBase.answer = question.answer;
+                        if (question.additionalInfo !== undefined) filteredQuestionBase.additionalinfo = question.additionalInfo;
+                        filteredQuestionBase.owner = user.data.user.id;
+                        if (question.collaborators) filteredQuestionBase.collaborators = question.collaborators;
+                        // Gruppenzuordnung über tags: Alle passenden Gruppen suchen
+                        let foundGroups = [];
+                        if (Array.isArray(question.tags) && question.tags.length > 0 && groups && groups.length > 0) {
+                            for (const tag of question.tags) {
+                                groups.forEach(g => {
+                                    if (g.name === tag && !foundGroups.includes(g.id)) {
+                                        foundGroups.push(g.id);
+                                    }
+                                });
+                            }
+                        }
+                        if (foundGroups.length > 0) {
+                            for (const groupId of foundGroups) {
+                                let filteredQuestion = { ...filteredQuestionBase, group_id: groupId };
+                                debugData.push(JSON.parse(JSON.stringify(filteredQuestion)));
+                                const { error } = await window.supabase.from('questions').upsert(filteredQuestion);
+                                if (error) {
+                                    errorMsg += error.message + '\n';
+                                    console.error('Supabase Error:', error, 'Gesendete Daten:', filteredQuestion);
+                                } else {
+                                    importedCount++;
+                                }
+                            }
+                        } else {
+                            errorMsg += 'Keine passende Gruppe für Frage: ' + (question.question || '-') + '\n';
+                        }
+                    }
+                    if (errorMsg) statusDiv.textContent = 'Fehler/Übersprungen: ' + errorMsg + '\nImportiert: ' + importedCount + '\nGesendete Daten: ' + JSON.stringify(debugData, null, 2);
+                    else statusDiv.textContent = 'Import erfolgreich! (' + importedCount + ' Fragen)';
+                } catch (err) {
+                    statusDiv.textContent = 'Fehler beim Import: ' + file.name;
+                }
+            };
+            reader.readAsText(file);
+        });
+    });
 }
