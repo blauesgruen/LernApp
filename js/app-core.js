@@ -1,4 +1,42 @@
 // Zentrale Funktionen für die LernApp
+// Small on-page debug overlay to track startup progress (useful when DevTools is unusable)
+if (!window._startupDebugOverlay) {
+    try {
+        const ov = document.createElement('div');
+        ov.id = 'startup-debug-overlay';
+        ov.style.position = 'fixed';
+        ov.style.right = '12px';
+        ov.style.top = '12px';
+        ov.style.zIndex = '2147483647';
+        ov.style.maxWidth = '340px';
+        ov.style.maxHeight = '60vh';
+        ov.style.overflow = 'auto';
+        ov.style.background = 'rgba(0,0,0,0.75)';
+        ov.style.color = '#fff';
+        ov.style.fontSize = '12px';
+        ov.style.padding = '8px';
+        ov.style.borderRadius = '8px';
+        ov.style.boxShadow = '0 6px 20px rgba(0,0,0,0.6)';
+        ov.innerHTML = '<strong style="display:block;margin-bottom:6px;">Startup debug</strong><div id="startup-debug-entries"></div>';
+        document.documentElement.appendChild(ov);
+        window._startupDebugOverlay = ov;
+        window.debugLog = function(msg) {
+            try {
+                const container = document.getElementById('startup-debug-entries');
+                const time = new Date().toLocaleTimeString();
+                const line = document.createElement('div');
+                line.style.marginBottom = '6px';
+                line.textContent = `${time} — ${msg}`;
+                if (container) {
+                    container.insertBefore(line, container.firstChild);
+                }
+            } catch (e) { /* no-op */ }
+        };
+        window.debugLog('overlay initialized');
+    } catch (e) {
+        // ignore overlay failures
+    }
+}
 // Einbindung: <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 //             <script src="js/app-core.js"></script>
 
@@ -24,9 +62,11 @@ if (typeof window.logConsole !== 'function') {
 }
 
 function initSupabase() {
+    try { if (typeof window.debugLog === 'function') window.debugLog('initSupabase start'); } catch(e){}
     // If a client already exists on window, prefer it (backwards compatibility with pages that created a client inline)
     if (window.supabaseClient) {
         window.logConsole('Supabase client already present on window.supabaseClient; skipping init.', 'info');
+        try { if (typeof window.debugLog === 'function') window.debugLog('supabaseClient present, skipping init'); } catch(e){}
         return;
     }
     // Some older pages placed the created client on window.supabase directly (overwriting the library).
@@ -48,6 +88,7 @@ function initSupabase() {
     try {
     window.supabaseClient = window.supabase.createClient(url, key);
     window.logConsole('Supabase-Client initialisiert.', 'info');
+        try { if (typeof window.debugLog === 'function') window.debugLog('Supabase client created'); } catch(e){}
         // Backwards compatibility: some modules expect `window.supabase` to be the client
         // If `window.supabase.from` is not a function (i.e. `window.supabase` is the library),
         // point `window.supabase` to the initialized client so older calls work.
@@ -61,6 +102,7 @@ function initSupabase() {
         }
     } catch (err) {
         window.showError('Fehler bei Supabase-Initialisierung: ' + err.message);
+        try { if (typeof window.debugLog === 'function') window.debugLog('Supabase init error: ' + (err && err.message)); } catch(e){}
     }
 }
 
@@ -142,17 +184,21 @@ window.loadHeaderFooter = function() {
     }
 
     if (headerContainer) {
+        try { if (typeof window.debugLog === 'function') window.debugLog('fetch header start -> ' + getPartialUrl('header.html')); } catch(e){}
         fetch(getPartialUrl('header.html')).then(r => r.text()).then(html => {
             headerContainer.innerHTML = html;
             if (window.updateNavigation) window.updateNavigation();
             if (window.breadcrumbs && typeof window.breadcrumbs.init === 'function') window.breadcrumbs.init();
-        }).catch(err => window.logConsole('Failed to load header: ' + err, 'error'));
+            try { if (typeof window.debugLog === 'function') window.debugLog('fetch header OK'); } catch(e){}
+        }).catch(err => { window.logConsole('Failed to load header: ' + err, 'error'); try { if (typeof window.debugLog === 'function') window.debugLog('fetch header ERR: ' + err); } catch(e){} });
     }
     if (footerContainer) {
+        try { if (typeof window.debugLog === 'function') window.debugLog('fetch footer start -> ' + getPartialUrl('footer.html')); } catch(e){}
         fetch(getPartialUrl('footer.html')).then(r => r.text()).then(html => {
             footerContainer.innerHTML = html;
             if (window.initHeaderFooter) window.initHeaderFooter();
-        }).catch(err => window.logConsole('Failed to load footer: ' + err, 'error'));
+            try { if (typeof window.debugLog === 'function') window.debugLog('fetch footer OK'); } catch(e){}
+        }).catch(err => { window.logConsole('Failed to load footer: ' + err, 'error'); try { if (typeof window.debugLog === 'function') window.debugLog('fetch footer ERR: ' + err); } catch(e){} });
     }
 };
 
