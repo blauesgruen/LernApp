@@ -121,7 +121,6 @@ async function initializePage() {
         ]);
         if (window.breadcrumbs) {
             window.breadcrumbs.set([
-                { label: 'Verwaltung', url: 'admin.html' },
                 { label: 'Kategorien & Gruppen', url: 'category-management.html' }
             ]);
         }

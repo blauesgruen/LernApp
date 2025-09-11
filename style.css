@@ -2,6 +2,8 @@
 :root {
     --primary-bg-color: #afc4dc; /* Etwas dunkleres Grau-Blau */
     --bar-height: 4rem; /* Verdoppelte Höhe für beide Balken */
+    --container-padding-desktop: 32px;
+    --container-padding-mobile: 12px;
 }
 
 /* Allgemeine Stile */
@@ -13,6 +15,7 @@ body {
     min-height: 100vh;
     display: flex;
     flex-direction: column;
+    box-sizing: border-box;
 }
 
 /* Allgemeine Utility-Klassen */
@@ -47,15 +50,25 @@ header nav ul li a {
 
 main {
     flex: 1;
-    padding: 2rem;
+    padding: 0;
     text-align: center;
-    margin-bottom: var(--bar-height); /* Abstand für den Footer */
+    margin-bottom: 0;
+}
+
+#index {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: calc(100vh - 2 * var(--bar-height)); /* Header und Footer abziehen */
+    overflow-y: auto; /* Scrollbalken nur bei Bedarf */
 }
 
 footer {
     background-color: var(--primary-bg-color);
     color: #333;
     height: var(--bar-height);
+    min-height: var(--bar-height);
     text-align: center;
     padding: 0;
     display: flex;
@@ -127,10 +140,6 @@ nav ul li a {
     font-size: 18px;
 }
 
-nav ul li a[href="#admin"] {
-    color: black; /* Admin-Button-Text schwarz */
-}
-
 /* Stile für den Willkommensbereich */
 #welcome {
     text-align: center;
@@ -150,16 +159,6 @@ nav ul li a[href="#admin"] {
     max-width: 600px; /* Begrenzte Breite für bessere Lesbarkeit */
     margin-left: auto; /* Zentrieren */
     margin-right: auto; /* Zentrieren */
-}
-
-#welcome a {
-    display: inline-block;
-    padding: 20px 40px;
-    font-size: 20px;
-    background-color: #007BFF;
-    color: white;
-    text-decoration: none;
-    border-radius: 8px;
 }
 
 /* Stile für die LernApp-Verknüpfung */
@@ -212,17 +211,28 @@ nav ul li a[href="#admin"] {
 }
 
 #login .btn-primary {
-    padding: 10px 20px;
-    font-size: 18px;
-    background-color: #007BFF;
-    color: white;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #007bff;
+    color: #fff;
     border: none;
-    border-radius: 5px;
+    border-radius: 4px;
+    padding: 6px 24px;
+    font-size: 1.1rem;
+    font-weight: 500;
+    text-align: center;
     cursor: pointer;
+    height: 38px;
+    min-width: 140px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    transition: background 0.2s, color 0.2s;
+    text-decoration: none;
 }
 
 #login .btn-primary:hover {
     background-color: #0056b3;
+    color: #fff;
 }
 
 #login p {
@@ -301,6 +311,8 @@ img.icon {
     max-width: 900px; /* Begrenzt die maximale Breite */
     margin-left: auto;
     margin-right: auto;
+    padding-left: var(--container-padding-desktop);
+    padding-right: var(--container-padding-desktop);
 }
 
 .dashboard-box {
@@ -440,6 +452,8 @@ img.icon {
     box-sizing: border-box;
     min-height: 420px;
     height: 100%; /* Karten sind immer gleich hoch wie der Container */
+    padding-left: var(--container-padding-desktop);
+    padding-right: var(--container-padding-desktop);
 }
 .profile-col::before {
     content: '';
@@ -487,6 +501,8 @@ img.icon {
         max-width: 98vw;
         min-height: 0;
         height: auto; /* Für mobile Ansicht, damit die Karten flexibel sind */
+        padding-left: var(--container-padding-mobile) !important;
+        padding-right: var(--container-padding-mobile) !important;
     }
 }
 
@@ -531,6 +547,8 @@ img.icon {
     max-width: 100% !important;
     margin: 0 !important;
     box-sizing: border-box !important;
+    padding-left: var(--container-padding-desktop);
+    padding-right: var(--container-padding-desktop);
 }
 
 .category-card .card-title {
@@ -609,15 +627,14 @@ img.icon {
         max-width: 98vw !important;
         padding: 16px !important;
         min-height: auto !important;
-    }
-    .profile-col .form-actions .btn-primary,
-    .profile-col .form-actions button {
-        padding: 14px 16px !important;
-        font-size: 1.08rem !important;
+        padding-left: var(--container-padding-mobile) !important;
+        padding-right: var(--container-padding-mobile) !important;
     }
     .category-card {
         padding: 14px 8px 14px 0 !important;
         min-height: auto !important;
+        padding-left: var(--container-padding-mobile) !important;
+        padding-right: var(--container-padding-mobile) !important;
     }
     .category-card .category-tree {
         padding: 8px 4px !important;
@@ -667,6 +684,8 @@ img.icon {
         min-width: 0 !important;
         width: 100% !important;
         padding: 18px 4px 18px 0 !important;
+        padding-left: var(--container-padding-mobile) !important;
+        padding-right: var(--container-padding-mobile) !important;
     }
     .category-card .category-tree {
         width: 100% !important;
@@ -1122,7 +1141,7 @@ img.icon {
 .question-creator-card {
     max-width: 900px;
     margin: 0 auto var(--bar-height) auto;
-    padding: 20px;
+    padding: 20px var(--container-padding-desktop);
     background-color: #fff;
     border-radius: 10px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
@@ -1238,6 +1257,15 @@ img.icon {
     margin: 30px auto var(--bar-height) auto;
 }
 
+#index {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: calc(100vh - 2 * var(--bar-height)); /* Header und Footer abziehen */
+    overflow: hidden;
+}
+
 @media (max-width: 576px) {
     .input-with-button {
         flex-direction: column;
@@ -1286,17 +1314,6 @@ img.icon {
     nav ul li {
         display: inline-block;
     }
-
-    nav ul li a[href="#admin"] {
-        display: inline-block;
-        visibility: visible;
-        background-color: transparent;
-        color: black;
-        padding: 0;
-        border: none;
-        text-align: center;
-        white-space: nowrap;
-    }
     
     .form-grid {
         grid-template-columns: 1fr;
@@ -1317,10 +1334,28 @@ img.icon {
     display: inline-block;
 }
 .btn-primary {
-    background-color: #007BFF;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #007bff;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 6px 24px;
+    font-size: 1.1rem;
+    font-weight: 500;
+    text-align: center;
+    cursor: pointer;
+    height: 38px;
+    min-width: 140px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    transition: background 0.2s, color 0.2s;
+    text-decoration: none;
 }
+
 .btn-primary:hover {
     background-color: #0056b3;
+    color: #fff;
 }
 .btn-secondary {
     background-color: #757575;
@@ -1588,3 +1623,26 @@ input, label {
     font-weight: 600;
 }
 .debug-placeholder small { display: block; font-weight: normal; color: #666; }
+
+#index .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #007bff;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 6px 24px;
+    font-size: 1.1rem;
+    font-weight: 500;
+    text-align: center;
+    cursor: pointer;
+    height: 38px;
+    min-width: 140px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    transition: background 0.2s, color 0.2s;
+}
+#index .btn-primary:hover {
+    background-color: #0056b3;
+    color: #fff;
+}
