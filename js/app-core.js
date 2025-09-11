@@ -21,10 +21,14 @@ if (document.readyState === 'loading') {
 }
 
 // 2. Authentifizierungs-Funktionen
-window.checkLoginAndRedirect = function() {
-    const isLoggedIn = localStorage.getItem('loggedIn') === 'true';
-    const username = localStorage.getItem('username');
-    if (isLoggedIn && username) {
+window.checkLoginAndRedirect = async function() {
+    if (!window.supabaseClient) return;
+    const { data, error } = await window.supabaseClient.auth.getSession();
+    if (error) {
+        window.showError('Fehler beim Prüfen der Session: ' + error.message);
+        return;
+    }
+    if (data?.session && data.session.user) {
         window.location.href = 'dashboard.html';
     }
 };
@@ -36,8 +40,6 @@ window.getCurrentUser = async function() {
 window.logoutUser = async function() {
     if (!window.supabaseClient) return;
     await window.supabaseClient.auth.signOut();
-    localStorage.removeItem('loggedIn');
-    localStorage.removeItem('username');
     window.location.href = 'login.html';
 };
 window.login = async function(email, password) {
@@ -61,8 +63,6 @@ window.login = async function(email, password) {
             return;
         }
         if (data?.user) {
-            localStorage.setItem('loggedIn', 'true');
-            localStorage.setItem('username', data.user.email);
             window.showSuccess('Login erfolgreich!');
             window.logInfo('User eingeloggt: ' + data.user.email);
             window.location.href = 'dashboard.html';
@@ -134,12 +134,13 @@ window.updateStorageStatusIcon = function() {
 };
 
 // 5. Navigation
-window.updateNavigation = function() {
-    const isLoggedIn = localStorage.getItem('loggedIn') === 'true';
+window.updateNavigation = async function() {
+    if (!window.supabaseClient) return;
+    const { data, error } = await window.supabaseClient.auth.getSession();
     const userButtons = document.getElementById('user-buttons');
-    window.logConsole({ isLoggedIn, userButtons }, 'info');
+    window.logConsole({ session: data?.session, userButtons }, 'info');
     if (userButtons) {
-        userButtons.style.display = isLoggedIn ? 'block' : 'none';
+        userButtons.style.display = (data?.session && data.session.user) ? 'block' : 'none';
     }
     window.logConsole('Navigation aktualisiert.', 'info');
 };
