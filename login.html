@@ -5,17 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - LernApp</title>
     <link rel="stylesheet" href="style.css">
-    <!-- Supabase JS einbinden -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script>
-      // Supabase initialisieren (Daten sind jetzt echt!)
-      const SUPABASE_URL = 'https://yzyrvwmofyztwttgmyqn.supabase.co';
-      const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl6eXJ2d21vZnl6dHd0dGdteXFuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc0NjA2ODUsImV4cCI6MjA3MzAzNjY4NX0.OaFPV0q-0mf2LO4dFd7FEd-vNzRjA1nJPnEXHM3WiXw';
-      window.supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-    </script>
-    <!-- Sicherstellen, dass Font Awesome korrekt eingebunden ist -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
-    <!-- Zentrales Logging-System laden -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.7/dist/umd/supabase.min.js"></script>
+    <script src="js/app-core.js"></script>
+    <script src="js/notification.js"></script>
     <script src="js/logger.js"></script>
 </head>
 <body>
@@ -39,18 +32,7 @@
     <!-- Einbindung des zentralen Footers -->
     <div id="footer-container"></div>
 
-    <script src="js/notification.js"></script>
     <script>
-        // Globale Funktionen für Erfolg- und Fehlermeldungen
-        window.showSuccess = msg => {
-            const el = document.getElementById('loginMessage');
-            if (el) { el.textContent = msg; el.style.color = 'green'; }
-        };
-        window.showError = msg => {
-            const el = document.getElementById('loginMessage');
-            if (el) { el.textContent = msg; el.style.color = 'red'; }
-        };
-
         // Login-Logik initialisieren
         function initLoginLogic() {
             const loginForm = document.getElementById('loginForm');
@@ -62,43 +44,24 @@
                     if (window.login) {
                         await window.login(email, password);
                     } else {
-                        showError('Fehler: Login-Funktion nicht verfügbar.');
+                        window.showError('Fehler: Login-Funktion nicht verfügbar.');
                     }
                 });
             }
         }
         // Header und Footer laden und dann Login-Logik initialisieren
-        async function loadHeaderAndFooterAndInitLogin() {
-            try {
-                document.getElementById('header-container').innerHTML = await (await fetch('partials/header.html')).text();
-                document.getElementById('footer-container').innerHTML = await (await fetch('partials/footer.html')).text();
-                // Skripte aus dem Header auswerten
-                const headerScripts = document.getElementById('header-container').querySelectorAll('script');
-                for (const script of headerScripts) {
-                    if (script.innerText) {
-                        eval(script.innerText);
-                    } else if (script.src) {
-                        const s = document.createElement('script'); s.src = script.src; document.head.appendChild(s);
-                    }
-                }
-                // Skripte aus dem Footer auswerten
-                const footerScripts = document.getElementById('footer-container').querySelectorAll('script');
-                for (const script of footerScripts) {
-                    if (script.innerText) {
-                        try { eval(script.innerText); } catch (e) { console.error('Footer-inline-script error', e); }
-                    } else if (script.src) {
-                        const s = document.createElement('script'); s.src = script.src; s.async = false; document.body.appendChild(s);
-                    }
-                }
-                if (window.updateNavigation) { window.updateNavigation(); }
-                setTimeout(() => { try { if (window.updateStorageStatusIcon) window.updateStorageStatusIcon(); } catch (e) {} }, 50);
-                initLoginLogic();
-            } catch (error) {
-                console.error('Fehler beim Laden des Headers oder Footers:', error);
-            }
-        }
-        // Starte alles
-        document.addEventListener('DOMContentLoaded', loadHeaderAndFooterAndInitLogin);
+        fetch('partials/header.html').then(r => r.text()).then(html => {
+            document.getElementById('header-container').innerHTML = html;
+            if (window.updateNavigation) window.updateNavigation();
+            if (window.breadcrumbs) window.breadcrumbs.init();
+        });
+        fetch('partials/footer.html').then(r => r.text()).then(html => {
+            document.getElementById('footer-container').innerHTML = html;
+            window.initHeaderFooter();
+        });
+        document.addEventListener('DOMContentLoaded', initLoginLogic);
+        // Zentraler Supabase-Client-Check
+        window.checkSupabaseClient();
     </script>
 </body>
 </html>

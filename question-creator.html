@@ -3,13 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fragen erstellen - LernApp</title>
+    <title>Fragen erstellen</title>
     <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="css/question-creator.css">
-    <link rel="stylesheet" href="css/question-creator-questions.css">
-    <link rel="stylesheet" href="css/back-button.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.1/css/all.min.css">
-    <!-- Zentrales Logging-System laden -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.7/dist/umd/supabase.min.js"></script>
+    <script src="js/app-core.js"></script>
+    <script src="js/notification.js"></script>
     <script src="js/logger.js"></script>
 </head>
 <body>
@@ -120,70 +119,11 @@
 
     <div id="footer-container"></div>
 
-    <script src="js/notification.js"></script>
     <script src="js/quiz-db.js"></script>
-    <script>
-        // Header und Footer dynamisch laden
-        async function loadHeaderAndFooter() {
-            try {
-                // Globale log-Funktion definieren, bevor Header geladen wird
-                if (!window.log) {
-                    window.log = function(message, type) {
-                        if (window.logger) {
-                            window.logger.log(message, type || 'info');
-                        } else if (window.logMessage) {
-                            window.logMessage(message, type || 'info');
-                        } else {
-                            console.log(message);
-                        }
-                    };
-                }
-
-                // Header und Footer laden
-                document.getElementById('header-container').innerHTML = await (await fetch('partials/header.html')).text();
-                document.getElementById('footer-container').innerHTML = await (await fetch('partials/footer.html')).text();
-                
-                // Skripte aus dem Header auswerten - mit expliziter Übergabe der log-Funktion
-                const headerScripts = document.getElementById('header-container').querySelectorAll('script');
-                for (const script of headerScripts) {
-                    if (script.innerText) {
-                        const evalContext = 
-                            `var log = function(message, type) {
-                                if (window.logger) {
-                                    window.logger.log(message, type || 'info');
-                                } else if (window.logMessage) {
-                                    window.logMessage(message, type || 'info');
-                                } else {
-                                    console.log(message);
-                                }
-                            };
-                            ${script.innerText}`;
-                        eval(evalContext);
-                    } else if (script.src) {
-                        const s = document.createElement('script'); s.src = script.src; document.head.appendChild(s);
-                    }
-                }
-
-                // Skripte aus dem Footer auswerten
-                const footerScripts = document.getElementById('footer-container').querySelectorAll('script');
-                for (const script of footerScripts) {
-                    if (script.innerText) {
-                        try { eval(script.innerText); } catch (e) { console.error('Footer-inline-script error', e); }
-                    } else if (script.src) {
-                        const s = document.createElement('script'); s.src = script.src; s.async = false; document.body.appendChild(s);
-                    }
-                }
-
-                if (window.updateNavigation) { window.updateNavigation(); }
-                setTimeout(() => { try { if (window.updateStorageStatusIcon) window.updateStorageStatusIcon(); } catch (e) {} }, 50);
-            } catch (error) {
-                console.error('Fehler beim Laden des Headers oder Footers:', error);
-            }
-        }
-        
-        // Header und Footer laden
-        loadHeaderAndFooter();
-    </script>
     <script src="js/question-creator.js"></script>
+    <script>
+        // Zentraler Supabase-Client-Check
+        window.checkSupabaseClient();
+    </script>
 </body>
 </html>

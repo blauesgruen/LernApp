@@ -5,14 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Registrierung</title>
     <link rel="stylesheet" href="style.css">
-    <!-- Supabase JS einbinden -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script>
-      // Supabase initialisieren (Daten sind jetzt echt!)
-      const SUPABASE_URL = 'https://yzyrvwmofyztwttgmyqn.supabase.co';
-      const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl6eXJ2d21vZnl6dHd0dGdteXFuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc0NjA2ODUsImV4cCI6MjA3MzAzNjY4NX0.OaFPV0q-0mf2LO4dFd7FEd-vNzRjA1nJPnEXHM3WiXw';
-      window.supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-    </script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.7/dist/umd/supabase.min.js"></script>
+    <script src="js/app-core.js"></script>
+    <script src="js/notification.js"></script>
+    <script src="js/logger.js"></script>
 </head>
 <body>
     <!-- Einbindung des zentralen Headers -->
@@ -36,49 +33,17 @@
     <!-- Einbindung des zentralen Footers -->
     <div id="footer-container"></div>
 
-    <script src="js/notification.js"></script>
     <script>
-        // Header und Footer dynamisch laden
-        async function loadHeaderAndFooter() {
-            try {
-                // Header und Footer laden
-                document.getElementById('header-container').innerHTML = await (await fetch('partials/header.html')).text();
-                document.getElementById('footer-container').innerHTML = await (await fetch('partials/footer.html')).text();
-                
-                // Skripte aus dem Header auswerten
-                const headerScripts = document.getElementById('header-container').querySelectorAll('script');
-                for (const script of headerScripts) {
-                    if (script.innerText) {
-                        eval(script.innerText);
-                    } else if (script.src) {
-                        const s = document.createElement('script'); s.src = script.src; document.head.appendChild(s);
-                    }
-                }
-
-                // Skripte aus dem Footer auswerten
-                const footerScripts = document.getElementById('footer-container').querySelectorAll('script');
-                for (const script of footerScripts) {
-                    if (script.innerText) {
-                        try { eval(script.innerText); } catch (e) { console.error('Footer-inline-script error', e); }
-                    } else if (script.src) {
-                        const s = document.createElement('script'); s.src = script.src; s.async = false; document.body.appendChild(s);
-                    }
-                }
-
-                if (window.updateNavigation) { window.updateNavigation(); }
-                setTimeout(() => { try { if (window.updateStorageStatusIcon) window.updateStorageStatusIcon(); } catch (e) {} }, 50);
-            } catch (error) {
-                console.error('Fehler beim Laden des Headers oder Footers:', error);
-            }
-        }
-        
         // Header und Footer laden
-        loadHeaderAndFooter();
-
-        // Globale Funktionen für Erfolg- und Fehlermeldungen
-        window.showSuccess = msg => document.getElementById('registerMessage').textContent = msg;
-        window.showError = msg => document.getElementById('registerMessage').textContent = msg;
-
+        fetch('partials/header.html').then(r => r.text()).then(html => {
+            document.getElementById('header-container').innerHTML = html;
+            if (window.updateNavigation) window.updateNavigation();
+            if (window.breadcrumbs) window.breadcrumbs.init();
+        });
+        fetch('partials/footer.html').then(r => r.text()).then(html => {
+            document.getElementById('footer-container').innerHTML = html;
+            window.initHeaderFooter();
+        });
         // Registrierung-Handler mit Passwort-Vergleich
         document.getElementById('registerForm').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -87,15 +52,21 @@
             const passwordRepeat = document.getElementById('registerPasswordRepeat').value;
             const nickname = document.getElementById('registerNickname').value;
             if (!nickname || nickname.trim().length < 2) {
-                showError('Bitte geben Sie einen Nickname mit mindestens 2 Zeichen an!');
+                window.showError('Bitte geben Sie einen Nickname mit mindestens 2 Zeichen an!');
                 return;
             }
             if (password !== passwordRepeat) {
-                showError('Die Passwörter stimmen nicht überein!');
+                window.showError('Die Passwörter stimmen nicht überein!');
                 return;
             }
-            await register(email, password, nickname);
+            if (window.register) {
+                await window.register(email, password, nickname);
+            } else {
+                window.showError('Fehler: Registrierungsfunktion nicht verfügbar.');
+            }
         });
+        // Zentraler Supabase-Client-Check
+        window.checkSupabaseClient();
     </script>
 </body>
 </html>

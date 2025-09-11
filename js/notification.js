@@ -165,6 +165,13 @@ window.showError = showError;
 window.showSuccess = showSuccess;
 window.showInfo = showInfo;
 window.showWarning = showWarning;
+window.notification = {
+    showError,
+    showSuccess,
+    showInfo,
+    showWarning,
+    showNotification
+};
 
 // Test-Funktion für das Benachrichtigungssystem
 window.testNotifications = function() {

@@ -53,11 +53,11 @@ async function initializeDatabase() {
  * @returns {Promise<Array>} Array mit allen Kategorien
  */
 async function loadCategories() {
-    if (!window.supabase) {
+    if (!window.supabaseClient) {
         console.error('Supabase-Client ist nicht verfügbar.');
         return [];
     }
-    const { data, error } = await window.supabase.from('categories').select('*');
+    const { data, error } = await window.supabaseClient.from('categories').select('*');
     if (error) {
         console.error('Fehler beim Laden der Kategorien:', error);
         return [];
@@ -153,11 +153,11 @@ async function createCategory(name, owner, description = '', collaborators = [])
  * @returns {Promise<Array>} Array mit allen Gruppen
  */
 async function loadGroups() {
-    if (!window.supabase) {
+    if (!window.supabaseClient) {
         console.error('Supabase-Client ist nicht verfügbar.');
         return [];
     }
-    const { data, error } = await window.supabase.from('groups').select('*');
+    const { data, error } = await window.supabaseClient.from('groups').select('*');
     if (error) {
         console.error('Fehler beim Laden der Gruppen:', error);
         return [];
@@ -399,11 +399,11 @@ async function deleteCategory(categoryId) {
  * @returns {Promise<Array>} Array mit allen Fragen
  */
 async function loadQuestions() {
-    if (!window.supabase) {
+    if (!window.supabaseClient) {
         console.error('Supabase-Client ist nicht verfügbar.');
         return [];
     }
-    const { data, error } = await window.supabase.from('questions').select('*');
+    const { data, error } = await window.supabaseClient.from('questions').select('*');
     if (error) {
         console.error('Fehler beim Laden der Fragen:', error);
         return [];
@@ -850,23 +850,10 @@ async function removeCollaborator(categoryId, userId) {
 
 // Funktionen global verfügbar machen
 window.quizDB = {
-    MAIN_CATEGORY,
-    initializeDatabase,
-    loadCategories,
-    createCategory,
-    loadGroups,
-    createGroup,
-    updateGroup,
-    deleteGroup,
-    updateCategory,
-    deleteCategory,
     loadQuestions,
-    createQuestion,
-    getQuizQuestions,
-    saveStatistics,
-    saveQuizResult,
-    addCollaborator,
-    removeCollaborator
+    loadCategories,
+    loadGroups,
+    // weitere Funktionen nach Bedarf
 };
 
 // Datenbank beim Laden initialisieren
