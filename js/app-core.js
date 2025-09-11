@@ -112,15 +112,27 @@ window.loadHeaderFooter = function() {
     window._headerFooterLoaded = true;
     const headerContainer = document.getElementById('header-container');
     const footerContainer = document.getElementById('footer-container');
+    // Helper: build partial URL so the app works locally and under GitHub Pages
+    function getPartialUrl(filename) {
+        // If the site is hosted under /LernApp/ (GitHub Pages for this repo), prefix paths
+        try {
+            const p = window.location && window.location.pathname ? window.location.pathname : '';
+            if (p.startsWith('/LernApp/')) return '/LernApp/partials/' + filename;
+        } catch (e) {
+            // ignore
+        }
+        return 'partials/' + filename;
+    }
+
     if (headerContainer) {
-        fetch('partials/header.html').then(r => r.text()).then(html => {
+        fetch(getPartialUrl('header.html')).then(r => r.text()).then(html => {
             headerContainer.innerHTML = html;
             if (window.updateNavigation) window.updateNavigation();
             if (window.breadcrumbs && typeof window.breadcrumbs.init === 'function') window.breadcrumbs.init();
         }).catch(err => window.logConsole('Failed to load header: ' + err, 'error'));
     }
     if (footerContainer) {
-        fetch('partials/footer.html').then(r => r.text()).then(html => {
+        fetch(getPartialUrl('footer.html')).then(r => r.text()).then(html => {
             footerContainer.innerHTML = html;
             if (window.initHeaderFooter) window.initHeaderFooter();
         }).catch(err => window.logConsole('Failed to load footer: ' + err, 'error'));
