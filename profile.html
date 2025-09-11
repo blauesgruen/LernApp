@@ -15,7 +15,12 @@
     <div id="header-container"></div>
     <main>
         <section id="profile">
-            <h1>Mein Profil</h1>
+            <div class="section-header" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; padding-left: 0; margin-top: 64px;">
+                <button onclick="history.back()" class="back-button" style="margin-right: auto;">
+                    <i class="fas fa-arrow-left"></i> Zurück
+                </button>
+                <h1 style="margin: 0; text-align: right; flex-grow: 1;">Mein Profil</h1>
+            </div>
             <div class="profile-user-info" style="margin-bottom: 18px;">
                 <span id="profile-user-nickname"></span>
                 <span id="profile-user-email"></span>
