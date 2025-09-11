@@ -114,14 +114,31 @@ window.loadHeaderFooter = function() {
     const footerContainer = document.getElementById('footer-container');
     // Helper: build partial URL so the app works locally and under GitHub Pages
     function getPartialUrl(filename) {
-        // If the site is hosted under /LernApp/ (GitHub Pages for this repo), prefix paths
         try {
-            const p = window.location && window.location.pathname ? window.location.pathname : '';
-            if (p.startsWith('/LernApp/')) return '/LernApp/partials/' + filename;
+            // 1) If a <base href="..."> is present, use that as the prefix
+            const baseEl = document.querySelector('base[href]');
+            if (baseEl) {
+                let bh = baseEl.getAttribute('href') || '';
+                if (!bh.endsWith('/')) bh = bh + '/';
+                const url = bh + 'partials/' + filename;
+                window.logConsole('getPartialUrl using <base>: ' + url, 'debug');
+                return url;
+            }
+
+            // 2) Detect GitHub Pages repo hosting: first path segment === 'LernApp'
+            const path = (window.location && window.location.pathname) ? window.location.pathname : '';
+            const seg = path.split('/').filter(Boolean)[0] || '';
+            if (seg === 'LernApp') {
+                const url = '/LernApp/partials/' + filename;
+                window.logConsole('getPartialUrl detected GitHub Pages path: ' + url, 'debug');
+                return url;
+            }
         } catch (e) {
-            // ignore
+            // ignore and fall back
         }
-        return 'partials/' + filename;
+        const fallback = 'partials/' + filename;
+        window.logConsole('getPartialUrl fallback: ' + fallback, 'debug');
+        return fallback;
     }
 
     if (headerContainer) {
