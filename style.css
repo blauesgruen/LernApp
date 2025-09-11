@@ -61,7 +61,7 @@ main {
     align-items: center;
     justify-content: center;
     height: calc(100vh - 2 * var(--bar-height)); /* Header und Footer abziehen */
-    overflow-y: auto; /* Scrollbalken nur bei Bedarf */
+    overflow-y: hidden; /* Scrollbalken nur bei Bedarf */
 }
 
 footer {
