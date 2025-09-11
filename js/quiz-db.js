@@ -235,11 +235,20 @@ async function createGroup(name, category_id, owner, collaborators = []) {
             owner,
             collaborators
         }).select();
-        if (error) {
-            console.error('Fehler beim Erstellen der Gruppe:', error);
-            return null;
-        }
-        return data && data[0] ? data[0] : null;
+            if (error) {
+                console.error('Fehler beim Erstellen der Gruppe:', error);
+                return null;
+            }
+            const g = data && data[0] ? data[0] : null;
+            if (!g) return null;
+            return {
+                id: g.id,
+                name: g.name,
+                categoryId: g.category_id ?? g.categoryId ?? null,
+                createdBy: g.created_by ?? g.createdBy ?? null,
+                createdAt: g.created_at ?? g.createdAt ?? null,
+                ...g
+            };
     } catch (error) {
         console.error('Fehler beim Erstellen der Gruppe:', error);
         return null;
@@ -366,8 +375,37 @@ async function deleteCategory(categoryId) {
     }
     if (!categoryId) return false;
     try {
-        // Prüfe, ob Fragen vorhanden sind
-        const { data: questions, error: qErr } = await window.supabase.from('questions').select('id').eq('categoryid', categoryId).limit(1);
+        // Prüfe, ob Fragen vorhanden sind.
+        // Verschiedene DB-Schemas können unterschiedliche Spaltennamen verwenden;
+        // versuche mehrere mögliche Spaltennamen, damit eine fehlende Spalte
+        // (SQL 42703) nicht zu einem Abbruch führt.
+        let questions = null;
+        let qErr = null;
+    const columnCandidates = ['category_id', 'categoryid', 'categoryId'];
+        for (const col of columnCandidates) {
+            try {
+                const resp = await window.supabase.from('questions').select('id').eq(col, categoryId).limit(1);
+                if (resp.error) {
+                    // Wenn die Spalte nicht existiert (Postgres 42703), probiere die nächste Variante
+                    if (resp.error.code === '42703' || (resp.error.message && resp.error.message.includes('does not exist'))) {
+                        continue;
+                    }
+                    qErr = resp.error;
+                    break;
+                }
+                questions = resp.data || [];
+                break; // erfolgreiche Abfrage
+            } catch (err) {
+                // Falls die Client-Bibliothek eine Exception wirft, prüfe die Fehlermeldung
+                qErr = err;
+                if (err && err.message && err.message.includes('does not exist')) {
+                    // Fehler aufgrund fehlender Spalte — nächste Spaltenvariante versuchen
+                    qErr = null;
+                    continue;
+                }
+                break;
+            }
+        }
         if (qErr) {
             console.error('Fehler beim Prüfen der Fragen zur Kategorie:', qErr);
             return false;
@@ -398,6 +436,29 @@ async function deleteCategory(categoryId) {
  * Lädt alle Fragen aus Supabase
  * @returns {Promise<Array>} Array mit allen Fragen
  */
+
+// Exponiere das Modul als globales Objekt `window.quizDB`, falls noch nicht vorhanden.
+// Manche Seiten erwarten `window.quizDB.createCategory()` etc.; hier wird die API zentral bereitgestellt.
+if (typeof window !== 'undefined') {
+    if (!window.quizDB) {
+        window.quizDB = {
+            initializeDatabase,
+            loadCategories,
+            saveCategories,
+            createCategory,
+            loadGroups,
+            saveGroups,
+            createGroup,
+            updateGroup,
+            deleteGroup,
+            updateCategory,
+            deleteCategory
+            // weitere Funktionen können hier bei Bedarf ergänzt werden
+        };
+        console.log('quizDB: API attached to window.quizDB');
+    }
+}
+
 async function loadQuestions() {
     if (!window.supabaseClient) {
         console.error('Supabase-Client ist nicht verfügbar.');
@@ -429,8 +490,9 @@ async function saveQuestions(questions) {
             imageurl: q.imageUrl ?? q.imageurl ?? null,
             options: q.options ?? null,
             explanation: q.explanation ?? null,
-            categoryid: q.categoryId ?? q.categoryid ?? null,
-            groupid: q.groupId ?? q.groupid ?? null,
+            // use canonical DB column names
+            category_id: q.categoryId ?? q.categoryid ?? q.category_id ?? null,
+            group_id: q.groupId ?? q.groupid ?? q.group_id ?? null,
             difficulty: q.difficulty ?? null,
             created_by: q.createdBy ?? q.created_by ?? null,
             created_at: q.createdAt ?? q.created_at ?? new Date().toISOString()
@@ -501,8 +563,9 @@ async function createQuestion(questionData) {
             imageurl: imageUrl || null,
             options: questionData.options ?? null,
             explanation: questionData.explanation || null,
-            categoryid: questionData.categoryId,
-            groupid: questionData.groupId,
+            // canonical DB columns
+            category_id: questionData.categoryId,
+            group_id: questionData.groupId,
             difficulty: questionData.difficulty || 1,
             created_by: questionData.createdBy || null,
             created_at: new Date().toISOString()
@@ -522,8 +585,9 @@ async function createQuestion(questionData) {
             imageUrl: q.imageurl ?? q.imageUrl ?? null,
             options: q.options ?? null,
             explanation: q.explanation ?? null,
-            categoryId: q.categoryid ?? q.categoryId ?? null,
-            groupId: q.groupid ?? q.groupId ?? null,
+            // accept either legacy or canonical DB columns when normalizing
+            categoryId: q.categoryid ?? q.category_id ?? q.categoryId ?? null,
+            groupId: q.groupid ?? q.group_id ?? q.groupId ?? null,
             difficulty: q.difficulty ?? null,
             createdBy: q.created_by ?? q.createdBy ?? null,
             createdAt: q.created_at ?? q.createdAt ?? null,
@@ -748,7 +812,7 @@ async function saveQuizResult(userId, categoryId, totalQuestions, correctAnswers
         if (!stats.quiz_stats) stats.quiz_stats = [];
         stats.quiz_stats.push({
             date: Date.now(),
-            categoryId,
+                category_id: categoryId,
             totalQuestions,
             correctAnswers,
             timeSpent
@@ -848,13 +912,31 @@ async function removeCollaborator(categoryId, userId) {
     }
 }
 
-// Funktionen global verfügbar machen
-window.quizDB = {
+// Funktionen global verfügbar machen (merge mit bestehendem window.quizDB, falls vorhanden)
+window.quizDB = Object.assign(window.quizDB || {}, {
+    MAIN_CATEGORY,
+    DEFAULT_CATEGORIES,
+    initializeDatabase,
     loadQuestions,
+    saveQuestions,
+    createQuestion,
+    getQuizQuestions,
     loadCategories,
+    saveCategories,
+    createCategory,
     loadGroups,
-    // weitere Funktionen nach Bedarf
-};
+    saveGroups,
+    createGroup,
+    updateGroup,
+    deleteGroup,
+    updateCategory,
+    deleteCategory,
+    saveStatistics,
+    saveQuizResult,
+    addCollaborator,
+    removeCollaborator,
+    // Weitere Funktionen können hier ergänzt werden
+});
 
 // Datenbank beim Laden initialisieren
 document.addEventListener('DOMContentLoaded', async () => {

@@ -20,10 +20,24 @@ const groupNameInput = document.getElementById('group-name');
 const filterCategoryInput = document.getElementById('filter-category');
 
 // Hilfsfunktion: aktuellen User holen
+// Verwendet bevorzugt die zentrale Funktion aus app-core (`window.getCurrentUser`),
+// fällt sonst auf den initialisierten Supabase-Client (`window.supabaseClient`) zurück.
 async function getCurrentUserId() {
-    const { data, error } = await window.supabase.auth.getUser();
-    if (error || !data?.user) return null;
-    return data.user.id;
+    try {
+        if (typeof window.getCurrentUser === 'function') {
+            const user = await window.getCurrentUser();
+            return user?.id || null;
+        }
+        // Fallback: verwende den globalen Supabase-Client, falls verfügbar
+        if (window.supabaseClient && window.supabaseClient.auth && typeof window.supabaseClient.auth.getUser === 'function') {
+            const { data, error } = await window.supabaseClient.auth.getUser();
+            if (error || !data?.user) return null;
+            return data.user.id;
+        }
+    } catch (err) {
+        console.error('getCurrentUserId Fehler:', err);
+    }
+    return null;
 }
 
 // Initialisierung

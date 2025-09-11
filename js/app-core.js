@@ -28,6 +28,17 @@ function initSupabase() {
     try {
         window.supabaseClient = window.supabase.createClient(url, key);
         console.log('Supabase-Client initialisiert.');
+        // Backwards compatibility: some modules expect `window.supabase` to be the client
+        // If `window.supabase.from` is not a function (i.e. `window.supabase` is the library),
+        // point `window.supabase` to the initialized client so older calls work.
+        try {
+            if (typeof window.supabase.from !== 'function') {
+                window.supabase = window.supabaseClient;
+                console.log('Supabase-Client als `window.supabase` gesetzt (Abwärtskompatibilität).');
+            }
+        } catch (compatErr) {
+            // ignore
+        }
     } catch (err) {
         window.showError('Fehler bei Supabase-Initialisierung: ' + err.message);
     }
