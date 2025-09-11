@@ -306,13 +306,14 @@ img.icon {
     justify-content: center;
     align-items: center;
     gap: 30px;
-    margin-top: 100px;
+    min-height: 80vh;
     flex-wrap: wrap; /* Ermöglicht Umbruch auf kleineren Bildschirmen */
     max-width: 900px; /* Begrenzt die maximale Breite */
     margin-left: auto;
     margin-right: auto;
     padding-left: var(--container-padding-desktop);
     padding-right: var(--container-padding-desktop);
+    /* Vertikal mittig im Viewport */
 }
 
 .dashboard-box {
@@ -1260,6 +1261,7 @@ img.icon {
 #index {
     display: flex;
     flex-direction: column;
+    min-height: 80vh;
     align-items: center;
     justify-content: center;
     height: calc(100vh - 2 * var(--bar-height)); /* Header und Footer abziehen */
