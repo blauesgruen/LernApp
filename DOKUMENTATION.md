@@ -67,217 +67,91 @@ Die LernApp ist eine interaktive Plattform, die Benutzern ermöglicht, Wissen du
 
 ---
 
-## Projektstruktur (Supabase-basiert)
+# LernApp — Aktuelle Dokumentation (Fokus: was gebraucht und genutzt wird)
 
+Kurz: diese Datei beschreibt die aktuelle, produktiv genutzte Architektur, die notwendigen Komponenten und wie man die App lokal startet. Hinweise auf entfernte/alte Implementationen werden hier nicht aufgeführt.
+
+## Übersicht
+- Ziel: Interaktive Multiple-Choice-Lernplattform mit Kategorien, Gruppen und Fragen.
+- Datenhaltung, Authentifizierung und Storage: Supabase (Auth, Postgres, Storage, Realtime).
+- Frontend: Vanilla HTML, CSS und JavaScript (ES6+). UI-Basis: Bootstrap (CDN) und eigene CSS-Dateien.
+
+## Technologie-Stack (genutzt)
+- Frontend: HTML5, CSS3, JavaScript (ES6+)
+- UI-Framework: Bootstrap (bereitgestellt über CDN)
+- Backend / Datenhaltung: Supabase (Postgres, Auth, Storage, Realtime)
+- Hosting/Testing: Statischer Webserver (lokal oder Web-Host), kein Node-Server für die statische Site nötig
+
+## Wichtige Projektdateien und Ordner
+- `index.html` — Einstieg / Landing-Page
+- `dashboard.html` — Nutzer-Dashboard
+- `login.html`, `register.html`, `profile.html` — Auth- & Profilseiten
+- `category-management.html` — Verwaltung von Kategorien und Gruppen
+- `question-creator.html` — UI zum Erstellen von Fragen
+- `quiz-player.html` — Quiz-Spieloberfläche
+- `partials/header.html`, `partials/footer.html` — zentral geladene Seitenbausteine (Header/Footer)
+
+- `css/` — stylespezifische Dateien (z. B. `style.css`, komponentenbezogene CSS)
+- `js/app-core.js` — zentrales Initialisierungsmodul (Supabase-Init, Storage-Adapter, Header/Footer-Loader, zentrale Helfer)
+- `js/auth.js` — Authentifizierungs-Logik und Session-Handling (Supabase)
+- `js/quiz-db.js` — Datenoperationen für Quizzes/Fragen (CRUD über Supabase)
+- `js/category-management.js` — Erzeugen und Anzeigen des Kategorien-/Gruppenbaums
+- `js/questions-db.js`, `js/quiz-player.js`, `js/question-creator.js` — Seiten- und Komponentenlogik
+- `js/notification.js` & `js/logger.js` — zentrale Benachrichtigungen und Logging
+
+## Supabase — Konfiguration und notwendige Werte
+- Erforderlich (lokal oder in Produktion):
+   - Supabase URL (Projekt-URL)
+   - Supabase Anon/Public API Key (oder Service Key für serverseitige Tasks)
+
+- Wo die Werte genutzt werden:
+   - `js/app-core.js` liest/initialisiert den Supabase-Client beim Laden der Seite. Je nach Deployment wird der Key entweder in einer `config.js` (nur lokal/entwicklung) oder per Umgebungs- bzw. Build-Variable bereitgestellt.
+
+- Sicherheitsempfehlung:
+   - Die Anon/Public Keys dürfen in statischen Demos auftreten, für produktive Anwendungen sollten sensible Keys nicht öffentlich im Repo liegen. Nutze bei Bedarf serverseitige Endpunkte oder Umgebungsvariablen.
+
+## Datenmodell — Kurzüberblick (genutzt)
+- categories: id, name, description, owner, collaborators, ggf. zusätzliche Metadaten
+- groups: id, name, category_id, created_by, created_at
+- questions: id, question/text, options (JSON), imageurl, explanation, categoryid/group_id, owner
+- statistics (optional): userbezogene Statistiken pro Frage/Quiz
+
+Hinweis: Spaltennamen können in JS-Modulen beim Zugriff angepasst/normalisiert werden. Verlasse dich für RLS-Policies und Migrationsskripte auf die tatsächliche Supabase-Konfiguration.
+
+## Laufzeit / Lokales Testen
+- Die App lädt Partials per fetch; daher muss die Seite über HTTP(S) geöffnet werden (einfaches `file://` funktioniert nicht zuverlässig).
+- Minimal lokal testen (Beispiel):
+
+```powershell
+# Im Projekt-Root ausführen (Windows PowerShell)
+python -m http.server 8000
+# Dann im Browser öffnen: http://localhost:8000/index.html
 ```
-/LernApp
-├── index.html          # Landing-Page
-├── style.css           # Globale Stile
-├── script.js           # Globale Skripte
-│
-├── /js                 # JavaScript-Module
-│   ├── auth.js         # Login/Logout und Authentifizierung (Supabase)
-│   ├── dashboard.js    # Benutzer-Dashboard
-│   ├── quiz-db.js      # Quiz- und Fragenlogik (Supabase)
-│   ├── category-management.js # Kategorien- und Gruppenlogik (Supabase)
-│   ├── notification.js # Zentrales Benachrichtigungssystem
-│   ├── logger.js       # Zentrales Logging
-│   └── ...             # Weitere Module
-│
-├── /css                # Bereichsspezifische Stile
-│   ├── dashboard.css   # Stile für das Dashboard
-│   ├── quiz.css        # Stile für den Quizbereich
-│   └── ...
-│
-├── /partials           # Zentrale HTML-Komponenten (Header, Footer)
-│   ├── header.html     # Dynamisch geladener Header
-│   ├── footer.html     # Dynamisch geladener Footer
-│   └── ...
-│
-├── /data               # (Optional: Beispiel-JSONs für Migration, nicht produktiv)
-│   └── ...
-│
-└── DOKUMENTATION.md    # Technische Dokumentation
-```
 
----
+Alternativ: Verwende VS Code Live Server oder einen beliebigen statischen Server.
 
-## Supabase als zentrale Datenbank
+## Entwicklerhinweise (wie die App aufgebaut ist)
+- Zentrale Initialisierung: `js/app-core.js`
+   - Initialisiert den Supabase-Client
+   - Stellt `window.storage` als Adapter für Storage-Operationen bereit (fällt auf `localStorage` zurück)
+   - Lädt `partials/header.html` und `partials/footer.html` einmalig und initialisiert Navigation/Breadcrumbs
 
-Alle App-Daten werden in Supabase-Tabellen gespeichert. Es gibt keine lokalen JSON-Dateien mehr.
+- Authentifizierung: `js/auth.js` verwendet den Supabase-Client für Login/Logout und Session-Management.
+- Daten-Operationen: Alle CRUD-Operationen laufen über die Supabase-Module (`quiz-db.js`, `questions-db.js`, `category-management.js`).
+- Benachrichtigungen & Logging: `js/notification.js` und `js/logger.js` verwenden zentrale Funktionen für konsistente UI-Meldungen und Log-Ausgaben.
 
-### Tabellenstruktur (Empfehlung)
+## Tests & Qualitätssicherung
+- Unit-Tests: Kleine Test-Skripte (falls vorhanden) befinden sich unter `js/*.test.js`.
+- Smoke-Test: Lokales Starten per HTTP-Server und manuelles Durchklicken der Seiten (Login, Kategoriebaum, Frageerstellung, Quiz-Spiel).
 
-**Kategorien**
-| Feld           | Typ      | Beschreibung                       |
-|----------------|----------|------------------------------------|
-| id             | UUID     | Primärschlüssel                    |
-| name           | TEXT     | Name der Kategorie                 |
-| owner          | UUID     | User-ID des Besitzers              |
-| collaborators  | JSONB    | Array von User-IDs (Mitbearbeiter) |
-| created_at     | TIMESTAMP| Erstellungsdatum                   |
+## Weiteres / To-Do (kurz)
+- Sicherstellen, dass `js/app-core.js` vor Seiten-spezifischen Skripten geladen wird (Header/Footer-Loader muss vor Komponenten laufen).
+- RLS-Policies in Supabase prüfen und mit Feld-/Namenskonventionen abgleichen.
 
-**Gruppen**
-| id             | UUID     | Primärschlüssel                    |
-| name           | TEXT     | Name der Gruppe                    |
-| category_id    | UUID     | Verweis auf Kategorie              |
-| created_by     | UUID     | User-ID des Erstellers             |
-| created_at     | TIMESTAMP| Erstellungsdatum                   |
+## Abschluss
+Diese Dokumentation beschreibt die aktuell genutzte Architektur und die Dateien, die beim Betrieb und der Entwicklung der LernApp benötigt werden. Änderungen an der Infrastruktur (z. B. Umzug von Supabase, Umstellung auf serverseitige APIs) sollten hier ergänzt werden.
 
-**Fragen**
-| id             | UUID     | Primärschlüssel                    |
-| text           | TEXT     | Fragetext                          |
-| image_url      | TEXT     | Bild-URL (Supabase Storage)        |
-| options        | JSONB    | Antwortoptionen (Array)            |
-| explanation    | TEXT     | Erklärung zur Antwort              |
-| category_id    | UUID     | Verweis auf Kategorie              |
-| group_id       | UUID     | Verweis auf Gruppe                 |
-| difficulty     | INT      | Schwierigkeitsgrad                 |
-| created_by     | UUID     | User-ID des Erstellers             |
-| created_at     | TIMESTAMP| Erstellungsdatum                   |
-
-**Statistiken**
-| id             | UUID     | Primärschlüssel                    |
-| user_id        | UUID     | User-ID                            |
-| question_stats | JSONB    | Statistiken pro Frage              |
-| quiz_stats     | JSONB    | Statistiken pro Quiz               |
-| updated_at     | TIMESTAMP| Letzte Aktualisierung              |
-
----
-
-## Kollaboratives Arbeiten: Rollen und Rechte
-
-- Jede Kategorie hat einen **Owner** (Ersteller/Admin) und eine Liste von **Mitbearbeitern** ("Collaborators", max. ca. 20 User pro Kategorie empfohlen).
-- Der Owner ist automatisch Admin der Kategorie und kann weitere Nutzer als Mitbearbeiter einladen oder entfernen.
-- Die Einladung erfolgt über die UI (z.B. per E-Mail-Adresse oder Username). Die App prüft, ob der eingeladene Nutzer existiert und fügt ihn zur Collaborators-Liste hinzu.
-- Nur der Owner kann die Collaborators-Liste bearbeiten (hinzufügen/entfernen).
-- Mitbearbeiter können die Kategorie, Gruppen und Fragen bearbeiten, aber keine weiteren Nutzer einladen oder entfernen.
-- Die Rechte werden in der App und im Backend geprüft (Supabase Row-Level Security).
-- Änderungen sind für alle Collaborators und den Owner in Echtzeit sichtbar.
-
-**Empfohlene Felder in der Tabelle `categories`:**
-| Feld           | Typ      | Beschreibung                       |
-|----------------|----------|------------------------------------|
-| owner          | UUID     | User-ID des Admins                 |
-| collaborators  | JSONB    | Array von User-IDs (max. 20)       |
-
-**Workflow:**
-1. Owner erstellt Kategorie und ist automatisch Admin.
-2. Owner lädt bis zu 20 Mitbearbeiter ein (UI: "Kollegen einladen").
-3. Eingeladene Nutzer erhalten Zugriff und können Inhalte bearbeiten.
-4. Nur Owner kann die Collaborators-Liste verwalten.
-5. Mitbearbeiter können Inhalte bearbeiten, aber keine weiteren Nutzer einladen.
-6. Änderungen werden in Echtzeit synchronisiert.
-
-**Hinweis:**
-- Die maximale Anzahl von Collaborators kann in der App und im Backend limitiert werden (z.B. 20).
-- Die UI sollte die Verwaltung der Collaborators übersichtlich und einfach gestalten (z.B. Liste mit Entfernen-Button, Einladungsfeld).
-- Die Rechte werden bei jedem Schreibzugriff geprüft.
-
----
-
-## Schritt-für-Schritt Umsetzung
-
----
-
-## Tatsächliche Tabellenspalten (aktuell im Projekt)
-
-Die folgenden Spalten sind derzeit in der Datenbankstruktur der App im Einsatz (exakte Namen):
-
-- categories
-   - id
-   - name
-   - description
-   - maincategory
-   - owner
-   - collaborators
-
-- groups
-   - id
-   - name
-   - category_id
-   - created_by
-   - created_at
-
-- questions
-   - id
-   - text
-   - imageurl
-   - options
-   - explanation
-   - categoryid
-
-Hinweis: Einige JS-Module normalisieren Feldnamen beim Zugriff (z. B. `category_id` → `categoryId`). Prüfe beim Schreiben von RLS-Policies die exakten Spaltennamen in deiner Supabase-Konsole.
-
-### IDs und Generierung
-
-Wichtig: Die App verwendet jetzt serverseitig generierte IDs (UUIDs), die von der Datenbank beim Insert erzeugt werden.
-- Die vorherige clientseitige ID-Generierung (temporäre `c-...` IDs) wurde entfernt, um Konsistenz und Kollisionen zu vermeiden.
-- Auswirkungen:
-   - Die UI wartet kurz auf die DB-Antwort, bevor sie die neue Zeile mit der endgültigen ID anzeigt.
-   - Offline-Erstellung ohne Verbindung wird dadurch nicht mehr unterstützt.
-   - Dies vereinfacht Backups, Migrationen und Integrationen, weil IDs jetzt einheitlich vom DB-Server stammen.
-
-1. **Supabase-Projekt anlegen**
-   - Tabellen für Kategorien, Gruppen, Fragen, Statistiken erstellen (siehe oben)
-   - Storage-Bucket für Bilder anlegen
-
-2. **Supabase-Client in der App einbinden**
-   - Supabase-JS-Client in allen relevanten Modulen verwenden
-   - Authentifizierung und Rechteprüfung zentral in `auth.js`
-
-3. **Migration der Daten**
-   - Bestehende lokale JSON-Daten (falls vorhanden) einmalig in die Supabase-Tabellen importieren
-   - Danach keine lokalen JSONs mehr verwenden
-
-4. **Kollaborations-Logik implementieren**
-   - UI für Mitbearbeiter-Verwaltung in Kategorie-Management
-   - Backend prüft Berechtigungen bei jedem Schreibzugriff
-   - Echtzeit-Updates über Supabase Realtime
-
-5. **Bilder-Upload über Supabase Storage**
-   - Bilder werden beim Erstellen von Fragen direkt in Supabase Storage hochgeladen
-   - Die Bild-URL wird in der Frage gespeichert
-
-6. **App-Logik anpassen**
-   - Alle Datenoperationen (CRUD) laufen über Supabase
-   - Keine lokalen JSON-Dateien mehr
-   - Fehlerbehandlung und Logging zentral
-
----
-
-## Vorteile
-- Zentrale, sichere und kollaborative Datenhaltung
-- Echtzeit-Synchronisation für alle Nutzer
-- Komfortable Verwaltung von Mitbearbeitern
-- Skalierbar und plattformunabhängig
-
----
-
-## Hinweise für Entwickler
-- Alle Datenoperationen laufen über Supabase-Tabellen und Storage
-- Die App ist vollständig cloudbasiert
-- Kollaboration und Rechteverwaltung sind direkt im Datenmodell abgebildet
-- Die UI muss die Mitbearbeiter-Funktionen und Echtzeit-Updates unterstützen
-
-# LernApp – Technische Dokumentation (Stand: 10.09.2025)
-
-## Architektur & Technologie
-- **Frontend:** Vanilla HTML, CSS, JavaScript (ES6+), Bootstrap für UI
-- **Backend:** Supabase (Auth, Datenhaltung, Storage)
-- **Design:** Responsive-first, moderne JS-Syntax, deutsche Kommentare
-
-## Zentrale Funktionen
-- Multiple-Choice-Fragen-System
-- Admin-Interface für Fragen/Kategorien
-- Kategorien- und Gruppenmanagement
-- Bildunterstützung für Fragen
-- Supabase-basierte Userverwaltung und Authentifizierung
-- Zentrales Logging und Benachrichtigungssystem
-
-## Wichtige Änderungen (2025)
-- **Lokale Storage-/Backup-/Filesystem-Logik entfernt**
-    - Alle alten JS-, CSS-, und HTML-Dateien für localStorage, Backups, Diagnosen, Migration, Pfadwahl etc. wurden gelöscht
+Letzte Aktualisierung: 2025-09-11
     - Keine lokale User-Initialisierung mehr (user-init.js entfernt)
     - Keine Speicherpfad-/Speichermodul-Funktionen mehr
     - Alle Einbindungen und UI-Reste zu Storage/Backup entfernt

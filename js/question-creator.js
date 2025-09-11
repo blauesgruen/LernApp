@@ -4,8 +4,8 @@
 
 document.addEventListener('DOMContentLoaded', function() {
     // Prüfen, ob der Benutzer eingeloggt ist
-    const isLoggedIn = localStorage.getItem('loggedIn') === 'true';
-    const username = localStorage.getItem('username');
+    const isLoggedIn = (window.storage && typeof window.storage.isLoggedIn === 'function') ? window.storage.isLoggedIn() : (localStorage.getItem('loggedIn') === 'true');
+    const username = (window.storage && typeof window.storage.getUsername === 'function') ? window.storage.getUsername() : localStorage.getItem('username');
     
     if (!isLoggedIn || !username) {
         // Nicht eingeloggt - zurück zur Login-Seite
@@ -661,8 +661,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
 document.addEventListener('DOMContentLoaded', function() {
     // Prüfen, ob der Benutzer eingeloggt ist
-    const isLoggedIn = localStorage.getItem('loggedIn') === 'true';
-    const username = localStorage.getItem('username');
+    const isLoggedIn = (window.storage && typeof window.storage.isLoggedIn === 'function') ? window.storage.isLoggedIn() : (localStorage.getItem('loggedIn') === 'true');
+    const username = (window.storage && typeof window.storage.getUsername === 'function') ? window.storage.getUsername() : localStorage.getItem('username');
     
     if (!isLoggedIn || !username) {
         // Nicht eingeloggt - zurück zur Login-Seite
@@ -1318,8 +1318,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
 document.addEventListener('DOMContentLoaded', function() {
     // Prüfen, ob der Benutzer eingeloggt ist
-    const isLoggedIn = localStorage.getItem('loggedIn') === 'true';
-    const username = localStorage.getItem('username');
+    const isLoggedIn = (window.storage && typeof window.storage.isLoggedIn === 'function') ? window.storage.isLoggedIn() : (localStorage.getItem('loggedIn') === 'true');
+    const username = (window.storage && typeof window.storage.getUsername === 'function') ? window.storage.getUsername() : localStorage.getItem('username');
     
     if (!isLoggedIn || !username) {
         // Nicht eingeloggt - zurück zur Login-Seite
@@ -1975,8 +1975,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
 document.addEventListener('DOMContentLoaded', function() {
     // Prüfen, ob der Benutzer eingeloggt ist
-    const isLoggedIn = localStorage.getItem('loggedIn') === 'true';
-    const username = localStorage.getItem('username');
+    const isLoggedIn = (window.storage && typeof window.storage.isLoggedIn === 'function') ? window.storage.isLoggedIn() : (localStorage.getItem('loggedIn') === 'true');
+    const username = (window.storage && typeof window.storage.getUsername === 'function') ? window.storage.getUsername() : localStorage.getItem('username');
     
     if (!isLoggedIn || !username) {
         // Nicht eingeloggt - zurück zur Login-Seite

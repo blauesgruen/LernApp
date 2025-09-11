@@ -29,10 +29,8 @@
     <div id="footer-container"></div>
     <script src="js/questions-db.js"></script>
     <script>
-    // Load header and footer (centralized in app-core.js)
     if (window.loadHeaderFooter) window.loadHeaderFooter();
-        // Zentraler Supabase-Client-Check
-        window.checkSupabaseClient();
+    if (window.checkSupabaseClient && !window._supabaseChecked) { window._supabaseChecked = true; window.checkSupabaseClient(); }
     </script>
 </body>
 </html>

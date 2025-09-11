@@ -51,10 +51,8 @@
         }
     // Load header/footer via centralized helper
     if (window.loadHeaderFooter) window.loadHeaderFooter();
-    if (window.checkSupabaseClient) window.checkSupabaseClient();
+    if (window.checkSupabaseClient && !window._supabaseChecked) { window._supabaseChecked = true; window.checkSupabaseClient(); }
         document.addEventListener('DOMContentLoaded', initLoginLogic);
-        // Zentraler Supabase-Client-Check
-        window.checkSupabaseClient();
     </script>
 </body>
 </html>

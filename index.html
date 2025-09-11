@@ -22,11 +22,10 @@
     </main>
     <div id="footer-container"></div>
     <script>
+        // Ensure header/footer via central loader and perform one-time checks
+        if (window.loadHeaderFooter) window.loadHeaderFooter();
         window.checkLoginAndRedirect();
-    // Load header and footer (centralized in app-core.js)
-    if (window.loadHeaderFooter) window.loadHeaderFooter();
-        // Zentraler Supabase-Client-Check
-        window.checkSupabaseClient();
+        if (window.checkSupabaseClient && !window._supabaseChecked) { window._supabaseChecked = true; window.checkSupabaseClient(); }
     </script>
 </body>
 </html>

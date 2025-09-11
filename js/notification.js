@@ -198,7 +198,7 @@ window.addEventListener('unhandledrejection', function(event) {
 
 // Zeige eine Test-Nachricht beim Laden der Datei (nur im Entwicklungsmodus)
 document.addEventListener('DOMContentLoaded', function() {
-    const isDevelopment = localStorage.getItem('developmentMode') === 'true';
+    const isDevelopment = (window.storage && typeof window.storage.getItem === 'function') ? (window.storage.getItem('developmentMode') === 'true') : (localStorage.getItem('developmentMode') === 'true');
     if (isDevelopment) {
         showInfo('Benachrichtigungssystem wurde geladen.', 3000);
     }

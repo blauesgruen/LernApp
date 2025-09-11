@@ -144,45 +144,14 @@
 
     <script src="js/quiz-player.js"></script>
     <script>
-        // Header und Footer dynamisch laden
-        async function loadHeaderAndFooter() {
-            try {
-                // Header und Footer laden
-                document.getElementById('header-container').innerHTML = await (await fetch('partials/header.html')).text();
-                document.getElementById('footer-container').innerHTML = await (await fetch('partials/footer.html')).text();
-                
-                // Skripte aus dem Header auswerten
-                const headerScripts = document.getElementById('header-container').querySelectorAll('script');
-                for (const script of headerScripts) {
-                    if (script.innerText) {
-                        eval(script.innerText);
-                    } else if (script.src) {
-                        const s = document.createElement('script'); s.src = script.src; document.head.appendChild(s);
-                    }
-                }
-
-                // Skripte aus dem Footer auswerten
-                const footerScripts = document.getElementById('footer-container').querySelectorAll('script');
-                for (const script of footerScripts) {
-                    if (script.innerText) {
-                        try { eval(script.innerText); } catch (e) { console.error('Footer-inline-script error', e); }
-                    } else if (script.src) {
-                        const s = document.createElement('script'); s.src = script.src; s.async = false; document.body.appendChild(s);
-                    }
-                }
-
-                if (window.updateNavigation) { window.updateNavigation(); }
-                setTimeout(() => { try { if (window.updateStorageStatusIcon) window.updateStorageStatusIcon(); } catch (e) {} }, 50);
-            } catch (error) {
-                console.error('Fehler beim Laden des Headers oder Footers:', error);
+        (async function() {
+            if (window.loadHeaderFooter) {
+                try { await window.loadHeaderFooter(); } catch (e) { console.error('Error loading central header/footer', e); }
             }
-        }
-        
-        // Zentraler Supabase-Client-Check
-        window.checkSupabaseClient();
-        
-        // Header und Footer laden
-        loadHeaderAndFooter();
+                // Navigation updated by central loader; no need to call again
+            setTimeout(() => { try { if (window.updateStorageStatusIcon) window.updateStorageStatusIcon(); } catch (e) {} }, 50);
+            if (window.checkSupabaseClient && !window._supabaseChecked) { window._supabaseChecked = true; window.checkSupabaseClient(); }
+        })();
     </script>
 </body>
 </html>

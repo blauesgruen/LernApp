@@ -33,6 +33,21 @@ function initSupabase() {
     }
 }
 
+// Storage-Adapter: zentrale Wrapper-API für localStorage (Fallback wenn kein spezifizierter Adapter vorhanden)
+if (!window.storage) {
+    window.storage = {
+        getItem: function(k) { try { return localStorage.getItem(k); } catch(e) { console.warn('storage.getItem failed', e); return null; } },
+        setItem: function(k,v) { try { localStorage.setItem(k,v); } catch(e) { console.warn('storage.setItem failed', e); } },
+        removeItem: function(k) { try { localStorage.removeItem(k); } catch(e) { console.warn('storage.removeItem failed', e); } },
+        // Convenience helpers
+        isLoggedIn: function() { return this.getItem('loggedIn') === 'true'; },
+        setLoggedIn: function(val) { this.setItem('loggedIn', val ? 'true' : 'false'); },
+        getUsername: function() { return this.getItem('username'); },
+        setUsername: function(name) { this.setItem('username', name); }
+    };
+    console.log('storage adapter initialized (fallback to localStorage)');
+}
+
 // Load header/footer central helper so pages can call it once
 window.loadHeaderFooter = function() {
     // Guard: avoid loading header/footer multiple times
@@ -68,8 +83,8 @@ if (document.readyState === 'loading') {
 
 // 2. Authentifizierungs-Funktionen
 window.checkLoginAndRedirect = function() {
-    const isLoggedIn = localStorage.getItem('loggedIn') === 'true';
-    const username = localStorage.getItem('username');
+    const isLoggedIn = (window.storage && typeof window.storage.isLoggedIn === 'function') ? window.storage.isLoggedIn() : (localStorage.getItem('loggedIn') === 'true');
+    const username = (window.storage && typeof window.storage.getUsername === 'function') ? window.storage.getUsername() : localStorage.getItem('username');
     if (isLoggedIn && username) {
         window.location.href = 'dashboard.html';
     }
@@ -82,8 +97,7 @@ window.getCurrentUser = async function() {
 window.logoutUser = async function() {
     if (!window.supabaseClient) return;
     await window.supabaseClient.auth.signOut();
-    localStorage.removeItem('loggedIn');
-    localStorage.removeItem('username');
+    if (window.storage && typeof window.storage.removeItem === 'function') { window.storage.removeItem('loggedIn'); window.storage.removeItem('username'); } else { localStorage.removeItem('loggedIn'); localStorage.removeItem('username'); }
     window.location.href = 'login.html';
 };
 window.login = async function(email, password) {
@@ -107,8 +121,8 @@ window.login = async function(email, password) {
             return;
         }
         if (data?.user) {
-            localStorage.setItem('loggedIn', 'true');
-            localStorage.setItem('username', data.user.email);
+            if (window.storage && typeof window.storage.setLoggedIn === 'function') { window.storage.setLoggedIn(true); } else { localStorage.setItem('loggedIn', 'true'); }
+            if (window.storage && typeof window.storage.setUsername === 'function') { window.storage.setUsername(data.user.email); } else { localStorage.setItem('username', data.user.email); }
             window.showSuccess('Login erfolgreich!');
             window.logInfo('User eingeloggt: ' + data.user.email);
             window.location.href = 'dashboard.html';
@@ -181,7 +195,7 @@ window.updateStorageStatusIcon = function() {
 
 // 5. Navigation
 window.updateNavigation = function() {
-    const isLoggedIn = localStorage.getItem('loggedIn') === 'true';
+    const isLoggedIn = (window.storage && typeof window.storage.isLoggedIn === 'function') ? window.storage.isLoggedIn() : (localStorage.getItem('loggedIn') === 'true');
     const userButtons = document.getElementById('user-buttons');
     window.logConsole({ isLoggedIn, userButtons }, 'info');
     if (userButtons) {
@@ -249,9 +263,11 @@ if (window.checkSupabaseClient === undefined) {
         if (typeof window.SupabaseClient === 'undefined' && typeof window.supabase === 'undefined') {
             window.showError('Supabase-Client ist nicht verfügbar! Bitte Script-Tag und Netzwerk prüfen.');
         } else {
-            window.logConsole('Supabase-Client geladen!', 'info');
+        window.logConsole('Supabase-Client geladen!', 'info');
         }
         window.logConsole('window.SupabaseClient: ' + window.SupabaseClient, 'debug');
-        window.logConsole('window.supabase: ' + JSON.stringify(window.supabase), 'debug');
+    window.logConsole('window.supabase: ' + JSON.stringify(window.supabase), 'debug');
+    // mark as checked so pages won't call this repeatedly
+    window._supabaseChecked = true;
     };
 }

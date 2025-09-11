@@ -45,8 +45,8 @@ window.login = async function(email, password) {
             setLoginStatus(false);
             return;
         }
-        setLoginStatus(true);
-        localStorage.setItem('username', data.user.email); // Benutzername für Speicherinitialisierung speichern
+    setLoginStatus(true);
+    if (window.storage && typeof window.storage.setUsername === 'function') { window.storage.setUsername(data.user.email); } else { localStorage.setItem('username', data.user.email); }
         logMessage('✅ Login-Status wurde auf "eingeloggt" gesetzt für: ' + data.user.email);
         showSuccess('Login erfolgreich! Sie werden weitergeleitet...');
         setTimeout(() => {
@@ -100,14 +100,14 @@ window.register = async function(email, password, nickname) {
  * Setzt den Login-Status im localStorage
  */
 window.setLoginStatus = function(status) {
-    localStorage.setItem('loggedIn', status ? 'true' : 'false');
+    if (window.storage && typeof window.storage.setLoggedIn === 'function') { window.storage.setLoggedIn(status); } else { localStorage.setItem('loggedIn', status ? 'true' : 'false'); }
 }
 
 /**
  * Löscht den Login-Status im localStorage
  */
 window.clearLoginStatus = function() {
-    localStorage.removeItem('loggedIn');
+    if (window.storage && typeof window.storage.removeItem === 'function') { window.storage.removeItem('loggedIn'); } else { localStorage.removeItem('loggedIn'); }
 }
 
 // Supabase-Login-Status prüfen und Weiterleitung steuern
@@ -138,7 +138,7 @@ window.addEventListener('DOMContentLoaded', checkLoginAndRedirect);
 window.showLogs = function() {
     logMessage('showLogs wurde aufgerufen.');
 
-    const logs = JSON.parse(localStorage.getItem('persistentLogs')) || [];
+    const logs = JSON.parse((window.storage && typeof window.storage.getItem === 'function' ? window.storage.getItem('persistentLogs') : localStorage.getItem('persistentLogs')) || '[]') || [];
     logMessage('Anzahl der abgerufenen Logs: ' + logs.length);
 
     const logContainer = document.createElement('div');
@@ -203,13 +203,13 @@ window.showLogs = function() {
 // Zusätzliche Logs zur Überprüfung der Log-Speicherung und Anzeige
 logMessage('Überprüfung der Log-Speicherung gestartet.');
 const testLog = { timestamp: new Date().toISOString(), type: 'info', message: 'Testlog für Debugging' };
-const existingLogs = JSON.parse(localStorage.getItem('persistentLogs')) || [];
+const existingLogs = JSON.parse((window.storage && typeof window.storage.getItem === 'function' ? window.storage.getItem('persistentLogs') : localStorage.getItem('persistentLogs')) || '[]') || [];
 existingLogs.push(testLog);
-localStorage.setItem('persistentLogs', JSON.stringify(existingLogs));
+if (window.storage && typeof window.storage.setItem === 'function') { window.storage.setItem('persistentLogs', JSON.stringify(existingLogs)); } else { localStorage.setItem('persistentLogs', JSON.stringify(existingLogs)); }
 // logMessage('Testlog wurde hinzugefügt: ' + JSON.stringify(testLog));
 
 // Logs direkt nach dem Hinzufügen anzeigen
-const logsAfterTest = JSON.parse(localStorage.getItem('persistentLogs')) || [];
+const logsAfterTest = JSON.parse((window.storage && typeof window.storage.getItem === 'function' ? window.storage.getItem('persistentLogs') : localStorage.getItem('persistentLogs')) || '[]') || [];
 // logMessage('Logs nach Test: ' + JSON.stringify(logsAfterTest));
 
 // Überprüfen, ob das Element mit der ID 'login' existiert

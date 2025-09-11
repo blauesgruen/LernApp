@@ -121,9 +121,9 @@ async function importDataToLocalStorage() {
     ];
 
     // Bestehende Daten laden, falls vorhanden
-    let existingCategories = JSON.parse(localStorage.getItem('categories') || '[]');
-    let existingGroups = JSON.parse(localStorage.getItem('groups') || '[]');
-    let existingQuestions = JSON.parse(localStorage.getItem('questions') || '[]');
+    const existingCategories = JSON.parse((window.storage && typeof window.storage.getItem === 'function' ? window.storage.getItem('categories') : localStorage.getItem('categories')) || '[]');
+    const existingGroups = JSON.parse((window.storage && typeof window.storage.getItem === 'function' ? window.storage.getItem('groups') : localStorage.getItem('groups')) || '[]');
+    const existingQuestions = JSON.parse((window.storage && typeof window.storage.getItem === 'function' ? window.storage.getItem('questions') : localStorage.getItem('questions')) || '[]');
 
     // Daten zusammenführen, Duplikate vermeiden
     const mergeData = (existing, newData) => {
@@ -148,9 +148,20 @@ async function importDataToLocalStorage() {
     const mergedQuestions = mergeData(existingQuestions, questions);
 
     // Daten im Browser-Speicher speichern
-    localStorage.setItem('categories', JSON.stringify(mergedCategories));
-    localStorage.setItem('groups', JSON.stringify(mergedGroups));
-    localStorage.setItem('questions', JSON.stringify(mergedQuestions));
+    // Store via adapter with localStorage fallback
+    try {
+        if (window.storage && typeof window.storage.setItem === 'function') {
+            window.storage.setItem('categories', JSON.stringify(mergedCategories));
+            window.storage.setItem('groups', JSON.stringify(mergedGroups));
+            window.storage.setItem('questions', JSON.stringify(mergedQuestions));
+        } else {
+            localStorage.setItem('categories', JSON.stringify(mergedCategories));
+            localStorage.setItem('groups', JSON.stringify(mergedGroups));
+            localStorage.setItem('questions', JSON.stringify(mergedQuestions));
+        }
+    } catch (e) {
+        console.warn('Failed to save imported data to storage adapter or localStorage', e);
+    }
 
     console.log('Daten erfolgreich in den Browser-Speicher importiert:');
     console.log(`- ${categories.length} Kategorie(n)`);

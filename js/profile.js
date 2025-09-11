@@ -1,12 +1,15 @@
 // profile.js
 // Supabase-Profile-Management: Nickname, Passwort, Account, DB-Export/Import
 
-// Header/Footer laden
-async function loadHeaderAndFooter() {
-    document.getElementById('header-container').innerHTML = await (await fetch('partials/header.html')).text();
-    document.getElementById('footer-container').innerHTML = await (await fetch('partials/footer.html')).text();
-}
-loadHeaderAndFooter();
+// Header/Footer: prefer central loader to avoid double-inits
+(async function() {
+    if (window.loadHeaderFooter) {
+        try { await window.loadHeaderFooter(); } catch (e) { console.error('failed to load header/footer via central loader', e); }
+    } else {
+        // No central loader available; as a last resort, do nothing to avoid double-loading. 
+        // (Previously we fetched partials here; central loader is preferred.)
+    }
+})();
 
 // Nickname laden und setzen
 async function loadNickname() {
