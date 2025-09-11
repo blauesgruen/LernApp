@@ -1,5 +1,8 @@
 // logger.js - Zentrale Logging-Funktionalität für die gesamte Anwendung
 
+// Lightweight startup indicator (helps detect whether this script is loaded)
+try { console.log && console.log('logger.js geladen'); } catch (e) { /* ignore */ }
+
 /**
  * Logger-Klasse für zentrale Logging-Funktionalität
  */
@@ -29,16 +32,20 @@ class Logger {
      * @returns {boolean} true wenn das Log gefiltert werden soll, sonst false
      */
     shouldFilterLog(message, type) {
+        // Normalize message to a safe string for substring checks to avoid
+        // exceptions when non-string values (objects, errors) are passed.
+        let msg = '';
+        try { msg = (typeof message === 'string') ? message : (message == null ? '' : String(message)); } catch (e) { msg = '' }
+
         // Rekursive Logs filtern
-        if (this._showingNotification || 
-            (typeof message === 'string' && message.includes('Benachrichtigung (') && message.split('Benachrichtigung (').length > 2)) {
+        if (this._showingNotification || (msg.includes('Benachrichtigung (') && msg.split('Benachrichtigung (').length > 2)) {
             return true;
         }
         
         // Wenn Button-bezogene Logs deaktiviert sind
         if (this.buttonLogsDisabled && 
-            (message.includes('Button') || message.includes('Buttons') || 
-             message.includes('updateHeaderVisibility') || message.includes('updateButtonVisibility'))) {
+            (msg.includes('Button') || msg.includes('Buttons') || 
+             msg.includes('updateHeaderVisibility') || msg.includes('updateButtonVisibility'))) {
             // Zeige trotzdem Button-bezogene Fehler an, aber keine "nicht gefunden" Meldungen
             if (type === 'error' && !message.includes('nicht gefunden')) {
                 return false;
@@ -47,9 +54,9 @@ class Logger {
         }
         
         // Stets Benutzer-bezogene Logs durchlassen
-        if (message.includes('Benutzer') || 
-            message.includes('Authentifizierungsstatus') || 
-            message.includes('Anzahl der Benutzer')) {
+        if (msg.includes('Benutzer') || 
+            msg.includes('Authentifizierungsstatus') || 
+            msg.includes('Anzahl der Benutzer')) {
             return false;
         }
         
@@ -86,14 +93,33 @@ class Logger {
         const displayTimestamp = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
         const logEntry = { timestamp: isoTimestamp, type, message };
 
-        try {
+    // Safely convert message for substring checks below
+    let msgStr = '';
+    try { msgStr = (typeof message === 'string') ? message : (message == null ? '' : String(message)); } catch (e) { msgStr = ''; }
+
+    try {
             // Logs immer in der Konsole ausgeben, mit reduziertem Zeitstempelformat (hh:mm)
-            console[type](`[${displayTimestamp}] ${type.toUpperCase()}: ${message}`);
+            // Use original console functions when available to avoid recursion
+            // in case console methods are overridden to call back into the logger.
+            try {
+                const originalMap = {
+                    'log': console.originalLog,
+                    'info': console.originalInfo || console.originalLog,
+                    'warn': console.originalWarn || console.originalLog,
+                    'error': console.originalError || console.originalLog,
+                    'debug': console.originalLog
+                };
+                const fn = (originalMap[type] && typeof originalMap[type] === 'function') ? originalMap[type] : (console[type] || console.log);
+                fn.call(console, `[${displayTimestamp}] ${type.toUpperCase()}: ${message}`);
+            } catch (e) {
+                // Fallback to the raw console method if anything fails
+                try { console[type] && console[type](`[${displayTimestamp}] ${type.toUpperCase()}: ${message}`); } catch (ee) { /* ignore */ }
+            }
             
             // Bei Fehlern und Warnungen auch als Benachrichtigung anzeigen, wenn die Funktion existiert
             // Prüfung auf rekursive Aufrufe, um Endlosschleifen zu vermeiden
             if ((type === 'error' || type === 'warn') && window.showNotification && 
-                !message.includes('Benachrichtigung (')) {
+                !msgStr.includes('Benachrichtigung (')) {
                 const notificationType = type === 'error' ? 'error' : 'warning';
                 try {
                     // Direktes Flag setzen, um Rekursion zu verhindern
@@ -206,26 +232,36 @@ console.originalInfo = console.info;
 
 // Console-Methoden überschreiben, um zentrales Logging zu verwenden
 // Dies sollte nur in der Produktionsumgebung aktiviert werden
-if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-    console.log = function() {
-        console.originalLog.apply(console, arguments);
-        logger.info(Array.from(arguments).join(' '));
-    };
-    
-    console.error = function() {
-        console.originalError.apply(console, arguments);
-        logger.error(Array.from(arguments).join(' '));
-    };
-    
-    console.warn = function() {
-        console.originalWarn.apply(console, arguments);
-        logger.warn(Array.from(arguments).join(' '));
-    };
-    
-    console.info = function() {
-        console.originalInfo.apply(console, arguments);
-        logger.info(Array.from(arguments).join(' '));
-    };
+try {
+    if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+        // Override console methods to feed into the central logger, but keep
+        // a try/catch to avoid throwing during page load if something is odd.
+        try {
+            console.log = function() {
+                console.originalLog && console.originalLog.apply(console, arguments);
+                try { logger.info(Array.from(arguments).join(' ')); } catch (e) { /* ignore */ }
+            };
+
+            console.error = function() {
+                console.originalError && console.originalError.apply(console, arguments);
+                try { logger.error(Array.from(arguments).join(' ')); } catch (e) { /* ignore */ }
+            };
+
+            console.warn = function() {
+                console.originalWarn && console.originalWarn.apply(console, arguments);
+                try { logger.warn(Array.from(arguments).join(' ')); } catch (e) { /* ignore */ }
+            };
+
+            console.info = function() {
+                console.originalInfo && console.originalInfo.apply(console, arguments);
+                try { logger.info(Array.from(arguments).join(' ')); } catch (e) { /* ignore */ }
+            };
+        } catch (inner) {
+            try { console.originalWarn && console.originalWarn('logger.js: failed to override console methods', inner); } catch (e) { /* ignore */ }
+        }
+    }
+} catch (outer) {
+    try { console && console.log && console.log('logger.js: console override skipped due to error', outer); } catch (e) { /* ignore */ }
 }
 
 // Exportiere die Funktionen, um sie überall verfügbar zu machen
