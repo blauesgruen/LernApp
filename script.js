@@ -7,7 +7,9 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
         console.log('Willkommen bei der LernApp!');
     }
-    const currentPath = window.location.pathname;
+    // Normalize path for GitHub Pages subpath support (/LernApp)
+    let currentPath = window.location.pathname || '/';
+    try { if (currentPath.indexOf('/LernApp') === 0) currentPath = currentPath.substring('/LernApp'.length) || '/'; } catch(e) {}
     const startseiteLink = document.querySelector('nav ul li a[href="#"]');
     const appLink = document.querySelector('nav div a');
 

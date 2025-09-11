@@ -9,14 +9,18 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Beispiel für die Verwendung auf verschiedenen Seiten
     
+    // Normalize pathname for GitHub Pages subpath support
+    let _path = window.location.pathname || '/';
+    try { if (_path.indexOf('/LernApp') === 0) _path = _path.substring('/LernApp'.length) || '/'; } catch(e) {}
+
     // 1. Auf der Dashboard-Seite
-    if (window.location.pathname.includes('dashboard.html')) {
+    if (_path.endsWith('dashboard.html') || _path === '/dashboard.html') {
         // Dashboard ist ein Startpunkt, also Breadcrumbs zurücksetzen
         window.breadcrumbs.clear();
     }
     
     // 2. Auf der Kategorie-Management-Seite
-    else if (window.location.pathname.includes('category-management.html')) {
+    else if (_path.endsWith('category-management.html')) {
         window.breadcrumbs.set([
             { label: 'Verwaltung', url: 'dashboard.html' },
             { label: 'Kategorien & Gruppen', url: null }  // Aktuelle Seite hat keine URL
@@ -24,7 +28,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // 3. Auf der Fragen-Erstellen-Seite
-    else if (window.location.pathname.includes('question-creator.html')) {
+    else if (_path.endsWith('question-creator.html')) {
         window.breadcrumbs.set([
             { label: 'Verwaltung', url: 'dashboard.html' },
             { label: 'Fragen erstellen', url: null }
@@ -32,7 +36,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // 4. Auf der Quiz-Spieler-Seite (Setup)
-    else if (window.location.pathname.includes('quiz-player.html')) {
+    else if (_path.endsWith('quiz-player.html')) {
         // Prüfen, ob wir im Quiz-Setup sind
         const isSetup = document.getElementById('quiz-setup-section') && 
                         !document.getElementById('quiz-setup-section').classList.contains('hidden');

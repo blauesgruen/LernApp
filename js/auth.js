@@ -114,7 +114,14 @@ window.clearLoginStatus = function() {
 async function checkLoginAndRedirect() {
     const { data, error } = await window.supabase.auth.getUser();
     const loggedIn = !!data?.user;
-    const path = window.location.pathname;
+    // Normalize path so comparisons work when the site is hosted under a subpath
+    // (e.g. GitHub Pages at /LernApp/). We only compare the filename (e.g. '/index.html')
+    // or root ('/').
+    let path = window.location.pathname || '/';
+    try {
+        // remove leading '/LernApp' if present (case-sensitive repo name)
+        if (path.indexOf('/LernApp') === 0) path = path.substring('/LernApp'.length) || '/';
+    } catch (e) { /* ignore */ }
     // Seiten, die nur für nicht eingeloggte User sind
     const guestPages = ['/index.html', '/login.html', '/register.html', '/'];
     if (loggedIn && guestPages.includes(path)) {
