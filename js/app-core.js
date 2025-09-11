@@ -346,13 +346,23 @@ window.loadGroups.displayName = 'loadGroups';
 if (window.checkSupabaseClient === undefined) {
     window.checkSupabaseClient = function() {
         // Prüft Supabase-Client und gibt Status nur in die Konsole aus
-        if (typeof window.SupabaseClient === 'undefined' && typeof window.supabase === 'undefined') {
-            window.showError('Supabase-Client ist nicht verfügbar! Bitte Script-Tag und Netzwerk prüfen.');
-        } else {
-        window.logConsole('Supabase-Client geladen!', 'info');
+        try {
+            if (typeof window.SupabaseClient === 'undefined' && typeof window.supabase === 'undefined') {
+                window.showError('Supabase-Client ist nicht verfügbar! Bitte Script-Tag und Netzwerk prüfen.');
+            } else {
+                window.logConsole('Supabase-Client geladen!', 'info');
+            }
+            // Avoid serializing large or circular objects (Supabase client). Log lightweight type info instead.
+            try {
+                window.logConsole('window.SupabaseClient type: ' + typeof window.SupabaseClient, 'debug');
+            } catch (e) { /* ignore */ }
+            try {
+                window.logConsole('window.supabase type: ' + (window.supabase ? (typeof window.supabase) : 'undefined'), 'debug');
+            } catch (e) { /* ignore */ }
+        } catch (e) {
+            // Non-fatal: ensure this function never throws
+            try { window.logConsole('checkSupabaseClient error: ' + e.message, 'error'); } catch (e2) {}
         }
-        window.logConsole('window.SupabaseClient: ' + window.SupabaseClient, 'debug');
-    window.logConsole('window.supabase: ' + JSON.stringify(window.supabase), 'debug');
     // mark as checked so pages won't call this repeatedly
     window._supabaseChecked = true;
     };
