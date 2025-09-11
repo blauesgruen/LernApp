@@ -93,9 +93,25 @@ class Logger {
         const displayTimestamp = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
         const logEntry = { timestamp: isoTimestamp, type, message };
 
-    // Safely convert message for substring checks below
+    // Safely convert/serialize message for substring checks and output.
     let msgStr = '';
-    try { msgStr = (typeof message === 'string') ? message : (message == null ? '' : String(message)); } catch (e) { msgStr = ''; }
+    try {
+        if (typeof message === 'string') msgStr = message;
+        else if (message == null) msgStr = '';
+        else {
+            // Try JSON stringify with fallback
+            try {
+                msgStr = JSON.stringify(message);
+            } catch (e) {
+                try { msgStr = String(message); } catch (ee) { msgStr = '[unserializable]'; }
+            }
+        }
+    } catch (e) { msgStr = '' }
+
+    // Truncate very long messages to avoid console flooding or blocking
+    const MAX_LOG_LENGTH = 2000;
+    let displayMessage = msgStr;
+    try { if (displayMessage && displayMessage.length > MAX_LOG_LENGTH) displayMessage = displayMessage.slice(0, MAX_LOG_LENGTH) + '…[truncated]'; } catch (e) { /* ignore */ }
 
     try {
             // Logs immer in der Konsole ausgeben, mit reduziertem Zeitstempelformat (hh:mm)
@@ -110,10 +126,10 @@ class Logger {
                     'debug': console.originalLog
                 };
                 const fn = (originalMap[type] && typeof originalMap[type] === 'function') ? originalMap[type] : (console[type] || console.log);
-                fn.call(console, `[${displayTimestamp}] ${type.toUpperCase()}: ${message}`);
+                fn.call(console, `[${displayTimestamp}] ${type.toUpperCase()}: ${displayMessage}`);
             } catch (e) {
                 // Fallback to the raw console method if anything fails
-                try { console[type] && console[type](`[${displayTimestamp}] ${type.toUpperCase()}: ${message}`); } catch (ee) { /* ignore */ }
+                try { console[type] && console[type](`[${displayTimestamp}] ${type.toUpperCase()}: ${displayMessage}`); } catch (ee) { /* ignore */ }
             }
             
             // Bei Fehlern und Warnungen auch als Benachrichtigung anzeigen, wenn die Funktion existiert
@@ -124,7 +140,8 @@ class Logger {
                 try {
                     // Direktes Flag setzen, um Rekursion zu verhindern
                     this._showingNotification = true;
-                    window.showNotification(message, notificationType, 5000);
+                    // Use the truncated/serialized message for notifications
+                    window.showNotification(displayMessage, notificationType, 5000);
                 } finally {
                     this._showingNotification = false;
                 }
