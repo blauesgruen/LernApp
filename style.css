@@ -485,8 +485,8 @@ img.icon {
     }
     .profile-col {
         max-width: 98vw;
-        min-height: 420px;
-        height: auto; /* Für mobile Ansicht, damit die Karten nicht zu groß werden */
+        min-height: 0;
+        height: auto; /* Für mobile Ansicht, damit die Karten flexibel sind */
     }
 }
 
