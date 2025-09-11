@@ -167,13 +167,19 @@ window.loadHeaderFooter = function() {
                 return url;
             }
 
-            // 2) Detect GitHub Pages repo hosting: first path segment === 'LernApp'
-            const path = (window.location && window.location.pathname) ? window.location.pathname : '';
-            const seg = path.split('/').filter(Boolean)[0] || '';
-            if (seg === 'LernApp') {
-                const url = '/LernApp/partials/' + filename;
-                window.logConsole('getPartialUrl detected GitHub Pages path: ' + url, 'debug');
-                return url;
+            // 2) If served from GitHub Pages (hostname contains 'github.io'),
+            // use the repository subpath '/LernApp/partials/...'. This matches
+            // the deployed site URL on GitHub Pages and avoids incorrect
+            // relative paths when hosted under a subdirectory.
+            try {
+                const host = window.location && window.location.hostname ? window.location.hostname : '';
+                if (host.indexOf('github.io') !== -1) {
+                    const url = '/LernApp/partials/' + filename;
+                    window.logConsole('getPartialUrl using GitHub Pages prefix: ' + url, 'debug');
+                    return url;
+                }
+            } catch (e) {
+                // ignore and continue to fallback
             }
         } catch (e) {
             // ignore and fall back
@@ -184,21 +190,45 @@ window.loadHeaderFooter = function() {
     }
 
     if (headerContainer) {
+        // Provide an immediate, simple placeholder so the page is not blank
+        // even if fetch() is blocked or paths are incorrect. The fetched
+        // partial (if successful) will replace this content.
+        try {
+            if (!headerContainer.innerHTML || headerContainer.innerHTML.trim() === '') {
+                headerContainer.innerHTML = '<div style="background:#eee;padding:8px;font-weight:600;">LernApp — Lade Header...</div>';
+            }
+        } catch (e) { /* ignore placeholder failures */ }
+
         try { if (typeof window.debugLog === 'function') window.debugLog('fetch header start -> ' + getPartialUrl('header.html')); } catch(e){}
         fetch(getPartialUrl('header.html')).then(r => r.text()).then(html => {
-            headerContainer.innerHTML = html;
+            try { headerContainer.innerHTML = html; } catch (e) { /* ignore DOM write errors */ }
             if (window.updateNavigation) window.updateNavigation();
             if (window.breadcrumbs && typeof window.breadcrumbs.init === 'function') window.breadcrumbs.init();
             try { if (typeof window.debugLog === 'function') window.debugLog('fetch header OK'); } catch(e){}
-        }).catch(err => { window.logConsole('Failed to load header: ' + err, 'error'); try { if (typeof window.debugLog === 'function') window.debugLog('fetch header ERR: ' + err); } catch(e){} });
+        }).catch(err => {
+            window.logConsole('Failed to load header: ' + err, 'error');
+            try { if (typeof window.debugLog === 'function') window.debugLog('fetch header ERR: ' + err); } catch(e){}
+            // keep the simple placeholder so the user can see something
+        });
     }
     if (footerContainer) {
+        // Immediate placeholder for the footer (visible even when fetch fails)
+        try {
+            if (!footerContainer.innerHTML || footerContainer.innerHTML.trim() === '') {
+                footerContainer.innerHTML = '<div style="background:#eee;padding:8px;text-align:center;">LernApp — Lade Footer...</div>';
+            }
+        } catch (e) { /* ignore placeholder failures */ }
+
         try { if (typeof window.debugLog === 'function') window.debugLog('fetch footer start -> ' + getPartialUrl('footer.html')); } catch(e){}
         fetch(getPartialUrl('footer.html')).then(r => r.text()).then(html => {
-            footerContainer.innerHTML = html;
+            try { footerContainer.innerHTML = html; } catch (e) { /* ignore DOM write errors */ }
             if (window.initHeaderFooter) window.initHeaderFooter();
             try { if (typeof window.debugLog === 'function') window.debugLog('fetch footer OK'); } catch(e){}
-        }).catch(err => { window.logConsole('Failed to load footer: ' + err, 'error'); try { if (typeof window.debugLog === 'function') window.debugLog('fetch footer ERR: ' + err); } catch(e){} });
+        }).catch(err => {
+            window.logConsole('Failed to load footer: ' + err, 'error');
+            try { if (typeof window.debugLog === 'function') window.debugLog('fetch footer ERR: ' + err); } catch(e){}
+            // keep the simple placeholder so the user can see something
+        });
     }
 };
 

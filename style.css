@@ -1551,3 +1551,12 @@ input, label {
     background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(0,0,0,0.02));
     border-radius: 0 0 12px 12px;
 }
+
+/* Debug placeholders used by app-core.js when fetch for partials is blocked or fails */
+.debug-placeholder {
+    background: #f7f7f7;
+    color: #222;
+    padding: 8px 12px;
+    font-weight: 600;
+}
+.debug-placeholder small { display: block; font-weight: normal; color: #666; }
