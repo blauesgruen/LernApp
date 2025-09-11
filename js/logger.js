@@ -1,7 +1,6 @@
 // logger.js - Zentrale Logging-Funktionalität für die gesamte Anwendung
 
-// Lightweight startup indicator (helps detect whether this script is loaded)
-try { console.log && console.log('logger.js geladen'); } catch (e) { /* ignore */ }
+// logger.js - zentrale Logging-Funktionalität (aufgeräumte Version)
 
 /**
  * Logger-Klasse für zentrale Logging-Funktionalität
@@ -236,50 +235,11 @@ window.logMessage = function(message, type = 'info') {
 // Logger-Instanz global verfügbar machen
 window.logger = logger;
 
-// Auch eine einfache log-Funktion bereitstellen für Code, der diese verwendet
-window.log = function(message, type) {
-    logger.log(message, type || 'info');
-};
+// (window.log wird am Ende auf die Logger-Instanz gebunden)
 
-// Alte Funktionen überbrücken, damit vorhandener Code weiter funktioniert
-console.originalLog = console.log;
-console.originalError = console.error;
-console.originalWarn = console.warn;
-console.originalInfo = console.info;
-
-// Console-Methoden überschreiben, um zentrales Logging zu verwenden
-// Dies sollte nur in der Produktionsumgebung aktiviert werden
-try {
-    if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-        // Override console methods to feed into the central logger, but keep
-        // a try/catch to avoid throwing during page load if something is odd.
-        try {
-            console.log = function() {
-                console.originalLog && console.originalLog.apply(console, arguments);
-                try { logger.info(Array.from(arguments).join(' ')); } catch (e) { /* ignore */ }
-            };
-
-            console.error = function() {
-                console.originalError && console.originalError.apply(console, arguments);
-                try { logger.error(Array.from(arguments).join(' ')); } catch (e) { /* ignore */ }
-            };
-
-            console.warn = function() {
-                console.originalWarn && console.originalWarn.apply(console, arguments);
-                try { logger.warn(Array.from(arguments).join(' ')); } catch (e) { /* ignore */ }
-            };
-
-            console.info = function() {
-                console.originalInfo && console.originalInfo.apply(console, arguments);
-                try { logger.info(Array.from(arguments).join(' ')); } catch (e) { /* ignore */ }
-            };
-        } catch (inner) {
-            try { console.originalWarn && console.originalWarn('logger.js: failed to override console methods', inner); } catch (e) { /* ignore */ }
-        }
-    }
-} catch (outer) {
-    try { console && console.log && console.log('logger.js: console override skipped due to error', outer); } catch (e) { /* ignore */ }
-}
+// NOTE: automatic console.* overriding removed to avoid recursion and
+// unexpected side effects. Use `window.logger` or `window.log*` explicitly
+// to send messages to the centralized logger.
 
 // Exportiere die Funktionen, um sie überall verfügbar zu machen
 window.log = logger.log.bind(logger);

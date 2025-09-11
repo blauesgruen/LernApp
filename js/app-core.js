@@ -1,41 +1,21 @@
 // Zentrale Funktionen für die LernApp
-// Small on-page debug overlay to track startup progress (useful when DevTools is unusable)
-if (!window._startupDebugOverlay) {
-    try {
-        const ov = document.createElement('div');
-        ov.id = 'startup-debug-overlay';
-        ov.style.position = 'fixed';
-        ov.style.right = '12px';
-        ov.style.top = '12px';
-        ov.style.zIndex = '2147483647';
-        ov.style.maxWidth = '340px';
-        ov.style.maxHeight = '60vh';
-        ov.style.overflow = 'auto';
-        ov.style.background = 'rgba(0,0,0,0.75)';
-        ov.style.color = '#fff';
-        ov.style.fontSize = '12px';
-        ov.style.padding = '8px';
-        ov.style.borderRadius = '8px';
-        ov.style.boxShadow = '0 6px 20px rgba(0,0,0,0.6)';
-        ov.innerHTML = '<strong style="display:block;margin-bottom:6px;">Startup debug</strong><div id="startup-debug-entries"></div>';
-        document.documentElement.appendChild(ov);
-        window._startupDebugOverlay = ov;
+// Lightweight, non-blocking debugLog implementation used during startup.
+// This deliberately avoids touching the DOM (to prevent blocking when
+// scripts run early) and stores entries in memory for later inspection.
+if (typeof window.debugLog !== 'function') {
+    (function() {
+        const _entries = [];
+        window._startupDebugEntries = _entries;
         window.debugLog = function(msg) {
             try {
-                const container = document.getElementById('startup-debug-entries');
                 const time = new Date().toLocaleTimeString();
-                const line = document.createElement('div');
-                line.style.marginBottom = '6px';
-                line.textContent = `${time} — ${msg}`;
-                if (container) {
-                    container.insertBefore(line, container.firstChild);
-                }
+                const entry = `${time} — ${String(msg)}`;
+                _entries.push(entry);
+                // Also mirror to console.debug for local dev visibility
+                try { console.debug('[startup]', entry); } catch (e) { /* ignore */ }
             } catch (e) { /* no-op */ }
         };
-        window.debugLog('overlay initialized');
-    } catch (e) {
-        // ignore overlay failures
-    }
+    })();
 }
 // Einbindung: <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 //             <script src="js/app-core.js"></script>

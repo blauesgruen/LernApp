@@ -174,6 +174,28 @@ Letzte Aktualisierung: 2025-09-11
 - Weiterleitungen nach Login/Logout sind in auth.js und header.html geregelt
 - UI ist vollständig responsive und modular
 
+## Kürzliche Fixes (Stand: 2025-09-11)
+
+Kurzer Überblick über wichtige Korrekturen und Änderungen, die nach der letzten Auslieferung vorgenommen wurden:
+
+- `js/logger.js`: Sicherung und Fehlerbehebung
+   - Preventive fixes: sichere String-Serialisierung vor `includes()`-Checks, Truncation langer Log-Nachrichten, try/catch-Schutzbereiche.
+   - Entfernte automatische Überschreibung von `console.*`, um Rekursionsprobleme und mögliche Browser-Blocks zu verhindern. Verwende `window.logger` oder `window.log*` explizit.
+
+- `js/app-core.js`: Robustere Partial-Loader & Fallback-Platzhalter
+   - `getPartialUrl()` erkennt GitHub-Pages-Hosting (hostname enthält `github.io`) und verwendet `/LernApp/partials/<file>` für korrekte Pfade beim Deployment.
+   - Sofort sichtbare Header/Footer-Placeholder eingefügt, damit die Seite nicht weiß bleibt, auch wenn fetch() fehlschlägt.
+   - Startup-Debug-Overlay entfernt und durch sichere `window.debugLog()`-Aufrufe (no-op falls nicht initialisiert) ersetzt, um visuelle Artefakte und Blocker zu vermeiden.
+
+- Pfad-Checks und Redirects
+   - Pfadvergleichslogik in `js/auth.js`, `js/breadcrumb-example.js` und `script.js` normalisiert Pfade (strippt ein mögliches `/LernApp`-Präfix), so dass Redirects und Seitenerkennung korrekt unter GitHub Pages funktionieren.
+
+- DB-Bound Mapping & Safe Deletes
+   - `window.mapToDb()` ist zentral in `js/app-core.js` verfügbar und wandelt clientseitige camelCase-Felder in snake_case-DB-Felder (z. B. `categoryId` → `category_id`).
+   - `js/quiz-db.js` enthält jetzt sichere cascade-delete-Funktionen (`cascadeDeleteCategory`, `cascadeDeleteGroup`) — Löschbestätigungs-Workflow wurde im UI implementiert, der erst nach expliziter Bestätigung Kaskaden ausführt.
+
+Anmerkung: Diese Änderungen beheben ein kritisches Problem, bei dem die Seite auf GitHub Pages durch unsichere Logger-Überschreibungen bzw. fehlerhafte Serialisierungen unbenutzbar wurde. Nach den Fixes ist das Laden und Initialisieren stabiler.
+
 ## Migration/Legacy
 - Alle alten Storage-/Backup-/Filesystem-Funktionen und Dateien sind entfernt
 - Die App ist jetzt vollständig cloudbasiert und zentralisiert
@@ -234,3 +256,44 @@ CREATE TABLE questions (
 - Das Feld `collaborators` enthält User-IDs oder Team-IDs, die Zugriff auf den jeweiligen Datensatz haben.
 - RLS-Policies müssen so gestaltet sein, dass Einträge für `owner` und alle in `collaborators` sichtbar/bearbeitbar sind.
 - Die Freigabe ist damit einheitlich und flexibel für alle Nutzer und Teams.
+
+## WICHTIG — Was man auf keinen Fall tun darf (und warum)
+Damit die Webseite stabil online bleibt, befolge unbedingt die folgenden "Do not"‑Regeln. Jede Regel enthält kurz den Grund und eine sichere Alternative.
+
+- Nie die globalen console.*-Methoden ungesichert überschreiben (z. B. console.log = ...)
+   - Warum: führt leicht zu rekursiven Aufrufen oder Exceptions, die das Laden der Seite blockieren.
+   - Stattdessen: Verwende `window.logger` / `window.logInfo` / `window.logError` für zentrales Logging.
+
+- Keine JSON.stringify() auf großen/zirkulären Objekten (z. B. window, supabase client)
+   - Warum: kann den Main‑Thread stark belasten oder den Browser für längere Zeit einfrieren.
+   - Stattdessen: serialisiere nur benötigte, kleine Objekte; nutze try/catch; begrenze Länge (truncate) vor dem Loggen.
+
+- Keine langen/synchronen Endlosschleifen oder blockierenden Rechenaufgaben beim Seiten-Startup
+   - Warum: blockiert das Rendering und verhindert, dass andere Skripte (z. B. der Header-Loader) laufen.
+   - Stattdessen: benutze Web Workers für schwere Berechnungen oder setTimeout/Promise-basierte, asynchrone Verarbeitung.
+
+- Nicht vorzeitig DOM-Schreiboperationen ausführen, die das Parsen blockieren (z. B. große document.documentElement.appendChild während parsing)
+   - Warum: kann das Rendering verzögern oder verhindern, dass nachfolgende Skripte ausgeführt werden.
+   - Stattdessen: führe DOM-Manipulationen nach DOMContentLoaded aus oder verwende kleine, performante Updates.
+
+- Keine kritischen Scripts per HTTP von unsicheren oder unzuverlässigen CDNs einbinden ohne Fallback
+   - Warum: ausgefallene CDN-Hosts können das Laden blockieren (z. B. wenn externe Script‑URLs nicht erreichbar sind).
+   - Stattdessen: prüfe Verfügbarkeit, biete lokale Fallbacks an oder lade kritischere Skripte selbst mit Retry-Logik.
+
+- Keine root-absolute Pfade (/foo) verwenden, die nicht für das GitHub-Pages-Subpath-Hosting angepasst sind
+   - Warum: auf GitHub Pages unter `/LernApp/` führen root-Pfade zu 404s und toten Requests.
+   - Stattdessen: benutze die bereitgestellte `getPartialUrl()`-Hilfe oder relative Pfade und prüfe `window.location.hostname`.
+
+- Keine großen localStorage/IndexedDB-Aufräum- oder Serialisierungs-Operationen synchron beim Laden
+   - Warum: langsame Sync-Operationen blockieren den Main-Thread und können Timeouts/Freezes verursachen.
+   - Stattdessen: performante, inkrementelle Updates oder async APIs (IndexedDB mit Promises) verwenden.
+
+- Keine sensiblen Server-Keys (Service-Keys) in Client-JS oder im Repo veröffentlichen
+   - Warum: Sicherheitsrisiko und Missbrauch; kann zu Datenverlust oder Kosten führen.
+   - Stattdessen: nur Public/Anon Keys im Client; Server-seitige Tasks über sichere Endpoints oder Umgebungsvariablen ausführen.
+
+- Keine Verwendung von document.write nach dem Laden der Seite
+   - Warum: document.write kann bestehendes DOM überschreiben und das Laden abbrechen.
+   - Stattdessen: DOM-Manipulation mit appendChild/insertBefore oder innerHTML nach DOMContentLoaded.
+
+Wenn du unsicher bist, frage kurz im Repo bevor du größere Änderungen einspielst. Diese Regeln verhindern die häufigsten Ursachen für "weißes Blatt" oder Browser‑Freezes nach Deployments.
