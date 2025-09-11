@@ -72,8 +72,13 @@
     transition: background-color 0.2s;
     display: flex;
     align-items: center;
+    justify-content: flex-start;
+    gap: 8px;
     margin-bottom: 2px;
 }
+
+/* allow absolute-positioning of the edit icon */
+.tree-item { position: relative; }
 
 .tree-item:hover {
     background-color: #e9ecef;
@@ -99,6 +104,50 @@
     cursor: pointer;
 }
 
+/* edit icon alignment and style */
+.tree-edit {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #0b5ed7; /* blue link color */
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    z-index: 2;
+    cursor: pointer;
+}
+.tree-edit i { font-size: 14px; }
+.tree-edit:hover { color: #084298; }
+
+/* ensure canonical tree-item-edit uses same styling so icons align project-wide */
+.tree-item-edit {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #0b5ed7;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    z-index: 2;
+    cursor: pointer;
+}
+.tree-item-edit i { font-size: 14px; }
+.tree-item-edit:hover { color: #084298; }
+
+/* make sure name doesn't push the edit icon away unintentionally */
+.tree-item .cat-name, .tree-item .group-name {
+    display: inline-block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 .tree-item-category {
     font-weight: 600;
     color: #343a40;
@@ -108,6 +157,8 @@
     padding-left: 25px;
     color: #495057;
 }
+/* groups shouldn't show a toggle chevron (avoid confusing UX) */
+.tree-item-group .tree-item-toggle { display: none; }
 
 .tree-item-empty {
     padding: 8px 5px 8px 25px;
@@ -261,6 +312,42 @@
     margin: 12px 0;
 }
 
+/* Questions list as single-line tree items */
+.tree-item-question {
+    display: flex;
+    align-items: center;
+    padding: 10px 12px;
+    border-radius: 6px;
+    margin-bottom: 6px;
+    background: #fff;
+    border: 1px solid #f0f0f0;
+}
+.tree-item-question .tree-item-toggle {
+    margin-right: 8px;
+    width: 20px;
+    text-align: center;
+    color: #6c757d;
+    background: transparent;
+    border: none;
+}
+.tree-item-question .tree-item-icon { margin-right: 10px; color: #6c757d; }
+.tree-item-question .question-text { flex: 1 1 auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tree-item-question .tree-item-edit { margin-left: 8px; }
+
+.question-expanded {
+    padding: 10px 14px 14px 40px; /* indent under the single-line item */
+    margin-bottom: 10px;
+    background: #fbfcfd;
+    border-left: 3px solid #e9ecef;
+    border-radius: 4px;
+}
+.question-expanded-expl { margin-top: 8px; color: #444; }
+.question-expanded-image { margin-top: 8px; }
+.question-expanded-actions { margin-top: 10px; display:flex; gap:8px; justify-content:flex-end; }
+
+/* smooth transition for expand/collapse (height-based transitions are tricky, keep simple) */
+.question-expanded[style] { transition: opacity 160ms ease; }
+
 .correct-answer-label {
     font-weight: bold;
     color: #28a745;
@@ -307,6 +394,11 @@
     line-height: 1.5;
 }
 
+/* Ensure modal action buttons have a consistent minimum width for visual balance */
+.modal-panel .form-actions button, .modal-panel .form-actions .btn, .modal-panel .form-actions .btn-primary, .modal-panel .form-actions .btn-secondary {
+    min-width: 96px;
+}
+
 /* Responsives Design */
 @media (max-width: 1200px) {
     .page-layout {
@@ -330,3 +422,4 @@
         padding: 20px; /* Weniger Padding auf kleinen Bildschirmen */
     }
 }
+

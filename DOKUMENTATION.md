@@ -297,3 +297,111 @@ Damit die Webseite stabil online bleibt, befolge unbedingt die folgenden "Do not
    - Stattdessen: DOM-Manipulation mit appendChild/insertBefore oder innerHTML nach DOMContentLoaded.
 
 Wenn du unsicher bist, frage kurz im Repo bevor du größere Änderungen einspielst. Diese Regeln verhindern die häufigsten Ursachen für "weißes Blatt" oder Browser‑Freezes nach Deployments.
+
+## SQL- RLS
+-- ================================
+-- Policies für Tabelle: categories
+-- ================================
+
+-- SELECT: Owner oder Collaborator darf lesen
+CREATE POLICY "categories_select"
+ON public.categories
+AS PERMISSIVE
+FOR SELECT
+TO public
+USING (owner = auth.uid() OR collaborators && ARRAY[auth.uid()]);
+
+-- INSERT: Nur eigener User darf als owner einfügen
+CREATE POLICY "categories_insert"
+ON public.categories
+AS PERMISSIVE
+FOR INSERT
+TO public
+WITH CHECK (owner = auth.uid());
+
+-- UPDATE: Nur Owner oder Collaborator darf bearbeiten
+CREATE POLICY "categories_update"
+ON public.categories
+AS PERMISSIVE
+FOR UPDATE
+TO public
+USING (owner = auth.uid() OR collaborators && ARRAY[auth.uid()])
+WITH CHECK (owner = auth.uid() OR collaborators && ARRAY[auth.uid()]);
+
+-- DELETE: Nur Owner oder Collaborator darf löschen
+CREATE POLICY "categories_delete"
+ON public.categories
+AS PERMISSIVE
+FOR DELETE
+TO public
+USING (owner = auth.uid() OR collaborators && ARRAY[auth.uid()]);
+
+
+
+-- =============================
+-- Policies für Tabelle: groups
+-- =============================
+
+CREATE POLICY "groups_select"
+ON public.groups
+AS PERMISSIVE
+FOR SELECT
+TO public
+USING (owner = auth.uid() OR collaborators && ARRAY[auth.uid()]);
+
+CREATE POLICY "groups_insert"
+ON public.groups
+AS PERMISSIVE
+FOR INSERT
+TO public
+WITH CHECK (owner = auth.uid());
+
+CREATE POLICY "groups_update"
+ON public.groups
+AS PERMISSIVE
+FOR UPDATE
+TO public
+USING (owner = auth.uid() OR collaborators && ARRAY[auth.uid()])
+WITH CHECK (owner = auth.uid() OR collaborators && ARRAY[auth.uid()]);
+
+CREATE POLICY "groups_delete"
+ON public.groups
+AS PERMISSIVE
+FOR DELETE
+TO public
+USING (owner = auth.uid() OR collaborators && ARRAY[auth.uid()]);
+
+
+
+-- ===============================
+-- Policies für Tabelle: questions
+-- ===============================
+
+CREATE POLICY "questions_select"
+ON public.questions
+AS PERMISSIVE
+FOR SELECT
+TO public
+USING (owner = auth.uid() OR collaborators && ARRAY[auth.uid()]);
+
+CREATE POLICY "questions_insert"
+ON public.questions
+AS PERMISSIVE
+FOR INSERT
+TO public
+WITH CHECK (owner = auth.uid());
+
+CREATE POLICY "questions_update"
+ON public.questions
+AS PERMISSIVE
+FOR UPDATE
+TO public
+USING (owner = auth.uid() OR collaborators && ARRAY[auth.uid()])
+WITH CHECK (owner = auth.uid() OR collaborators && ARRAY[auth.uid()]);
+
+CREATE POLICY "questions_delete"
+ON public.questions
+AS PERMISSIVE
+FOR DELETE
+TO public
+USING (owner = auth.uid() OR collaborators && ARRAY[auth.uid()]);

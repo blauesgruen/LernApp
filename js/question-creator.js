@@ -1,2644 +1,426 @@
-// Die lokale Speicherung und JSON-Logik wurde entfernt.
-// Die Frage-Erstellung nutzt jetzt Supabase für alle Datenoperationen.
-// question-creator.js - Verwaltung der Fragenerstellung
+// question-creator.js
+// Minimal, clean implementation: renders category/group tree on the left
+// and replaces the right panel (#group-questions-list) with questions for the selected group.
 
-document.addEventListener('DOMContentLoaded', function() {
-    // Prüfen, ob der Benutzer eingeloggt ist
-    const isLoggedIn = (window.storage && typeof window.storage.isLoggedIn === 'function') ? window.storage.isLoggedIn() : (localStorage.getItem('loggedIn') === 'true');
-    const username = (window.storage && typeof window.storage.getUsername === 'function') ? window.storage.getUsername() : localStorage.getItem('username');
-    
-    if (!isLoggedIn || !username) {
-        // Nicht eingeloggt - zurück zur Login-Seite
-        window.location.href = 'login.html';
-        return;
-    }
+(function () {
+  'use strict';
 
-    // Elemente für das Fragenformular
-    const questionForm = document.getElementById('question-form');
-    const categorySelect = document.getElementById('question-category');
-       const groupSelect = document.getElementById('question-group');
-    const questionTextInput = document.getElementById('question-text');
-    const questionImageInput = document.getElementById('question-image');
-    const imagePreview = document.getElementById('image-preview');
-    const explanationInput = document.getElementById('question-explanation');
-    const difficultyInput = document.getElementById('question-difficulty');
-    const groupQuestionsList = document.getElementById('group-questions-list');
+  // Short contract
+  // Inputs: expects functions window.loadCategories(), window.loadGroups(), window.loadQuestions() and window.supabase (optional)
+  // Outputs: updates DOM nodes #category-tree and #group-questions-list and sets hidden inputs #question-category, #question-group
+  // Error modes: calls window.notification.showError/showSuccess if available, falls back to console
 
-    // Elemente für Kategorie- und Gruppenauswahl
-    const categoryTree = document.getElementById('category-tree');
+  const get = id => document.getElementById(id);
+  const categoryTree = get('category-tree');
+  const groupQuestionsList = get('group-questions-list');
+  const leftCategoryCol = document.querySelector('.profile-col.profile-info');
+  const categorySelect = get('question-category');
+  const groupSelect = get('question-group');
 
-    // Base64-kodiertes Bild
-    let imageBase64 = null;
+  // Track currently expanded question so only one can be open at a time
+  let _currentExpandedQuestion = null;
+  let _currentExpandedToggle = null;
 
-    // Initialisierung
-    initializePage();
+  const notifyError = (m) => { if (window.notification?.showError) return window.notification.showError(m); console.error(m); };
+  const notifySuccess = (m) => { if (window.notification?.showSuccess) return window.notification.showSuccess(m); console.log(m); };
 
-    // Helper: Map client-side question object to DB columns (canonical snake_case)
-    function mapQuestionForDb(q) {
-        return {
-            text: q.question ?? q.text ?? null,
-            answer: q.answer ?? null,
-            additional_info: q.additionalInfo ?? q.additional_info ?? null,
-            type: q.type ?? null,
-            difficulty: q.difficulty ?? null,
-            tags: q.tags ?? null,
-            imageurl: q.imageUrl ?? q.imageurl ?? null,
-            category_id: q.categoryId ?? q.category_id ?? null,
-            group_id: q.group_id ?? q.groupId ?? null,
-            owner: q.owner ?? q.createdBy ?? null
+  function safeHtml(el, html) { if (!el) return; el.innerHTML = html; }
+
+  function mapQuestionForDb(q) {
+    return {
+      question: q.question ?? q.text ?? null,
+      answer: q.answer ?? null,
+      additionalinfo: q.additionalinfo ?? q.additionalInfo ?? null,
+      imageurl: q.imageurl ?? q.imageUrl ?? null,
+      category_id: q.category_id ?? q.categoryId ?? null,
+      group_id: q.group_id ?? q.groupId ?? null,
+      difficulty: q.difficulty ?? null,
+      tags: q.tags ?? null,
+      owner: q.owner ?? q.createdBy ?? null
+    };
+  }
+
+  async function loadQuestionsForGroup(groupId) {
+    if (!groupQuestionsList) return;
+    if (!groupId) { safeHtml(groupQuestionsList, '<p class="info-text">Wähle eine Gruppe aus.</p>'); return; }
+    safeHtml(groupQuestionsList, '');
+    // show loading indicator only if loading takes longer than 180ms
+    let qLoadingTimer = setTimeout(() => { safeHtml(groupQuestionsList, '<p class="loading-info">Fragen werden geladen...</p>'); }, 180);
+
+    try {
+      const questions = (window.quizDB?.loadQuestions) ? await window.quizDB.loadQuestions() : (window.loadQuestions ? await window.loadQuestions() : []);
+      const filtered = (questions || []).filter(q => String(q.group_id ?? q.groupId) === String(groupId));
+
+      if (!filtered.length) { safeHtml(groupQuestionsList, '<p class="info-text">Keine Fragen in dieser Gruppe vorhanden</p>'); return; }
+
+      const container = document.createElement('div'); container.className = 'question-tree';
+
+  filtered.forEach(q => {
+        // create a single-line tree-like item for each question
+        const item = document.createElement('div'); item.className = 'tree-item tree-item-question'; item.dataset.id = q.id;
+
+        const toggle = document.createElement('button'); toggle.type = 'button'; toggle.className = 'tree-item-toggle'; toggle.setAttribute('aria-expanded','false');
+        toggle.innerHTML = '<i class="fas fa-chevron-right" aria-hidden="true"></i>';
+
+        const icon = document.createElement('span'); icon.className = 'tree-item-icon'; icon.innerHTML = '<i class="fas fa-question-circle" aria-hidden="true"></i>';
+
+        const text = document.createElement('span'); text.className = 'question-text'; text.textContent = (q.question || q.text || '');
+
+  const editLink = document.createElement('a'); editLink.href = '#'; editLink.className = 'tree-item-edit'; editLink.title = 'Frage bearbeiten'; editLink.innerHTML = '<i class="fas fa-edit"></i>';
+  editLink.addEventListener('click', (ev) => { ev.preventDefault(); ev.stopPropagation(); openQuestionModal(q); });
+
+        // expanded content (hidden by default)
+        const expanded = document.createElement('div'); expanded.className = 'question-expanded'; expanded.style.display = 'none';
+        const ans = document.createElement('div'); ans.className = 'question-expanded-answer'; ans.innerHTML = `<strong>Antwort:</strong> ${q.answer || ''}`;
+        expanded.appendChild(ans);
+        if (q.additionalinfo) { const ex = document.createElement('div'); ex.className = 'question-expanded-expl'; ex.innerHTML = `<strong>Erklärung:</strong> ${q.additionalinfo}`; expanded.appendChild(ex); }
+        if (q.imageurl || q.imageUrl) { const imw = document.createElement('div'); imw.className = 'question-expanded-image'; const img = document.createElement('img'); img.src = q.imageurl || q.imageUrl; img.alt = 'Frage Bild'; img.style.maxWidth = '100%'; imw.appendChild(img); expanded.appendChild(imw); }
+
+        // deletion is handled in the edit modal; no inline delete button here per UX
+
+        // assemble
+        item.appendChild(toggle); item.appendChild(icon); item.appendChild(text); item.appendChild(editLink);
+        container.appendChild(item); container.appendChild(expanded);
+
+        // toggle behaviour: ensure only one question is expanded at once
+        const toggleHandler = () => {
+          const isExpandedNow = expanded.style.display === 'block';
+          if (!isExpandedNow) {
+            // about to expand -> collapse previous
+            if (_currentExpandedQuestion && _currentExpandedQuestion !== expanded) {
+              _currentExpandedQuestion.style.display = 'none';
+              if (_currentExpandedToggle) {
+                _currentExpandedToggle.setAttribute('aria-expanded', 'false');
+                const prevIc = _currentExpandedToggle.querySelector('i');
+                if (prevIc) { prevIc.classList.remove('fa-chevron-down'); prevIc.classList.add('fa-chevron-right'); }
+              }
+            }
+            expanded.style.display = 'block';
+            toggle.setAttribute('aria-expanded', 'true');
+            const ic = toggle.querySelector('i'); if (ic) { ic.classList.remove('fa-chevron-right'); ic.classList.add('fa-chevron-down'); }
+            _currentExpandedQuestion = expanded; _currentExpandedToggle = toggle;
+          } else {
+            // collapse
+            expanded.style.display = 'none';
+            toggle.setAttribute('aria-expanded', 'false');
+            const ic = toggle.querySelector('i'); if (ic) { ic.classList.remove('fa-chevron-down'); ic.classList.add('fa-chevron-right'); }
+            if (_currentExpandedQuestion === expanded) { _currentExpandedQuestion = null; _currentExpandedToggle = null; }
+          }
         };
+        toggle.addEventListener('click', (e) => { e.stopPropagation(); toggleHandler(); });
+        text.addEventListener('click', (e) => { e.stopPropagation(); toggleHandler(); });
+        text.tabIndex = 0; text.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleHandler(); } });
+      });
+
+      clearTimeout(qLoadingTimer);
+      groupQuestionsList.innerHTML = '';
+      groupQuestionsList.appendChild(container);
+
+    } catch (err) {
+      console.error('Fehler beim Laden der Gruppenfragen:', err);
+      safeHtml(groupQuestionsList, '<p class="error-text">Fehler beim Laden der Fragen.</p>');
     }
-    
-    // Supabase-konforme Frage-Erstellung und Anzeige
-    if (questionForm) {
-        questionForm.addEventListener('submit', async function(e) {
-            e.preventDefault();
-            if (!validateForm()) return;
-            const correctAnswerText = document.getElementById('answer-0').value.trim();
-            if (!correctAnswerText) {
-                showError('Bitte gib eine richtige Antwort ein.');
-                return;
+  }
+
+  async function renderCategoryTree() {
+    const outEl = categoryTree;
+  if (!outEl) return;
+  // Ensure left column is visible (clear any previous inline hide) and remove leftover body class
+  try { if (leftCategoryCol) leftCategoryCol.style.display = ''; document.body.classList.remove('tree-right-mode'); } catch (e) {}
+  safeHtml(outEl, '<p class="loading-info">Kategorien werden geladen...</p>');
+    try {
+      const categories = (window.quizDB?.loadCategories) ? await window.quizDB.loadCategories() : (window.loadCategories ? await window.loadCategories() : []);
+      const groups = (window.quizDB?.loadGroups) ? await window.quizDB.loadGroups() : (window.loadGroups ? await window.loadGroups() : []);
+      const userCategories = (categories || []).filter(c => String(c.createdBy ?? c.created_by ?? '') !== 'system');
+      if (!userCategories.length) { safeHtml(outEl, '<p class="info-text">Keine Kategorien gefunden.</p>'); return; }
+      userCategories.sort((a,b)=>a.name.localeCompare(b.name));
+
+      let html = '';
+  userCategories.forEach(cat => {
+        const gs = (groups || []).filter(g => String(g.category_id ?? g.categoryId) === String(cat.id)).sort((a,b)=>a.name.localeCompare(b.name));
+        // Category header with chevron, folder icon and edit button on the right
+        html += `
+          <div class="tree-item tree-item-category" data-id="${cat.id}">
+            <span class="tree-item-toggle"><i class="fas fa-chevron-right"></i></span>
+            <span class="tree-item-icon"><i class="fas fa-folder"></i></span>
+            <span class="cat-name"><strong>${cat.name}</strong></span>
+            <a href="#" class="tree-item-edit" data-type="category" data-id="${cat.id}" title="Kategorie bearbeiten"><i class="fas fa-edit"></i></a>
+          </div>`;
+        html += `<div class="tree-group-container" data-category-id="${cat.id}" style="display:none">`;
+        if (gs.length) gs.forEach(g => { html += `
+            <div class="tree-item tree-item-group" data-id="${g.id}" data-category-id="${cat.id}">
+              <span class="tree-item-icon"><i class="fas fa-tag"></i></span>
+              <span class="group-name">${g.name}</span>
+              <a href="#" class="tree-item-edit" data-type="group" data-id="${g.id}" data-cat="${cat.id}" title="Gruppe bearbeiten"><i class="fas fa-edit"></i></a>
+            </div>`; });
+        else html += `<div class="tree-item-empty">Keine Gruppen</div>`;
+        html += `</div>`;
+      });
+
+      safeHtml(outEl, html);
+
+      // scope listeners to the rendered tree inside outEl
+      // Clicking a category toggles its group container and rotates the chevron. Only one group container is expanded at a time.
+      outEl.querySelectorAll('.tree-item-category').forEach(catEl => {
+        const toggleBtn = catEl.querySelector('.tree-item-toggle');
+        catEl.addEventListener('click', function (e) {
+          e.stopPropagation();
+          const id = this.getAttribute('data-id');
+
+          // Collapse other containers and reset their chevrons
+          outEl.querySelectorAll('.tree-group-container').forEach(c => {
+            const cid = c.dataset.categoryId;
+            if (String(cid) !== String(id)) {
+              c.style.display = 'none';
+              const relatedCat = outEl.querySelector('.tree-item-category[data-id="' + cid + '"]');
+              const relToggle = relatedCat ? relatedCat.querySelector('.tree-item-toggle') : null;
+              if (relToggle) { relToggle.setAttribute('aria-expanded','false'); const ic = relToggle.querySelector('i'); if (ic) { ic.classList.remove('fa-chevron-down'); ic.classList.add('fa-chevron-right'); } }
             }
-            const groupId = groupSelect.value;
-            const ownerId = await window.supabase.auth.getUser().then(u => u.data.user.id);
-            let imageUrl = null;
-            // Bild-Upload zu Supabase Storage (falls vorhanden)
-            if (questionImageInput.files && questionImageInput.files[0]) {
-                const file = questionImageInput.files[0];
-                const fileName = 'question-images/' + Date.now() + '_' + file.name;
-                const { data, error } = await window.supabase.storage.from('question-images').upload(fileName, file);
-                if (!error && data && data.path) {
-                    imageUrl = window.supabase.storage.from('question-images').getPublicUrl(data.path).publicUrl;
-                } else {
-                    showError('Fehler beim Bild-Upload: ' + (error?.message || ''));
-                }
-            }
-            // Tags aus dem Tag-Input holen (z. B. Komma-getrennt)
-            const tagsInput = document.getElementById('question-tags');
-            const tags = tagsInput ? tagsInput.value.split(',').map(t => t.trim()).filter(Boolean) : [];
-            // Typ aus dem Typ-Input holen
-            const typeInput = document.getElementById('question-type');
-            const type = typeInput ? typeInput.value : 'text';
-            // Schwierigkeitsgrad
-            const difficulty = parseInt(difficultyInput.value, 10) || 1;
-            const questionData = {
-                question: questionTextInput.value.trim(),
-                answer: correctAnswerText,
-                additionalInfo: explanationInput.value.trim(),
-                type,
-                difficulty,
-                tags,
-                imageUrl: imageUrl || '',
-                group_id: groupId,
-                owner: ownerId
-            };
-            try {
-                const submitButton = questionForm.querySelector('button[type="submit"]');
-                const originalButtonText = submitButton.innerHTML;
-                submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Wird gespeichert...';
-                submitButton.disabled = true;
-                const { error } = await window.supabase.from('questions').insert([ mapQuestionForDb(questionData) ]);
-                if (!error) {
-                    showSuccess('Frage wurde erfolgreich erstellt!');
-                    resetForm();
-                    if (groupSelect.value) await loadQuestionsForGroup(groupSelect.value);
-                } else {
-                    showError('Fehler beim Erstellen der Frage: ' + error.message);
-                }
-                submitButton.innerHTML = originalButtonText;
-                submitButton.disabled = false;
-            } catch (err) {
-                showError('Fehler: ' + err.message);
-                const submitButton = questionForm.querySelector('button[type="submit"]');
-                if (submitButton) {
-                    submitButton.innerHTML = '<i class="fas fa-save"></i> Frage speichern';
-                    submitButton.disabled = false;
-                }
-            }
+          });
+
+          const container = outEl.querySelector('.tree-group-container[data-category-id="' + id + '"]');
+          if (!container) return;
+          const isExpanded = container.style.display === 'block';
+          if (isExpanded) {
+            container.style.display = 'none';
+            if (toggleBtn) { toggleBtn.setAttribute('aria-expanded','false'); const ic = toggleBtn.querySelector('i'); if (ic) { ic.classList.remove('fa-chevron-down'); ic.classList.add('fa-chevron-right'); } }
+          } else {
+            container.style.display = 'block';
+            if (toggleBtn) { toggleBtn.setAttribute('aria-expanded','true'); const ic = toggleBtn.querySelector('i'); if (ic) { ic.classList.remove('fa-chevron-right'); ic.classList.add('fa-chevron-down'); } }
+          }
+
+          outEl.querySelectorAll('.tree-item-category').forEach(c => c.classList.remove('active'));
+          this.classList.add('active');
+          if (categorySelect) categorySelect.value = id;
         });
+
+        // Clicking the small toggle chevron should perform the same toggle behaviour
+        if (toggleBtn) {
+          toggleBtn.addEventListener('click', function (ev) { ev.stopPropagation(); try { catEl.click(); } catch (e) { /* ignore */ } });
+        }
+      });
+
+      outEl.querySelectorAll('.tree-item-group').forEach(gEl => gEl.addEventListener('click', function (e) {
+        const gid = this.getAttribute('data-id'); const cid = this.getAttribute('data-category-id');
+        // Remove active classes in the whole document to keep UI consistent
+        document.querySelectorAll('.tree-item-category, .tree-item-group').forEach(el => el.classList.remove('active'));
+        document.querySelector('.tree-item-category[data-id="' + cid + '"]')?.classList.add('active'); this.classList.add('active');
+        if (categorySelect) categorySelect.value = cid; if (groupSelect) groupSelect.value = gid; loadQuestionsForGroup(gid);
+      }));
+
+      // Edit icon handlers (category/group edit)
+      outEl.querySelectorAll('.tree-item-edit').forEach(el => el.addEventListener('click', function (ev) {
+        ev.preventDefault(); ev.stopPropagation();
+        const type = this.dataset.type; const id = this.dataset.id; const cat = this.dataset.cat;
+        // If the shared edit modal exists on the page or the global openEditModal function is available,
+        // open the modal in-place. Otherwise, navigate to the category-management page as a fallback.
+        if (document.getElementById('edit-item-modal') || typeof window.openEditModal === 'function') {
+          try {
+            if (typeof window.openEditModal === 'function') {
+              window.openEditModal(type, id, cat);
+            } else {
+              // fallback to navigation if something unexpected happens
+              if (type === 'category') window.location.href = 'category-management.html?category=' + encodeURIComponent(id);
+              else if (type === 'group') window.location.href = 'category-management.html?category=' + encodeURIComponent(cat) + '&group=' + encodeURIComponent(id);
+            }
+          } catch (err) {
+            console.error('Fehler beim Öffnen des Edit-Modals:', err);
+            if (type === 'category') window.location.href = 'category-management.html?category=' + encodeURIComponent(id);
+            else if (type === 'group') window.location.href = 'category-management.html?category=' + encodeURIComponent(cat) + '&group=' + encodeURIComponent(id);
+          }
+        } else {
+          // navigate to category-management page if modal not present
+          if (type === 'category') {
+            window.location.href = 'category-management.html?category=' + encodeURIComponent(id);
+          } else if (type === 'group') {
+            window.location.href = 'category-management.html?category=' + encodeURIComponent(cat) + '&group=' + encodeURIComponent(id);
+          }
+        }
+      }));
+
+
+    } catch (err) { console.error('Fehler beim Rendern des Kategorie-Baums:', err); safeHtml(outEl, '<p class="error-text">Fehler beim Laden der Kategorien und Gruppen.</p>'); }
+  }
+
+  // Initialize
+  async function init() {
+    try {
+  // Render the category/group tree into the left tree (default)
+  await renderCategoryTree();
+      if (groupSelect?.value) await loadQuestionsForGroup(groupSelect.value);
+      window.addEventListener('resize', () => { /* optional adjust heights */ });
+    } catch (err) {
+      console.error('Fehler beim Initialisieren:', err);
+      notifyError('Fehler beim Laden der Daten. Bitte Seite neu laden.');
+    }
+  }
+
+  // Open a modal to edit a question. Reuses #edit-item-modal when available by adapting its fields,
+  // otherwise creates a simple modal overlay. Uses window.updateQuestion (questions-db) if present.
+  function openQuestionModal(q) {
+    // try to reuse existing edit-item-modal from category-management.html
+    const existingModal = document.getElementById('edit-item-modal');
+    if (existingModal) {
+      // populate modal fields (we repurpose edit-item-name for question text and show delete)
+      const title = document.getElementById('edit-item-title');
+      const inputName = document.getElementById('edit-item-name');
+      const inputType = document.getElementById('edit-item-type');
+      const inputId = document.getElementById('edit-item-id');
+      const categoryRow = document.getElementById('edit-item-category-row');
+      const categorySelect = document.getElementById('edit-item-category');
+
+      title.textContent = 'Frage bearbeiten';
+      inputType.value = 'question';
+      inputId.value = q.id;
+      inputName.value = q.question || q.text || '';
+      // hide category row for questions but keep it available
+      if (categoryRow) categoryRow.style.display = 'none';
+
+      // show modal
+      existingModal.style.display = 'block'; existingModal.setAttribute('aria-hidden','false');
+
+      // adjust form submit handler
+      const form = document.getElementById('edit-item-form');
+      const submitHandler = async function (ev) {
+        ev.preventDefault();
+        const newName = inputName.value.trim();
+        // build updated question object; we keep other fields untouched for simplicity
+        const updated = Object.assign({}, q, { text: newName, question: newName });
+        // try to call window.updateQuestion (questions-db)
+        try {
+          if (typeof window.updateQuestion === 'function') {
+            const ok = await window.updateQuestion(q.id, updated);
+            if (ok) {
+              existingModal.style.display = 'none'; existingModal.setAttribute('aria-hidden','true');
+              await loadQuestionsForGroup(q.groupId ?? q.group_id);
+            }
+          } else if (window.supabase) {
+            // fallback: update via supabase
+            const payload = { question: updated.question ?? updated.text, additionalinfo: updated.additionalinfo ?? updated.additionalInfo };
+            const { error } = await window.supabase.from('questions').update(payload).eq('id', q.id);
+            if (!error) { existingModal.style.display = 'none'; existingModal.setAttribute('aria-hidden','true'); await loadQuestionsForGroup(q.groupId ?? q.group_id); }
+            else { notifyError('Fehler beim Speichern: ' + (error.message || '')); }
+          } else {
+            notifyError('Keine Update-Funktion verfügbar.');
+          }
+        } catch (err) { console.error(err); notifyError('Fehler beim Speichern'); }
+      };
+      // remove previous listener to avoid duplicates
+      try { form.removeEventListener('submit', form._editSubmitHandler); } catch (e) {}
+      form.addEventListener('submit', submitHandler);
+      form._editSubmitHandler = submitHandler;
+
+      // wire delete button inside modal to perform deletion if available
+      const deleteBtn = document.getElementById('edit-item-delete');
+      if (deleteBtn) {
+        deleteBtn.onclick = async function () {
+          if (!confirm('Frage wirklich löschen?')) return;
+          try {
+            if (typeof window.deleteQuestion === 'function') {
+              const ok = await window.deleteQuestion(q.id);
+              if (ok) { existingModal.style.display = 'none'; existingModal.setAttribute('aria-hidden','true'); await loadQuestionsForGroup(q.groupId ?? q.group_id); }
+            } else if (window.supabase) {
+              const { error } = await window.supabase.from('questions').delete().eq('id', q.id);
+              if (!error) { existingModal.style.display = 'none'; existingModal.setAttribute('aria-hidden','true'); await loadQuestionsForGroup(q.groupId ?? q.group_id); }
+              else notifyError('Fehler beim Löschen');
+            } else notifyError('Keine Lösch-Funktion verfügbar.');
+          } catch (err) { console.error(err); notifyError('Fehler beim Löschen'); }
+        };
+      }
+      return;
     }
 
-    /**
-     * Lädt die Fragen für eine bestimmte Gruppe und zeigt sie an
-     */
-    async function loadQuestionsForGroup(groupId) {
-        try {
-            if (!groupId) {
-                groupQuestionsList.innerHTML = '<p class="info-text">Wähle eine Gruppe aus, um deren Fragen zu sehen</p>';
-                return;
-            }
-            
-            groupQuestionsList.innerHTML = '<p class="loading-info">Fragen werden geladen...</p>';
-            
-            // Alle Fragen laden
-            const questions = await window.quizDB.loadQuestions();
-            
-            // Fragen für die ausgewählte Gruppe filtern
-            const groupQuestions = questions.filter(q => q.group_id === groupId);
-            
-            if (groupQuestions.length === 0) {
-                groupQuestionsList.innerHTML = '<p class="info-text">Keine Fragen in dieser Gruppe vorhanden</p>';
-                return;
-            }
-            
-            // Liste der Fragen erzeugen
-            let html = '';
-            
-            groupQuestions.forEach(question => {
-                const hasImage = question.imageUrl && question.imageUrl.trim() !== '';
-                const questionText = question.question && question.question.trim() !== '' 
-                    ? question.question 
-                    : 'Bildfrage ohne Text';
-                
-                html += `
-                    <div class="question-list-item" data-id="${question.id}">
-                        <p class="question-text">${questionText}</p>
-                        <div class="question-meta">
-                            <span>${hasImage ? '<span class="question-has-image"><i class="fas fa-image"></i> Bild: ja</span>' : ''}</span>
-                            <span>Schwierigkeit: ${question.difficulty}/5</span>
-                            <span>Typ: ${question.type || 'text'}</span>
-                            <span>Tags: ${question.tags ? question.tags.join(', ') : ''}</span>
-                        </div>
-                    </div>
-                `;
-            });
-            
-            groupQuestionsList.innerHTML = html;
-        } catch (error) {
-            console.error('Fehler beim Laden der Gruppenfragen:', error);
-            groupQuestionsList.innerHTML = '<p class="error-text">Fehler beim Laden der Fragen.</p>';
-        }
-    }
-    
-    // Event Listener für Fenstergrößenänderung
-    window.addEventListener('resize', function() {
-        adjustCategoryTreeHeight();
+    // If no existing modal, create a small modal for question editing
+    const modal = document.createElement('div'); modal.className = 'qc-modal';
+    modal.innerHTML = `
+      <div class="modal-backdrop" style="position:fixed;inset:0;background:rgba(0,0,0,0.45);"></div>
+      <div class="modal-panel" style="position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);background:#fff;padding:18px;border-radius:8px;max-width:720px;width:90%;box-shadow:0 12px 48px rgba(0,0,0,0.35);z-index:2147483647;">
+        <button class="modal-close" style="position:absolute;right:12px;top:8px;background:none;border:none;font-size:20px;cursor:pointer;">×</button>
+        <h2>Frage bearbeiten</h2>
+        <form id="qc-edit-form">
+          <div class="form-group"><label>Fragetext</label><input id="qc-edit-text" type="text" style="width:100%;" value="${(q.question||q.text||'').replace(/"/g,'&quot;')}"></div>
+          <div class="form-group"><label>Antwort</label><input id="qc-edit-ans" type="text" style="width:100%;" value="${(q.answer||'').replace(/"/g,'&quot;')}"></div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;"><button type="submit" class="btn-primary">Speichern</button><button type="button" id="qc-cancel" class="btn-secondary">Abbrechen</button></div>
+        </form>
+      </div>`;
+    document.body.appendChild(modal);
+    modal.querySelector('.modal-close').addEventListener('click', () => { modal.remove(); });
+    modal.querySelector('#qc-cancel').addEventListener('click', () => { modal.remove(); });
+    const form = modal.querySelector('#qc-edit-form');
+    form.addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      const newText = modal.querySelector('#qc-edit-text').value.trim();
+      const newAns = modal.querySelector('#qc-edit-ans').value.trim();
+      const updated = Object.assign({}, q, { text: newText, question: newText, answer: newAns });
+      try {
+        if (typeof window.updateQuestion === 'function') {
+          const ok = await window.updateQuestion(q.id, updated);
+          if (ok) { modal.remove(); await loadQuestionsForGroup(q.groupId ?? q.group_id); }
+        } else if (window.supabase) {
+          const payload = { question: updated.question ?? updated.text, answer: updated.answer };
+          const { error } = await window.supabase.from('questions').update(payload).eq('id', q.id);
+          if (!error) { modal.remove(); await loadQuestionsForGroup(q.groupId ?? q.group_id); } else notifyError('Fehler beim Speichern');
+        } else notifyError('Keine Update-Funktion verfügbar.');
+      } catch (err) { console.error(err); notifyError('Fehler beim Speichern'); }
     });
+  }
 
-    // Event-Listener für Bildupload bleibt erhalten
+  // Run when DOM is ready
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 
-    // Event Listener für Bild-Upload
-    if (questionImageInput) {
-        questionImageInput.addEventListener('change', handleImageUpload);
+})();
+
+// Provide a global fallback openEditModal if not provided by category-management.js
+if (typeof window.openEditModal !== 'function') {
+  window.openEditModal = async function (type, id, categoryId=null) {
+    // If canonical modal exists, delegate to its openEditModal (category-management.js)
+    if (typeof window.openEditModal === 'function' && document.getElementById('edit-item-modal')) {
+      // If the page already loaded category-management.js, its openEditModal will be present and will handle it.
+      try { return window.openEditModal(type, id, categoryId); } catch (e) { /* fallthrough */ }
     }
-
-    // Verzeichnisbaum für Kategorien und Gruppen erstellen
-    async function renderCategoryTree() {
-        try {
-            categoryTree.innerHTML = '<p class="loading-info">Kategorien werden geladen...</p>';
-            
-            const [categories, groups] = await Promise.all([
-                window.loadCategories(),
-                window.loadGroups()
-            ]);
-            
-            // Nur benutzerdefinierte Kategorien verwenden (keine Systemkategorien)
-            const userCategories = categories.filter(category => category.createdBy !== 'system');
-            
-            if (userCategories.length === 0) {
-                categoryTree.innerHTML = `
-                    <p class="info-text">Keine Kategorien gefunden. 
-                    Erstellen Sie Kategorien in der <a href="category-management.html">Kategorie-Verwaltung</a>.</p>
-                `;
-                return;
-            }
-            
-            // Kategorien nach Namen sortieren
-            userCategories.sort((a, b) => a.name.localeCompare(b.name));
-            
-            let html = '';
-            
-            userCategories.forEach(category => {
-                // Gruppieren der Gruppen nach Kategorie
-                const categoryGroups = groups.filter(group => group.category_id == category.id);
-                categoryGroups.sort((a, b) => a.name.localeCompare(b.name));
-                
-                html += `
-                    <div class="tree-item tree-item-category" data-id="${category.id}">
-                        <span class="tree-item-toggle"><i class="fas fa-chevron-right"></i></span>
-                        <span class="tree-item-icon"><i class="fas fa-folder"></i></span>
-                        ${category.name}
-                    </div>
-                    <div class="tree-group-container" style="display: none;" data-category-id="${category.id}">
-                `;
-                
-                if (categoryGroups.length > 0) {
-                    categoryGroups.forEach(group => {
-                        html += `
-                            <div class="tree-item tree-item-group" data-category-id="${category.id}" data-id="${group.id}">
-                                <span class="tree-item-icon"><i class="fas fa-tag"></i></span>
-                                ${group.name}
-                            </div>
-                        `;
-                    });
-                } else {
-                    html += `
-                        <div class="tree-item-empty">
-                            <span class="tree-item-icon"><i class="fas fa-info-circle"></i></span>
-                            Keine Gruppen in dieser Kategorie
-                        </div>
-                    `;
-                }
-                
-                html += '</div>';
-            });
-            
-            categoryTree.innerHTML = html;
-            
-            // Event-Listener für Kategorien im Baum
-            document.querySelectorAll('.tree-item-category').forEach(item => {
-                item.addEventListener('click', function(e) {
-                    const categoryId = this.getAttribute('data-id');
-                    
-                    // Alle anderen Kategorien einklappen
-                    document.querySelectorAll('.tree-item-category').forEach(category => {
-                        const catId = category.getAttribute('data-id');
-                        if (catId !== categoryId) {
-                            // Andere Kategorie als die angeklickte
-                            const otherGroupContainer = document.querySelector(`.tree-group-container[data-category-id="${catId}"]`);
-                            const otherToggleIcon = category.querySelector('.tree-item-toggle i');
-                            
-                            // Nur einklappen, wenn sie aktuell ausgeklappt ist
-                            if (otherGroupContainer && otherGroupContainer.style.display !== 'none') {
-                                otherGroupContainer.style.display = 'none';
-                                if (otherToggleIcon) {
-                                    otherToggleIcon.className = 'fas fa-chevron-right';
-                                }
-                            }
-                        }
-                    });
-                    
-                    // Die angeklickte Kategorie immer ausklappen
-                    const groupContainer = document.querySelector(`.tree-group-container[data-category-id="${categoryId}"]`);
-                    const toggleIcon = this.querySelector('.tree-item-toggle i');
-                    
-                    if (groupContainer) {
-                        // Immer ausklappen (nicht umschalten)
-                        groupContainer.style.display = 'block';
-                        
-                        // Icon immer auf ausgeklappt setzen
-                        if (toggleIcon) {
-                            toggleIcon.className = 'fas fa-chevron-down';
-                        }
-                    }
-                    
-                    // Kategorie auswählen
-                    document.querySelectorAll('.tree-item-category').forEach(cat => {
-                        cat.classList.remove('active');
-                    });
-                    this.classList.add('active');
-                    
-                    // Werte im Hidden-Input setzen
-                    categorySelect.value = categoryId;
-                    
-                    // Verhindern, dass ein Klick auf das Toggle-Icon auch die Kategorie auswählt
-                    if (e.target.closest('.tree-item-toggle')) {
-                        e.stopPropagation();
-                    }
-                });
-            });
-            
-            // Event-Listener für Gruppen im Baum
-            document.querySelectorAll('.tree-item-group').forEach(item => {
-                item.addEventListener('click', function() {
-                    const categoryId = this.getAttribute('data-category-id');
-                    const groupId = this.getAttribute('data-id');
-                    
-                    // Klassen für aktive Elemente setzen
-                    document.querySelectorAll('.tree-item-category').forEach(cat => {
-                        cat.classList.remove('active');
-                    });
-                    document.querySelectorAll('.tree-item-group').forEach(group => {
-                        group.classList.remove('active');
-                    });
-                    
-                    // Aktive Kategorie finden und markieren
-                    const parentCategory = document.querySelector(`.tree-item-category[data-id="${categoryId}"]`);
-                    if (parentCategory) {
-                        parentCategory.classList.add('active');
-                    }
-                    
-                    // Aktive Gruppe markieren
-                    this.classList.add('active');
-                    
-                    // Werte in Hidden-Inputs setzen
-                    categorySelect.value = categoryId;
-                    groupSelect.value = groupId;
-                    
-                    // Fragen für diese Gruppe laden und anzeigen
-                    loadQuestionsForGroup(groupId);
-                });
-            });
-            
-        } catch (error) {
-            console.error('Fehler beim Rendern des Kategorie-Baums:', error);
-            categoryTree.innerHTML = '<p class="error-text">Fehler beim Laden der Kategorien und Gruppen.</p>';
+    // create a simple modal for editing name (category or group)
+    const modal = document.createElement('div'); modal.className = 'qc-modal';
+    modal.innerHTML = `
+      <div class="modal-backdrop" style="position:fixed;inset:0;background:rgba(0,0,0,0.45);"></div>
+      <div class="modal-panel" style="position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);background:#fff;padding:18px;border-radius:8px;max-width:640px;width:90%;box-shadow:0 12px 48px rgba(0,0,0,0.35);z-index:2147483647;">
+        <button class="modal-close" style="position:absolute;right:12px;top:8px;background:none;border:none;font-size:20px;cursor:pointer;">×</button>
+        <h2>Bearbeiten</h2>
+        <form id="qc-edit-catgrp-form">
+          <div class="form-group"><label>Name</label><input id="qc-edit-name" type="text" style="width:100%;"></div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;"><button type="submit" class="btn-primary">Speichern</button><button type="button" id="qc-cancel" class="btn-secondary">Abbrechen</button></div>
+        </form>
+      </div>`;
+    document.body.appendChild(modal);
+    const close = () => { try { modal.remove(); } catch (e) {} };
+    modal.querySelector('.modal-close').addEventListener('click', close);
+    modal.querySelector('#qc-cancel').addEventListener('click', close);
+    // prefill name from quizDB
+    try {
+      if (type === 'category') {
+        const cats = await window.quizDB.loadCategories(); const c = cats.find(x=>String(x.id)===String(id)); modal.querySelector('#qc-edit-name').value = c ? c.name : '';
+      } else if (type === 'group') {
+        const gs = await window.quizDB.loadGroups(); const g = gs.find(x=>String(x.id)===String(id)); modal.querySelector('#qc-edit-name').value = g ? g.name : '';
+      }
+    } catch (e) { console.warn('Prefill failed', e); }
+    modal.querySelector('#qc-edit-catgrp-form').addEventListener('submit', async function (ev) {
+      ev.preventDefault();
+      const newName = modal.querySelector('#qc-edit-name').value.trim();
+      if (!newName) return;
+      try {
+        if (type === 'category' && window.quizDB && typeof window.quizDB.updateCategory === 'function') {
+          await window.quizDB.updateCategory(id, { name: newName });
+        } else if (type === 'group' && window.quizDB && typeof window.quizDB.updateGroup === 'function') {
+          await window.quizDB.updateGroup(id, { name: newName, categoryId: categoryId || undefined });
+        } else {
+          // fallback: navigate to category-management page
+          if (type === 'category') window.location.href = 'category-management.html?category=' + encodeURIComponent(id);
+          else window.location.href = 'category-management.html?category=' + encodeURIComponent(categoryId) + '&group=' + encodeURIComponent(id);
+          return;
         }
-    }
-    
-    // Event Listener für Bild-Upload
-    if (questionImageInput) {
-        questionImageInput.addEventListener('change', handleImageUpload);
-    }    // Event Listener für das Fragen-Formular
-    // Fragen-Erstellung: Bild als imageurl speichern
-    if (questionForm) {
-        questionForm.addEventListener('submit', async function(e) {
-            e.preventDefault();
-            if (!validateForm()) return;
-            const correctAnswerText = document.getElementById('answer-0').value.trim();
-            if (!correctAnswerText) {
-                showError('Bitte gib eine richtige Antwort ein.');
-                return;
-            }
-            const groupId = groupSelect.value;
-            const ownerId = await window.supabase.auth.getUser().then(u => u.data.user.id);
-            let imageUrl = null;
-            // Bild-Upload zu Supabase Storage (falls vorhanden)
-            if (questionImageInput.files && questionImageInput.files[0]) {
-                const file = questionImageInput.files[0];
-                const fileName = 'question-images/' + Date.now() + '_' + file.name;
-                const { data, error } = await window.supabase.storage.from('question-images').upload(fileName, file);
-                if (!error && data && data.path) {
-                    imageUrl = window.supabase.storage.from('question-images').getPublicUrl(data.path).publicUrl;
-                } else {
-                    showError('Fehler beim Bild-Upload: ' + (error?.message || '')); // Bild-Upload Fehler anzeigen
-                }
-            }
-            const questionData = {
-                question: questionTextInput.value.trim(),
-                answer: correctAnswerText,
-                additionalinfo: explanationInput.value.trim(),
-                imageurl: imageUrl || '',
-                group_id: groupId,
-                owner: ownerId
-                // collaborators: [] // Optional
-            };
-            try {
-                const submitButton = questionForm.querySelector('button[type="submit"]');
-                const originalButtonText = submitButton.innerHTML;
-                submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Wird gespeichert...';
-                submitButton.disabled = true;
-                const { error } = await window.supabase.from('questions').insert([ mapQuestionForDb(questionData) ]);
-                if (!error) {
-                    showSuccess('Frage wurde erfolgreich erstellt!');
-                    resetForm();
-                    if (groupSelect.value) await loadQuestionsForGroup(groupSelect.value);
-                } else {
-                    showError('Fehler beim Erstellen der Frage: ' + error.message);
-                }
-                submitButton.innerHTML = originalButtonText;
-                submitButton.disabled = false;
-            } catch (err) {
-                showError('Fehler: ' + err.message);
-                const submitButton = questionForm.querySelector('button[type="submit"]');
-                if (submitButton) {
-                    submitButton.innerHTML = '<i class="fas fa-save"></i> Frage speichern';
-                    submitButton.disabled = false;
-                }
-            }
-        });
-    }
-
-    /**
-     * Initialisiert die Seite
-     */
-    async function initializePage() {
-        try {
-            // Kategorie-Verzeichnisbaum rendern
-            await renderCategoryTree();
-            
-            // Fragen der ausgewählten Gruppe laden (falls eine ausgewählt ist)
-            if (groupSelect.value) {
-                await loadQuestionsForGroup(groupSelect.value);
-            }
-            
-            // Höhe des Kategorie-Baums dynamisch anpassen
-            adjustCategoryTreeHeight();
-            
-            // Breadcrumbs initialisieren, falls verfügbar
-            if (window.breadcrumbs) {
-                window.breadcrumbs.set([
-                    { label: 'Verwaltung', url: 'admin.html' },
-                    { label: 'Fragen erstellen', url: 'question-creator.html' }
-                ]);
-            }
-        } catch (error) {
-            console.error('Fehler beim Initialisieren der Seite:', error);
-            showError('Fehler beim Laden der Daten. Bitte aktualisiere die Seite.');
-        }
-    }
-    
-    /**
-     * Passt die Höhe des Kategorie-Baums an die Bildschirmhöhe an
-     */
-    function adjustCategoryTreeHeight() {
-        const categoryTree = document.getElementById('category-tree');
-        if (!categoryTree) return;
-        
-        // Verfügbare Höhe berechnen (abzüglich Header und anderer Elemente)
-        const windowHeight = window.innerHeight;
-        const headerHeight = document.querySelector('#header-container')?.offsetHeight || 0;
-        const footerHeight = document.querySelector('#footer-container')?.offsetHeight || 0;
-        
-        // Abstand von oben und andere UI-Elemente berücksichtigen
-        const treeContainer = categoryTree.parentElement;
-        const treeContainerRect = treeContainer.getBoundingClientRect();
-        const topOffset = treeContainerRect.top;
-        
-        // Maximale Höhe berechnen (mit Puffer)
-        const maxHeight = windowHeight - topOffset - footerHeight - 80; // 80px Puffer
-        
-        // Höhe setzen, mindestens 200px, maximal berechnete Höhe
-        const newHeight = Math.max(200, Math.min(maxHeight, 600)); // Zwischen 200px und 600px
-        categoryTree.style.maxHeight = `${newHeight}px`;
-    }
-
-    /**
-     * Aktualisiert die Kategorie-Dropdown-Menüs
-     * Diese Funktion wird nicht mehr benötigt, da wir nur noch den Verzeichnisbaum verwenden
-     */
-    async function updateCategoryDropdowns() {
-        try {
-            // Nur noch für das Logging - Kein UI-Update mehr
-            const categories = await window.quizDB.loadCategories();
-            console.log('Kategorien geladen:', categories.length);
-        } catch (error) {
-            console.error('Fehler beim Aktualisieren der Kategorie-Auswahlfelder:', error);
-        }
-    }
-
-    /**
-     * Aktualisiert die Gruppen-Dropdown basierend auf der ausgewählten Kategorie
-     * Diese Funktion wird nicht mehr benötigt, da wir nur noch den Verzeichnisbaum verwenden
-     */
-    async function updateGroupDropdown(categoryId) {
-        try {
-            // Nur noch für das Logging - Kein UI-Update mehr
-            if (!categoryId) {
-                return;
-            }
-            
-            // Gruppen laden
-            const groups = await window.quizDB.loadGroups();
-            
-            // Gruppen für die gewählte Kategorie filtern
-            const filteredGroups = groups.filter(group => group.categoryId === categoryId);
-            console.log('Gruppen für Kategorie geladen:', filteredGroups.length);
-        } catch (error) {
-            console.error('Fehler beim Aktualisieren des Gruppen-Auswahlfelds:', error);
-        }
-    }
-
-    /**
-     * Verarbeitet den Bild-Upload und erstellt eine Vorschau
-     */
-    function handleImageUpload() {
-        const file = questionImageInput.files[0];
-        const imageNameElement = document.getElementById('image-name');
-        
-        if (!file) {
-            imagePreview.style.display = 'none';
-            imagePreview.innerHTML = '';
-            imagePreview.classList.remove('has-image');
-            imageNameElement.textContent = '';
-            imageBase64 = null;
-            return;
-        }
-        
-        if (!file.type.startsWith('image/')) {
-            showError('Bitte wähle eine Bilddatei aus.');
-            questionImageInput.value = '';
-            imagePreview.style.display = 'none';
-            imagePreview.innerHTML = '';
-            imagePreview.classList.remove('has-image');
-            imageNameElement.textContent = '';
-            imageBase64 = null;
-            return;
-        }
-        
-        // Größe prüfen (max. 5 MB)
-        if (file.size > 5 * 1024 * 1024) {
-            showError('Das Bild ist zu groß. Maximale Größe: 5 MB.');
-            questionImageInput.value = '';
-            imagePreview.style.display = 'none';
-            imagePreview.innerHTML = '';
-            imagePreview.classList.remove('has-image');
-            imageNameElement.textContent = '';
-            imageBase64 = null;
-            return;
-        }
-        
-        const reader = new FileReader();
-        
-        reader.onload = function(e) {
-            // Wir komprimieren das Bild mit einer Hilfsfunktion
-            compressImage(e.target.result, file.type, (compressedBase64) => {
-                // Base64-kodiertes komprimiertes Bild speichern
-                imageBase64 = compressedBase64;
-                
-                // Vorschau erstellen und anzeigen
-                imagePreview.style.display = 'block';
-                imagePreview.classList.add('has-image');
-                imagePreview.innerHTML = `<img src="${imageBase64}" alt="Vorschau">`;
-                
-                // Bildnamen anzeigen
-                imageNameElement.textContent = file.name;
-                
-                // Größe des komprimierten Bildes anzeigen (optional)
-                const sizeKB = Math.round(compressedBase64.length / 1024);
-                console.log(`Bildgröße nach Komprimierung: ${sizeKB} KB`);
-            });
-        };
-        
-        reader.onerror = function() {
-            showError('Fehler beim Lesen der Bilddatei.');
-            imagePreview.style.display = 'none';
-            imagePreview.innerHTML = '';
-            imagePreview.classList.remove('has-image');
-            imageNameElement.textContent = '';
-            imageBase64 = null;
-        };
-        
-        reader.readAsDataURL(file);
-    }
-    
-    /**
-     * Komprimiert ein Bild mit Canvas
-     * @param {string} base64 - Das Originalbild als Base64-String
-     * @param {string} type - Der MIME-Typ des Bildes
-     * @param {function} callback - Callback-Funktion mit dem komprimierten Bild
-     */
-    function compressImage(base64, type, callback) {
-        const img = new Image();
-        img.src = base64;
-        
-        img.onload = function() {
-            // Maximale Größe für Quizbilder festlegen (z.B. 800x600)
-            const MAX_WIDTH = 800;
-            const MAX_HEIGHT = 600;
-            
-            let width = img.width;
-            let height = img.height;
-            
-            // Verhältnis beibehalten, aber Größe reduzieren
-            if (width > MAX_WIDTH) {
-                height = Math.round(height * (MAX_WIDTH / width));
-                width = MAX_WIDTH;
-            }
-            
-            if (height > MAX_HEIGHT) {
-                width = Math.round(width * (MAX_HEIGHT / height));
-                height = MAX_HEIGHT;
-            }
-            
-            // Canvas für die Komprimierung erstellen
-            const canvas = document.createElement('canvas');
-            canvas.width = width;
-            canvas.height = height;
-            
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(img, 0, 0, width, height);
-            
-            // Qualität auf 0.7 (70%) setzen für JPEG, 0.8 für andere Formate
-            const quality = type === 'image/jpeg' ? 0.7 : 0.8;
-            
-            // Komprimiertes Bild als Base64 zurückgeben
-            const compressedBase64 = canvas.toDataURL(type, quality);
-            callback(compressedBase64);
-        };
-        
-        img.onerror = function() {
-            console.error('Fehler beim Laden des Bildes zur Komprimierung');
-            callback(base64); // Originalbild zurückgeben im Fehlerfall
-        };
-    }
-
-    /**
-     * Validiert das Fragenformular
-     * @returns {boolean} True, wenn das Formular gültig ist
-     */
-    function validateForm() {
-        // Kategorie prüfen
-        if (!categorySelect.value) {
-            showError('Bitte wähle eine Kategorie aus.');
-            return false;
-        }
-        
-        // Gruppe prüfen
-        if (!groupSelect.value) {
-            showError('Bitte wähle eine Gruppe aus.');
-            return false;
-        }
-        
-        // Fragetext prüfen
-        if (!questionTextInput.value.trim()) {
-            showError('Bitte gib einen Fragetext ein.');
-            questionTextInput.focus();
-            return false;
-        }
-        
-        // Richtige Antwort prüfen
-        const correctAnswer = document.getElementById('answer-0');
-        if (!correctAnswer.value.trim()) {
-            showError('Bitte gib eine richtige Antwort ein.');
-            correctAnswer.focus();
-            return false;
-        }
-        
-        return true;
-    }
-
-    /**
-     * Setzt das Formular zurück
-     */
-    function resetForm() {
-        // Texteingaben zurücksetzen
-        questionTextInput.value = '';
-        explanationInput.value = '';
-        
-        // Bild zurücksetzen
-        questionImageInput.value = '';
-        imagePreview.innerHTML = '';
-        imagePreview.style.display = 'none';
-        imagePreview.classList.remove('has-image');
-        document.getElementById('image-name').textContent = '';
-        imageBase64 = null;
-        
-        // Schwierigkeitsgrad zurücksetzen
-        difficultyInput.value = 3;
-        
-        // Richtige Antwort zurücksetzen
-        document.getElementById('answer-0').value = '';
-    }
-});
-// Die lokale Speicherung und JSON-Logik wurde entfernt.
-// Die Frage-Erstellung nutzt jetzt Supabase für alle Datenoperationen.
-// question-creator.js - Verwaltung der Fragenerstellung
-
-document.addEventListener('DOMContentLoaded', function() {
-    // Prüfen, ob der Benutzer eingeloggt ist
-    const isLoggedIn = (window.storage && typeof window.storage.isLoggedIn === 'function') ? window.storage.isLoggedIn() : (localStorage.getItem('loggedIn') === 'true');
-    const username = (window.storage && typeof window.storage.getUsername === 'function') ? window.storage.getUsername() : localStorage.getItem('username');
-    
-    if (!isLoggedIn || !username) {
-        // Nicht eingeloggt - zurück zur Login-Seite
-        window.location.href = 'login.html';
-        return;
-    }
-
-    // Elemente für das Fragenformular
-    const questionForm = document.getElementById('question-form');
-    const categorySelect = document.getElementById('question-category');
-       const groupSelect = document.getElementById('question-group');
-    const questionTextInput = document.getElementById('question-text');
-    const questionImageInput = document.getElementById('question-image');
-    const imagePreview = document.getElementById('image-preview');
-    const explanationInput = document.getElementById('question-explanation');
-    const difficultyInput = document.getElementById('question-difficulty');
-    const groupQuestionsList = document.getElementById('group-questions-list');
-
-    // Elemente für Kategorie- und Gruppenauswahl
-    const categoryTree = document.getElementById('category-tree');
-
-    // Base64-kodiertes Bild
-    let imageBase64 = null;
-
-    // Initialisierung
-    initializePage();
-    
-    // Supabase-konforme Frage-Erstellung und Anzeige
-    if (questionForm) {
-        questionForm.addEventListener('submit', async function(e) {
-            e.preventDefault();
-            if (!validateForm()) return;
-            const correctAnswerText = document.getElementById('answer-0').value.trim();
-            if (!correctAnswerText) {
-                showError('Bitte gib eine richtige Antwort ein.');
-                return;
-            }
-            const groupId = groupSelect.value;
-            const ownerId = await window.supabase.auth.getUser().then(u => u.data.user.id);
-            let imageUrl = null;
-            // Bild-Upload zu Supabase Storage (falls vorhanden)
-            if (questionImageInput.files && questionImageInput.files[0]) {
-                const file = questionImageInput.files[0];
-                const fileName = 'question-images/' + Date.now() + '_' + file.name;
-                const { data, error } = await window.supabase.storage.from('question-images').upload(fileName, file);
-                if (!error && data && data.path) {
-                    imageUrl = window.supabase.storage.from('question-images').getPublicUrl(data.path).publicUrl;
-                } else {
-                    showError('Fehler beim Bild-Upload: ' + (error?.message || ''));
-                }
-            }
-            // Tags aus dem Tag-Input holen (z. B. Komma-getrennt)
-            const tagsInput = document.getElementById('question-tags');
-            const tags = tagsInput ? tagsInput.value.split(',').map(t => t.trim()).filter(Boolean) : [];
-            // Typ aus dem Typ-Input holen
-            const typeInput = document.getElementById('question-type');
-            const type = typeInput ? typeInput.value : 'text';
-            // Schwierigkeitsgrad
-            const difficulty = parseInt(difficultyInput.value, 10) || 1;
-            const questionData = {
-                question: questionTextInput.value.trim(),
-                answer: correctAnswerText,
-                additionalInfo: explanationInput.value.trim(),
-                type,
-                difficulty,
-                tags,
-                imageUrl: imageUrl || '',
-                group_id: groupId,
-                owner: ownerId
-            };
-            try {
-                const submitButton = questionForm.querySelector('button[type="submit"]');
-                const originalButtonText = submitButton.innerHTML;
-                submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Wird gespeichert...';
-                submitButton.disabled = true;
-                const { error } = await window.supabase.from('questions').insert([ mapQuestionForDb(questionData) ]);
-                if (!error) {
-                    showSuccess('Frage wurde erfolgreich erstellt!');
-                    resetForm();
-                    if (groupSelect.value) await loadQuestionsForGroup(groupSelect.value);
-                } else {
-                    showError('Fehler beim Erstellen der Frage: ' + error.message);
-                }
-                submitButton.innerHTML = originalButtonText;
-                submitButton.disabled = false;
-            } catch (err) {
-                showError('Fehler: ' + err.message);
-                const submitButton = questionForm.querySelector('button[type="submit"]');
-                if (submitButton) {
-                    submitButton.innerHTML = '<i class="fas fa-save"></i> Frage speichern';
-                    submitButton.disabled = false;
-                }
-            }
-        });
-    }
-
-    /**
-     * Lädt die Fragen für eine bestimmte Gruppe und zeigt sie an
-     */
-    async function loadQuestionsForGroup(groupId) {
-        try {
-            if (!groupId) {
-                groupQuestionsList.innerHTML = '<p class="info-text">Wähle eine Gruppe aus, um deren Fragen zu sehen</p>';
-                return;
-            }
-            
-            groupQuestionsList.innerHTML = '<p class="loading-info">Fragen werden geladen...</p>';
-            
-            // Alle Fragen laden
-            const questions = await window.quizDB.loadQuestions();
-            
-            // Fragen für die ausgewählte Gruppe filtern
-            const groupQuestions = questions.filter(q => q.group_id === groupId);
-            
-            if (groupQuestions.length === 0) {
-                groupQuestionsList.innerHTML = '<p class="info-text">Keine Fragen in dieser Gruppe vorhanden</p>';
-                return;
-            }
-            
-            // Liste der Fragen erzeugen
-            let html = '';
-            
-            groupQuestions.forEach(question => {
-                const hasImage = question.imageUrl && question.imageUrl.trim() !== '';
-                const questionText = question.question && question.question.trim() !== '' 
-                    ? question.question 
-                    : 'Bildfrage ohne Text';
-                
-                html += `
-                    <div class="question-list-item" data-id="${question.id}">
-                        <p class="question-text">${questionText}</p>
-                        <div class="question-meta">
-                            <span>${hasImage ? '<span class="question-has-image"><i class="fas fa-image"></i> Bild: ja</span>' : ''}</span>
-                            <span>Schwierigkeit: ${question.difficulty}/5</span>
-                            <span>Typ: ${question.type || 'text'}</span>
-                            <span>Tags: ${question.tags ? question.tags.join(', ') : ''}</span>
-                        </div>
-                    </div>
-                `;
-            });
-            
-            groupQuestionsList.innerHTML = html;
-        } catch (error) {
-            console.error('Fehler beim Laden der Gruppenfragen:', error);
-            groupQuestionsList.innerHTML = '<p class="error-text">Fehler beim Laden der Fragen.</p>';
-        }
-    }
-    
-    // Event Listener für Fenstergrößenänderung
-    window.addEventListener('resize', function() {
-        adjustCategoryTreeHeight();
+        close();
+        // refresh trees if present
+        try { if (typeof renderCategoryTree === 'function') renderCategoryTree(); } catch (e) {}
+      } catch (err) { console.error('Save failed', err); }
     });
-
-    // Event-Listener für Bildupload bleibt erhalten
-
-    // Event Listener für Bild-Upload
-    if (questionImageInput) {
-        questionImageInput.addEventListener('change', handleImageUpload);
-    }
-
-    // Verzeichnisbaum für Kategorien und Gruppen erstellen
-    async function renderCategoryTree() {
-        try {
-            categoryTree.innerHTML = '<p class="loading-info">Kategorien werden geladen...</p>';
-            
-            const [categories, groups] = await Promise.all([
-                window.loadCategories(),
-                window.loadGroups()
-            ]);
-            
-            // Nur benutzerdefinierte Kategorien verwenden (keine Systemkategorien)
-            const userCategories = categories.filter(category => category.createdBy !== 'system');
-            
-            if (userCategories.length === 0) {
-                categoryTree.innerHTML = `
-                    <p class="info-text">Keine Kategorien gefunden. 
-                    Erstellen Sie Kategorien in der <a href="category-management.html">Kategorie-Verwaltung</a>.</p>
-                `;
-                return;
-            }
-            
-            // Kategorien nach Namen sortieren
-            userCategories.sort((a, b) => a.name.localeCompare(b.name));
-            
-            let html = '';
-            
-            userCategories.forEach(category => {
-                // Gruppieren der Gruppen nach Kategorie
-                const categoryGroups = groups.filter(group => group.category_id == category.id);
-                categoryGroups.sort((a, b) => a.name.localeCompare(b.name));
-                
-                html += `
-                    <div class="tree-item tree-item-category" data-id="${category.id}">
-                        <span class="tree-item-toggle"><i class="fas fa-chevron-right"></i></span>
-                        <span class="tree-item-icon"><i class="fas fa-folder"></i></span>
-                        ${category.name}
-                    </div>
-                    <div class="tree-group-container" style="display: none;" data-category-id="${category.id}">
-                `;
-                
-                if (categoryGroups.length > 0) {
-                    categoryGroups.forEach(group => {
-                        html += `
-                            <div class="tree-item tree-item-group" data-category-id="${category.id}" data-id="${group.id}">
-                                <span class="tree-item-icon"><i class="fas fa-tag"></i></span>
-                                ${group.name}
-                            </div>
-                        `;
-                    });
-                } else {
-                    html += `
-                        <div class="tree-item-empty">
-                            <span class="tree-item-icon"><i class="fas fa-info-circle"></i></span>
-                            Keine Gruppen in dieser Kategorie
-                        </div>
-                    `;
-                }
-                
-                html += '</div>';
-            });
-            
-            categoryTree.innerHTML = html;
-            
-            // Event-Listener für Kategorien im Baum
-            document.querySelectorAll('.tree-item-category').forEach(item => {
-                item.addEventListener('click', function(e) {
-                    const categoryId = this.getAttribute('data-id');
-                    
-                    // Alle anderen Kategorien einklappen
-                    document.querySelectorAll('.tree-item-category').forEach(category => {
-                        const catId = category.getAttribute('data-id');
-                        if (catId !== categoryId) {
-                            // Andere Kategorie als die angeklickte
-                            const otherGroupContainer = document.querySelector(`.tree-group-container[data-category-id="${catId}"]`);
-                            const otherToggleIcon = category.querySelector('.tree-item-toggle i');
-                            
-                            // Nur einklappen, wenn sie aktuell ausgeklappt ist
-                            if (otherGroupContainer && otherGroupContainer.style.display !== 'none') {
-                                otherGroupContainer.style.display = 'none';
-                                if (otherToggleIcon) {
-                                    otherToggleIcon.className = 'fas fa-chevron-right';
-                                }
-                            }
-                        }
-                    });
-                    
-                    // Die angeklickte Kategorie immer ausklappen
-                    const groupContainer = document.querySelector(`.tree-group-container[data-category-id="${categoryId}"]`);
-                    const toggleIcon = this.querySelector('.tree-item-toggle i');
-                    
-                    if (groupContainer) {
-                        // Immer ausklappen (nicht umschalten)
-                        groupContainer.style.display = 'block';
-                        
-                        // Icon immer auf ausgeklappt setzen
-                        if (toggleIcon) {
-                            toggleIcon.className = 'fas fa-chevron-down';
-                        }
-                    }
-                    
-                    // Kategorie auswählen
-                    document.querySelectorAll('.tree-item-category').forEach(cat => {
-                        cat.classList.remove('active');
-                    });
-                    this.classList.add('active');
-                    
-                    // Werte im Hidden-Input setzen
-                    categorySelect.value = categoryId;
-                    
-                    // Verhindern, dass ein Klick auf das Toggle-Icon auch die Kategorie auswählt
-                    if (e.target.closest('.tree-item-toggle')) {
-                        e.stopPropagation();
-                    }
-                });
-            });
-            
-            // Event-Listener für Gruppen im Baum
-            document.querySelectorAll('.tree-item-group').forEach(item => {
-                item.addEventListener('click', function() {
-                    const categoryId = this.getAttribute('data-category-id');
-                    const groupId = this.getAttribute('data-id');
-                    
-                    // Klassen für aktive Elemente setzen
-                    document.querySelectorAll('.tree-item-category').forEach(cat => {
-                        cat.classList.remove('active');
-                    });
-                    document.querySelectorAll('.tree-item-group').forEach(group => {
-                        group.classList.remove('active');
-                    });
-                    
-                    // Aktive Kategorie finden und markieren
-                    const parentCategory = document.querySelector(`.tree-item-category[data-id="${categoryId}"]`);
-                    if (parentCategory) {
-                        parentCategory.classList.add('active');
-                    }
-                    
-                    // Aktive Gruppe markieren
-                    this.classList.add('active');
-                    
-                    // Werte in Hidden-Inputs setzen
-                    categorySelect.value = categoryId;
-                    groupSelect.value = groupId;
-                    
-                    // Fragen für diese Gruppe laden und anzeigen
-                    loadQuestionsForGroup(groupId);
-                });
-            });
-            
-        } catch (error) {
-            console.error('Fehler beim Rendern des Kategorie-Baums:', error);
-            categoryTree.innerHTML = '<p class="error-text">Fehler beim Laden der Kategorien und Gruppen.</p>';
-        }
-    }
-    
-    // Event Listener für Bild-Upload
-    if (questionImageInput) {
-        questionImageInput.addEventListener('change', handleImageUpload);
-    }    // Event Listener für das Fragen-Formular
-    // Fragen-Erstellung: Bild als imageurl speichern
-    if (questionForm) {
-        questionForm.addEventListener('submit', async function(e) {
-            e.preventDefault();
-            if (!validateForm()) return;
-            const correctAnswerText = document.getElementById('answer-0').value.trim();
-            if (!correctAnswerText) {
-                showError('Bitte gib eine richtige Antwort ein.');
-                return;
-            }
-            const groupId = groupSelect.value;
-            const ownerId = await window.supabase.auth.getUser().then(u => u.data.user.id);
-            let imageUrl = null;
-            // Bild-Upload zu Supabase Storage (falls vorhanden)
-            if (questionImageInput.files && questionImageInput.files[0]) {
-                const file = questionImageInput.files[0];
-                const fileName = 'question-images/' + Date.now() + '_' + file.name;
-                const { data, error } = await window.supabase.storage.from('question-images').upload(fileName, file);
-                if (!error && data && data.path) {
-                    imageUrl = window.supabase.storage.from('question-images').getPublicUrl(data.path).publicUrl;
-                } else {
-                    showError('Fehler beim Bild-Upload: ' + (error?.message || '')); // Bild-Upload Fehler anzeigen
-                }
-            }
-            const questionData = {
-                question: questionTextInput.value.trim(),
-                answer: correctAnswerText,
-                additionalinfo: explanationInput.value.trim(),
-                imageurl: imageUrl || '',
-                group_id: groupId,
-                owner: ownerId
-                // collaborators: [] // Optional
-            };
-            try {
-                const submitButton = questionForm.querySelector('button[type="submit"]');
-                const originalButtonText = submitButton.innerHTML;
-                submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Wird gespeichert...';
-                submitButton.disabled = true;
-                const { error } = await window.supabase.from('questions').insert([ mapQuestionForDb(questionData) ]);
-                if (!error) {
-                    showSuccess('Frage wurde erfolgreich erstellt!');
-                    resetForm();
-                    if (groupSelect.value) await loadQuestionsForGroup(groupSelect.value);
-                } else {
-                    showError('Fehler beim Erstellen der Frage: ' + error.message);
-                }
-                submitButton.innerHTML = originalButtonText;
-                submitButton.disabled = false;
-            } catch (err) {
-                showError('Fehler: ' + err.message);
-                const submitButton = questionForm.querySelector('button[type="submit"]');
-                if (submitButton) {
-                    submitButton.innerHTML = '<i class="fas fa-save"></i> Frage speichern';
-                    submitButton.disabled = false;
-                }
-            }
-        });
-    }
-
-    /**
-     * Initialisiert die Seite
-     */
-    async function initializePage() {
-        try {
-            // Kategorie-Verzeichnisbaum rendern
-            await renderCategoryTree();
-            
-            // Fragen der ausgewählten Gruppe laden (falls eine ausgewählt ist)
-            if (groupSelect.value) {
-                await loadQuestionsForGroup(groupSelect.value);
-            }
-            
-            // Höhe des Kategorie-Baums dynamisch anpassen
-            adjustCategoryTreeHeight();
-            
-            // Breadcrumbs initialisieren, falls verfügbar
-            if (window.breadcrumbs) {
-                window.breadcrumbs.set([
-                    { label: 'Verwaltung', url: 'admin.html' },
-                    { label: 'Fragen erstellen', url: 'question-creator.html' }
-                ]);
-            }
-        } catch (error) {
-            console.error('Fehler beim Initialisieren der Seite:', error);
-            showError('Fehler beim Laden der Daten. Bitte aktualisiere die Seite.');
-        }
-    }
-    
-    /**
-     * Passt die Höhe des Kategorie-Baums an die Bildschirmhöhe an
-     */
-    function adjustCategoryTreeHeight() {
-        const categoryTree = document.getElementById('category-tree');
-        if (!categoryTree) return;
-        
-        // Verfügbare Höhe berechnen (abzüglich Header und anderer Elemente)
-        const windowHeight = window.innerHeight;
-        const headerHeight = document.querySelector('#header-container')?.offsetHeight || 0;
-        const footerHeight = document.querySelector('#footer-container')?.offsetHeight || 0;
-        
-        // Abstand von oben und andere UI-Elemente berücksichtigen
-        const treeContainer = categoryTree.parentElement;
-        const treeContainerRect = treeContainer.getBoundingClientRect();
-        const topOffset = treeContainerRect.top;
-        
-        // Maximale Höhe berechnen (mit Puffer)
-        const maxHeight = windowHeight - topOffset - footerHeight - 80; // 80px Puffer
-        
-        // Höhe setzen, mindestens 200px, maximal berechnete Höhe
-        const newHeight = Math.max(200, Math.min(maxHeight, 600)); // Zwischen 200px und 600px
-        categoryTree.style.maxHeight = `${newHeight}px`;
-    }
-
-    /**
-     * Aktualisiert die Kategorie-Dropdown-Menüs
-     * Diese Funktion wird nicht mehr benötigt, da wir nur noch den Verzeichnisbaum verwenden
-     */
-    async function updateCategoryDropdowns() {
-        try {
-            // Nur noch für das Logging - Kein UI-Update mehr
-            const categories = await window.quizDB.loadCategories();
-            console.log('Kategorien geladen:', categories.length);
-        } catch (error) {
-            console.error('Fehler beim Aktualisieren der Kategorie-Auswahlfelder:', error);
-        }
-    }
-
-    /**
-     * Aktualisiert die Gruppen-Dropdown basierend auf der ausgewählten Kategorie
-     * Diese Funktion wird nicht mehr benötigt, da wir nur noch den Verzeichnisbaum verwenden
-     */
-    async function updateGroupDropdown(categoryId) {
-        try {
-            // Nur noch für das Logging - Kein UI-Update mehr
-            if (!categoryId) {
-                return;
-            }
-            
-            // Gruppen laden
-            const groups = await window.quizDB.loadGroups();
-            
-            // Gruppen für die gewählte Kategorie filtern
-            const filteredGroups = groups.filter(group => group.categoryId === categoryId);
-            console.log('Gruppen für Kategorie geladen:', filteredGroups.length);
-        } catch (error) {
-            console.error('Fehler beim Aktualisieren des Gruppen-Auswahlfelds:', error);
-        }
-    }
-
-    /**
-     * Verarbeitet den Bild-Upload und erstellt eine Vorschau
-     */
-    function handleImageUpload() {
-        const file = questionImageInput.files[0];
-        const imageNameElement = document.getElementById('image-name');
-        
-        if (!file) {
-            imagePreview.style.display = 'none';
-            imagePreview.innerHTML = '';
-            imagePreview.classList.remove('has-image');
-            imageNameElement.textContent = '';
-            imageBase64 = null;
-            return;
-        }
-        
-        if (!file.type.startsWith('image/')) {
-            showError('Bitte wähle eine Bilddatei aus.');
-            questionImageInput.value = '';
-            imagePreview.style.display = 'none';
-            imagePreview.innerHTML = '';
-            imagePreview.classList.remove('has-image');
-            imageNameElement.textContent = '';
-            imageBase64 = null;
-            return;
-        }
-        
-        // Größe prüfen (max. 5 MB)
-        if (file.size > 5 * 1024 * 1024) {
-            showError('Das Bild ist zu groß. Maximale Größe: 5 MB.');
-            questionImageInput.value = '';
-            imagePreview.style.display = 'none';
-            imagePreview.innerHTML = '';
-            imagePreview.classList.remove('has-image');
-            imageNameElement.textContent = '';
-            imageBase64 = null;
-            return;
-        }
-        
-        const reader = new FileReader();
-        
-        reader.onload = function(e) {
-            // Wir komprimieren das Bild mit einer Hilfsfunktion
-            compressImage(e.target.result, file.type, (compressedBase64) => {
-                // Base64-kodiertes komprimiertes Bild speichern
-                imageBase64 = compressedBase64;
-                
-                // Vorschau erstellen und anzeigen
-                imagePreview.style.display = 'block';
-                imagePreview.classList.add('has-image');
-                imagePreview.innerHTML = `<img src="${imageBase64}" alt="Vorschau">`;
-                
-                // Bildnamen anzeigen
-                imageNameElement.textContent = file.name;
-                
-                // Größe des komprimierten Bildes anzeigen (optional)
-                const sizeKB = Math.round(compressedBase64.length / 1024);
-                console.log(`Bildgröße nach Komprimierung: ${sizeKB} KB`);
-            });
-        };
-        
-        reader.onerror = function() {
-            showError('Fehler beim Lesen der Bilddatei.');
-            imagePreview.style.display = 'none';
-            imagePreview.innerHTML = '';
-            imagePreview.classList.remove('has-image');
-            imageNameElement.textContent = '';
-            imageBase64 = null;
-        };
-        
-        reader.readAsDataURL(file);
-    }
-    
-    /**
-     * Komprimiert ein Bild mit Canvas
-     * @param {string} base64 - Das Originalbild als Base64-String
-     * @param {string} type - Der MIME-Typ des Bildes
-     * @param {function} callback - Callback-Funktion mit dem komprimierten Bild
-     */
-    function compressImage(base64, type, callback) {
-        const img = new Image();
-        img.src = base64;
-        
-        img.onload = function() {
-            // Maximale Größe für Quizbilder festlegen (z.B. 800x600)
-            const MAX_WIDTH = 800;
-            const MAX_HEIGHT = 600;
-            
-            let width = img.width;
-            let height = img.height;
-            
-            // Verhältnis beibehalten, aber Größe reduzieren
-            if (width > MAX_WIDTH) {
-                height = Math.round(height * (MAX_WIDTH / width));
-                width = MAX_WIDTH;
-            }
-            
-            if (height > MAX_HEIGHT) {
-                width = Math.round(width * (MAX_HEIGHT / height));
-                height = MAX_HEIGHT;
-            }
-            
-            // Canvas für die Komprimierung erstellen
-            const canvas = document.createElement('canvas');
-            canvas.width = width;
-            canvas.height = height;
-            
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(img, 0, 0, width, height);
-            
-            // Qualität auf 0.7 (70%) setzen für JPEG, 0.8 für andere Formate
-            const quality = type === 'image/jpeg' ? 0.7 : 0.8;
-            
-            // Komprimiertes Bild als Base64 zurückgeben
-            const compressedBase64 = canvas.toDataURL(type, quality);
-            callback(compressedBase64);
-        };
-        
-        img.onerror = function() {
-            console.error('Fehler beim Laden des Bildes zur Komprimierung');
-            callback(base64); // Originalbild zurückgeben im Fehlerfall
-        };
-    }
-
-    /**
-     * Validiert das Fragenformular
-     * @returns {boolean} True, wenn das Formular gültig ist
-     */
-    function validateForm() {
-        // Kategorie prüfen
-        if (!categorySelect.value) {
-            showError('Bitte wähle eine Kategorie aus.');
-            return false;
-        }
-        
-        // Gruppe prüfen
-        if (!groupSelect.value) {
-            showError('Bitte wähle eine Gruppe aus.');
-            return false;
-        }
-        
-        // Fragetext prüfen
-        if (!questionTextInput.value.trim()) {
-            showError('Bitte gib einen Fragetext ein.');
-            questionTextInput.focus();
-            return false;
-        }
-        
-        // Richtige Antwort prüfen
-        const correctAnswer = document.getElementById('answer-0');
-        if (!correctAnswer.value.trim()) {
-            showError('Bitte gib eine richtige Antwort ein.');
-            correctAnswer.focus();
-            return false;
-        }
-        
-        return true;
-    }
-
-    /**
-     * Setzt das Formular zurück
-     */
-    function resetForm() {
-        // Texteingaben zurücksetzen
-        questionTextInput.value = '';
-        explanationInput.value = '';
-        
-        // Bild zurücksetzen
-        questionImageInput.value = '';
-        imagePreview.innerHTML = '';
-        imagePreview.style.display = 'none';
-        imagePreview.classList.remove('has-image');
-        document.getElementById('image-name').textContent = '';
-        imageBase64 = null;
-        
-        // Schwierigkeitsgrad zurücksetzen
-        difficultyInput.value = 3;
-        
-        // Richtige Antwort zurücksetzen
-        document.getElementById('answer-0').value = '';
-    }
-});
-// Die lokale Speicherung und JSON-Logik wurde entfernt.
-// Die Frage-Erstellung nutzt jetzt Supabase für alle Datenoperationen.
-// question-creator.js - Verwaltung der Fragenerstellung
-
-document.addEventListener('DOMContentLoaded', function() {
-    // Prüfen, ob der Benutzer eingeloggt ist
-    const isLoggedIn = (window.storage && typeof window.storage.isLoggedIn === 'function') ? window.storage.isLoggedIn() : (localStorage.getItem('loggedIn') === 'true');
-    const username = (window.storage && typeof window.storage.getUsername === 'function') ? window.storage.getUsername() : localStorage.getItem('username');
-    
-    if (!isLoggedIn || !username) {
-        // Nicht eingeloggt - zurück zur Login-Seite
-        window.location.href = 'login.html';
-        return;
-    }
-
-    // Elemente für das Fragenformular
-    const questionForm = document.getElementById('question-form');
-    const categorySelect = document.getElementById('question-category');
-       const groupSelect = document.getElementById('question-group');
-    const questionTextInput = document.getElementById('question-text');
-    const questionImageInput = document.getElementById('question-image');
-    const imagePreview = document.getElementById('image-preview');
-    const explanationInput = document.getElementById('question-explanation');
-    const difficultyInput = document.getElementById('question-difficulty');
-    const groupQuestionsList = document.getElementById('group-questions-list');
-
-    // Elemente für Kategorie- und Gruppenauswahl
-    const categoryTree = document.getElementById('category-tree');
-
-    // Base64-kodiertes Bild
-    let imageBase64 = null;
-
-    // Initialisierung
-    initializePage();
-    
-    // Supabase-konforme Frage-Erstellung und Anzeige
-    if (questionForm) {
-        questionForm.addEventListener('submit', async function(e) {
-            e.preventDefault();
-            if (!validateForm()) return;
-            const correctAnswerText = document.getElementById('answer-0').value.trim();
-            if (!correctAnswerText) {
-                showError('Bitte gib eine richtige Antwort ein.');
-                return;
-            }
-            const groupId = groupSelect.value;
-            const ownerId = await window.supabase.auth.getUser().then(u => u.data.user.id);
-            let imageUrl = null;
-            // Bild-Upload zu Supabase Storage (falls vorhanden)
-            if (questionImageInput.files && questionImageInput.files[0]) {
-                const file = questionImageInput.files[0];
-                const fileName = 'question-images/' + Date.now() + '_' + file.name;
-                const { data, error } = await window.supabase.storage.from('question-images').upload(fileName, file);
-                if (!error && data && data.path) {
-                    imageUrl = window.supabase.storage.from('question-images').getPublicUrl(data.path).publicUrl;
-                } else {
-                    showError('Fehler beim Bild-Upload: ' + (error?.message || ''));
-                }
-            }
-            // Tags aus dem Tag-Input holen (z. B. Komma-getrennt)
-            const tagsInput = document.getElementById('question-tags');
-            const tags = tagsInput ? tagsInput.value.split(',').map(t => t.trim()).filter(Boolean) : [];
-            // Typ aus dem Typ-Input holen
-            const typeInput = document.getElementById('question-type');
-            const type = typeInput ? typeInput.value : 'text';
-            // Schwierigkeitsgrad
-            const difficulty = parseInt(difficultyInput.value, 10) || 1;
-            const questionData = {
-                question: questionTextInput.value.trim(),
-                answer: correctAnswerText,
-                additionalInfo: explanationInput.value.trim(),
-                type,
-                difficulty,
-                tags,
-                imageUrl: imageUrl || '',
-                group_id: groupId,
-                owner: ownerId
-            };
-            try {
-                const submitButton = questionForm.querySelector('button[type="submit"]');
-                const originalButtonText = submitButton.innerHTML;
-                submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Wird gespeichert...';
-                submitButton.disabled = true;
-                const { error } = await window.supabase.from('questions').insert([ mapQuestionForDb(questionData) ]);
-                if (!error) {
-                    showSuccess('Frage wurde erfolgreich erstellt!');
-                    resetForm();
-                    if (groupSelect.value) await loadQuestionsForGroup(groupSelect.value);
-                } else {
-                    showError('Fehler beim Erstellen der Frage: ' + error.message);
-                }
-                submitButton.innerHTML = originalButtonText;
-                submitButton.disabled = false;
-            } catch (err) {
-                showError('Fehler: ' + err.message);
-                const submitButton = questionForm.querySelector('button[type="submit"]');
-                if (submitButton) {
-                    submitButton.innerHTML = '<i class="fas fa-save"></i> Frage speichern';
-                    submitButton.disabled = false;
-                }
-            }
-        });
-    }
-
-    /**
-     * Lädt die Fragen für eine bestimmte Gruppe und zeigt sie an
-     */
-    async function loadQuestionsForGroup(groupId) {
-        try {
-            if (!groupId) {
-                groupQuestionsList.innerHTML = '<p class="info-text">Wähle eine Gruppe aus, um deren Fragen zu sehen</p>';
-                return;
-            }
-            
-            groupQuestionsList.innerHTML = '<p class="loading-info">Fragen werden geladen...</p>';
-            
-            // Alle Fragen laden
-            const questions = await window.quizDB.loadQuestions();
-            
-            // Fragen für die ausgewählte Gruppe filtern
-            const groupQuestions = questions.filter(q => q.group_id === groupId);
-            
-            if (groupQuestions.length === 0) {
-                groupQuestionsList.innerHTML = '<p class="info-text">Keine Fragen in dieser Gruppe vorhanden</p>';
-                return;
-            }
-            
-            // Liste der Fragen erzeugen
-            let html = '';
-            
-            groupQuestions.forEach(question => {
-                const hasImage = question.imageUrl && question.imageUrl.trim() !== '';
-                const questionText = question.question && question.question.trim() !== '' 
-                    ? question.question 
-                    : 'Bildfrage ohne Text';
-                
-                html += `
-                    <div class="question-list-item" data-id="${question.id}">
-                        <p class="question-text">${questionText}</p>
-                        <div class="question-meta">
-                            <span>${hasImage ? '<span class="question-has-image"><i class="fas fa-image"></i> Bild: ja</span>' : ''}</span>
-                            <span>Schwierigkeit: ${question.difficulty}/5</span>
-                            <span>Typ: ${question.type || 'text'}</span>
-                            <span>Tags: ${question.tags ? question.tags.join(', ') : ''}</span>
-                        </div>
-                    </div>
-                `;
-            });
-            
-            groupQuestionsList.innerHTML = html;
-        } catch (error) {
-            console.error('Fehler beim Laden der Gruppenfragen:', error);
-            groupQuestionsList.innerHTML = '<p class="error-text">Fehler beim Laden der Fragen.</p>';
-        }
-    }
-    
-    // Event Listener für Fenstergrößenänderung
-    window.addEventListener('resize', function() {
-        adjustCategoryTreeHeight();
-    });
-
-    // Event-Listener für Bildupload bleibt erhalten
-
-    // Event Listener für Bild-Upload
-    if (questionImageInput) {
-        questionImageInput.addEventListener('change', handleImageUpload);
-    }
-
-    // Verzeichnisbaum für Kategorien und Gruppen erstellen
-    async function renderCategoryTree() {
-        try {
-            categoryTree.innerHTML = '<p class="loading-info">Kategorien werden geladen...</p>';
-            
-            const [categories, groups] = await Promise.all([
-                window.loadCategories(),
-                window.loadGroups()
-            ]);
-            
-            // Nur benutzerdefinierte Kategorien verwenden (keine Systemkategorien)
-            const userCategories = categories.filter(category => category.createdBy !== 'system');
-            
-            if (userCategories.length === 0) {
-                categoryTree.innerHTML = `
-                    <p class="info-text">Keine Kategorien gefunden. 
-                    Erstellen Sie Kategorien in der <a href="category-management.html">Kategorie-Verwaltung</a>.</p>
-                `;
-                return;
-            }
-            
-            // Kategorien nach Namen sortieren
-            userCategories.sort((a, b) => a.name.localeCompare(b.name));
-            
-            let html = '';
-            
-            userCategories.forEach(category => {
-                // Gruppieren der Gruppen nach Kategorie
-                const categoryGroups = groups.filter(group => group.category_id == category.id);
-                categoryGroups.sort((a, b) => a.name.localeCompare(b.name));
-                
-                html += `
-                    <div class="tree-item tree-item-category" data-id="${category.id}">
-                        <span class="tree-item-toggle"><i class="fas fa-chevron-right"></i></span>
-                        <span class="tree-item-icon"><i class="fas fa-folder"></i></span>
-                        ${category.name}
-                    </div>
-                    <div class="tree-group-container" style="display: none;" data-category-id="${category.id}">
-                `;
-                
-                if (categoryGroups.length > 0) {
-                    categoryGroups.forEach(group => {
-                        html += `
-                            <div class="tree-item tree-item-group" data-category-id="${category.id}" data-id="${group.id}">
-                                <span class="tree-item-icon"><i class="fas fa-tag"></i></span>
-                                ${group.name}
-                            </div>
-                        `;
-                    });
-                } else {
-                    html += `
-                        <div class="tree-item-empty">
-                            <span class="tree-item-icon"><i class="fas fa-info-circle"></i></span>
-                            Keine Gruppen in dieser Kategorie
-                        </div>
-                    `;
-                }
-                
-                html += '</div>';
-            });
-            
-            categoryTree.innerHTML = html;
-            
-            // Event-Listener für Kategorien im Baum
-            document.querySelectorAll('.tree-item-category').forEach(item => {
-                item.addEventListener('click', function(e) {
-                    const categoryId = this.getAttribute('data-id');
-                    
-                    // Alle anderen Kategorien einklappen
-                    document.querySelectorAll('.tree-item-category').forEach(category => {
-                        const catId = category.getAttribute('data-id');
-                        if (catId !== categoryId) {
-                            // Andere Kategorie als die angeklickte
-                            const otherGroupContainer = document.querySelector(`.tree-group-container[data-category-id="${catId}"]`);
-                            const otherToggleIcon = category.querySelector('.tree-item-toggle i');
-                            
-                            // Nur einklappen, wenn sie aktuell ausgeklappt ist
-                            if (otherGroupContainer && otherGroupContainer.style.display !== 'none') {
-                                otherGroupContainer.style.display = 'none';
-                                if (otherToggleIcon) {
-                                    otherToggleIcon.className = 'fas fa-chevron-right';
-                                }
-                            }
-                        }
-                    });
-                    
-                    // Die angeklickte Kategorie immer ausklappen
-                    const groupContainer = document.querySelector(`.tree-group-container[data-category-id="${categoryId}"]`);
-                    const toggleIcon = this.querySelector('.tree-item-toggle i');
-                    
-                    if (groupContainer) {
-                        // Immer ausklappen (nicht umschalten)
-                        groupContainer.style.display = 'block';
-                        
-                        // Icon immer auf ausgeklappt setzen
-                        if (toggleIcon) {
-                            toggleIcon.className = 'fas fa-chevron-down';
-                        }
-                    }
-                    
-                    // Kategorie auswählen
-                    document.querySelectorAll('.tree-item-category').forEach(cat => {
-                        cat.classList.remove('active');
-                    });
-                    this.classList.add('active');
-                    
-                    // Werte im Hidden-Input setzen
-                    categorySelect.value = categoryId;
-                    
-                    // Verhindern, dass ein Klick auf das Toggle-Icon auch die Kategorie auswählt
-                    if (e.target.closest('.tree-item-toggle')) {
-                        e.stopPropagation();
-                    }
-                });
-            });
-            
-            // Event-Listener für Gruppen im Baum
-            document.querySelectorAll('.tree-item-group').forEach(item => {
-                item.addEventListener('click', function() {
-                    const categoryId = this.getAttribute('data-category-id');
-                    const groupId = this.getAttribute('data-id');
-                    
-                    // Klassen für aktive Elemente setzen
-                    document.querySelectorAll('.tree-item-category').forEach(cat => {
-                        cat.classList.remove('active');
-                    });
-                    document.querySelectorAll('.tree-item-group').forEach(group => {
-                        group.classList.remove('active');
-                    });
-                    
-                    // Aktive Kategorie finden und markieren
-                    const parentCategory = document.querySelector(`.tree-item-category[data-id="${categoryId}"]`);
-                    if (parentCategory) {
-                        parentCategory.classList.add('active');
-                    }
-                    
-                    // Aktive Gruppe markieren
-                    this.classList.add('active');
-                    
-                    // Werte in Hidden-Inputs setzen
-                    categorySelect.value = categoryId;
-                    groupSelect.value = groupId;
-                    
-                    // Fragen für diese Gruppe laden und anzeigen
-                    loadQuestionsForGroup(groupId);
-                });
-            });
-            
-        } catch (error) {
-            console.error('Fehler beim Rendern des Kategorie-Baums:', error);
-            categoryTree.innerHTML = '<p class="error-text">Fehler beim Laden der Kategorien und Gruppen.</p>';
-        }
-    }
-    
-    // Event Listener für Bild-Upload
-    if (questionImageInput) {
-        questionImageInput.addEventListener('change', handleImageUpload);
-    }    // Event Listener für das Fragen-Formular
-    // Fragen-Erstellung: Bild als imageurl speichern
-    if (questionForm) {
-        questionForm.addEventListener('submit', async function(e) {
-            e.preventDefault();
-            if (!validateForm()) return;
-            const correctAnswerText = document.getElementById('answer-0').value.trim();
-            if (!correctAnswerText) {
-                showError('Bitte gib eine richtige Antwort ein.');
-                return;
-            }
-            const groupId = groupSelect.value;
-            const ownerId = await window.supabase.auth.getUser().then(u => u.data.user.id);
-            let imageUrl = null;
-            // Bild-Upload zu Supabase Storage (falls vorhanden)
-            if (questionImageInput.files && questionImageInput.files[0]) {
-                const file = questionImageInput.files[0];
-                const fileName = 'question-images/' + Date.now() + '_' + file.name;
-                const { data, error } = await window.supabase.storage.from('question-images').upload(fileName, file);
-                if (!error && data && data.path) {
-                    imageUrl = window.supabase.storage.from('question-images').getPublicUrl(data.path).publicUrl;
-                } else {
-                    showError('Fehler beim Bild-Upload: ' + (error?.message || '')); // Bild-Upload Fehler anzeigen
-                }
-            }
-            const questionData = {
-                question: questionTextInput.value.trim(),
-                answer: correctAnswerText,
-                additionalinfo: explanationInput.value.trim(),
-                imageurl: imageUrl || '',
-                group_id: groupId,
-                owner: ownerId
-                // collaborators: [] // Optional
-            };
-            try {
-                const submitButton = questionForm.querySelector('button[type="submit"]');
-                const originalButtonText = submitButton.innerHTML;
-                submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Wird gespeichert...';
-                submitButton.disabled = true;
-                const { error } = await window.supabase.from('questions').insert([ mapQuestionForDb(questionData) ]);
-                if (!error) {
-                    showSuccess('Frage wurde erfolgreich erstellt!');
-                    resetForm();
-                    if (groupSelect.value) await loadQuestionsForGroup(groupSelect.value);
-                } else {
-                    showError('Fehler beim Erstellen der Frage: ' + error.message);
-                }
-                submitButton.innerHTML = originalButtonText;
-                submitButton.disabled = false;
-            } catch (err) {
-                showError('Fehler: ' + err.message);
-                const submitButton = questionForm.querySelector('button[type="submit"]');
-                if (submitButton) {
-                    submitButton.innerHTML = '<i class="fas fa-save"></i> Frage speichern';
-                    submitButton.disabled = false;
-                }
-            }
-        });
-    }
-
-    /**
-     * Initialisiert die Seite
-     */
-    async function initializePage() {
-        try {
-            // Kategorie-Verzeichnisbaum rendern
-            await renderCategoryTree();
-            
-            // Fragen der ausgewählten Gruppe laden (falls eine ausgewählt ist)
-            if (groupSelect.value) {
-                await loadQuestionsForGroup(groupSelect.value);
-            }
-            
-            // Höhe des Kategorie-Baums dynamisch anpassen
-            adjustCategoryTreeHeight();
-            
-            // Breadcrumbs initialisieren, falls verfügbar
-            if (window.breadcrumbs) {
-                window.breadcrumbs.set([
-                    { label: 'Verwaltung', url: 'admin.html' },
-                    { label: 'Fragen erstellen', url: 'question-creator.html' }
-                ]);
-            }
-        } catch (error) {
-            console.error('Fehler beim Initialisieren der Seite:', error);
-            showError('Fehler beim Laden der Daten. Bitte aktualisiere die Seite.');
-        }
-    }
-    
-    /**
-     * Passt die Höhe des Kategorie-Baums an die Bildschirmhöhe an
-     */
-    function adjustCategoryTreeHeight() {
-        const categoryTree = document.getElementById('category-tree');
-        if (!categoryTree) return;
-        
-        // Verfügbare Höhe berechnen (abzüglich Header und anderer Elemente)
-        const windowHeight = window.innerHeight;
-        const headerHeight = document.querySelector('#header-container')?.offsetHeight || 0;
-        const footerHeight = document.querySelector('#footer-container')?.offsetHeight || 0;
-        
-        // Abstand von oben und andere UI-Elemente berücksichtigen
-        const treeContainer = categoryTree.parentElement;
-        const treeContainerRect = treeContainer.getBoundingClientRect();
-        const topOffset = treeContainerRect.top;
-        
-        // Maximale Höhe berechnen (mit Puffer)
-        const maxHeight = windowHeight - topOffset - footerHeight - 80; // 80px Puffer
-        
-        // Höhe setzen, mindestens 200px, maximal berechnete Höhe
-        const newHeight = Math.max(200, Math.min(maxHeight, 600)); // Zwischen 200px und 600px
-        categoryTree.style.maxHeight = `${newHeight}px`;
-    }
-
-    /**
-     * Aktualisiert die Kategorie-Dropdown-Menüs
-     * Diese Funktion wird nicht mehr benötigt, da wir nur noch den Verzeichnisbaum verwenden
-     */
-    async function updateCategoryDropdowns() {
-        try {
-            // Nur noch für das Logging - Kein UI-Update mehr
-            const categories = await window.quizDB.loadCategories();
-            console.log('Kategorien geladen:', categories.length);
-        } catch (error) {
-            console.error('Fehler beim Aktualisieren der Kategorie-Auswahlfelder:', error);
-        }
-    }
-
-    /**
-     * Aktualisiert die Gruppen-Dropdown basierend auf der ausgewählten Kategorie
-     * Diese Funktion wird nicht mehr benötigt, da wir nur noch den Verzeichnisbaum verwenden
-     */
-    async function updateGroupDropdown(categoryId) {
-        try {
-            // Nur noch für das Logging - Kein UI-Update mehr
-            if (!categoryId) {
-                return;
-            }
-            
-            // Gruppen laden
-            const groups = await window.quizDB.loadGroups();
-            
-            // Gruppen für die gewählte Kategorie filtern
-            const filteredGroups = groups.filter(group => group.categoryId === categoryId);
-            console.log('Gruppen für Kategorie geladen:', filteredGroups.length);
-        } catch (error) {
-            console.error('Fehler beim Aktualisieren des Gruppen-Auswahlfelds:', error);
-        }
-    }
-
-    /**
-     * Verarbeitet den Bild-Upload und erstellt eine Vorschau
-     */
-    function handleImageUpload() {
-        const file = questionImageInput.files[0];
-        const imageNameElement = document.getElementById('image-name');
-        
-        if (!file) {
-            imagePreview.style.display = 'none';
-            imagePreview.innerHTML = '';
-            imagePreview.classList.remove('has-image');
-            imageNameElement.textContent = '';
-            imageBase64 = null;
-            return;
-        }
-        
-        if (!file.type.startsWith('image/')) {
-            showError('Bitte wähle eine Bilddatei aus.');
-            questionImageInput.value = '';
-            imagePreview.style.display = 'none';
-            imagePreview.innerHTML = '';
-            imagePreview.classList.remove('has-image');
-            imageNameElement.textContent = '';
-            imageBase64 = null;
-            return;
-        }
-        
-        // Größe prüfen (max. 5 MB)
-        if (file.size > 5 * 1024 * 1024) {
-            showError('Das Bild ist zu groß. Maximale Größe: 5 MB.');
-            questionImageInput.value = '';
-            imagePreview.style.display = 'none';
-            imagePreview.innerHTML = '';
-            imagePreview.classList.remove('has-image');
-            imageNameElement.textContent = '';
-            imageBase64 = null;
-            return;
-        }
-        
-        const reader = new FileReader();
-        
-        reader.onload = function(e) {
-            // Wir komprimieren das Bild mit einer Hilfsfunktion
-            compressImage(e.target.result, file.type, (compressedBase64) => {
-                // Base64-kodiertes komprimiertes Bild speichern
-                imageBase64 = compressedBase64;
-                
-                // Vorschau erstellen und anzeigen
-                imagePreview.style.display = 'block';
-                imagePreview.classList.add('has-image');
-                imagePreview.innerHTML = `<img src="${imageBase64}" alt="Vorschau">`;
-                
-                // Bildnamen anzeigen
-                imageNameElement.textContent = file.name;
-                
-                // Größe des komprimierten Bildes anzeigen (optional)
-                const sizeKB = Math.round(compressedBase64.length / 1024);
-                console.log(`Bildgröße nach Komprimierung: ${sizeKB} KB`);
-            });
-        };
-        
-        reader.onerror = function() {
-            showError('Fehler beim Lesen der Bilddatei.');
-            imagePreview.style.display = 'none';
-            imagePreview.innerHTML = '';
-            imagePreview.classList.remove('has-image');
-            imageNameElement.textContent = '';
-            imageBase64 = null;
-        };
-        
-        reader.readAsDataURL(file);
-    }
-    
-    /**
-     * Komprimiert ein Bild mit Canvas
-     * @param {string} base64 - Das Originalbild als Base64-String
-     * @param {string} type - Der MIME-Typ des Bildes
-     * @param {function} callback - Callback-Funktion mit dem komprimierten Bild
-     */
-    function compressImage(base64, type, callback) {
-        const img = new Image();
-        img.src = base64;
-        
-        img.onload = function() {
-            // Maximale Größe für Quizbilder festlegen (z.B. 800x600)
-            const MAX_WIDTH = 800;
-            const MAX_HEIGHT = 600;
-            
-            let width = img.width;
-            let height = img.height;
-            
-            // Verhältnis beibehalten, aber Größe reduzieren
-            if (width > MAX_WIDTH) {
-                height = Math.round(height * (MAX_WIDTH / width));
-                width = MAX_WIDTH;
-            }
-            
-            if (height > MAX_HEIGHT) {
-                width = Math.round(width * (MAX_HEIGHT / height));
-                height = MAX_HEIGHT;
-            }
-            
-            // Canvas für die Komprimierung erstellen
-            const canvas = document.createElement('canvas');
-            canvas.width = width;
-            canvas.height = height;
-            
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(img, 0, 0, width, height);
-            
-            // Qualität auf 0.7 (70%) setzen für JPEG, 0.8 für andere Formate
-            const quality = type === 'image/jpeg' ? 0.7 : 0.8;
-            
-            // Komprimiertes Bild als Base64 zurückgeben
-            const compressedBase64 = canvas.toDataURL(type, quality);
-            callback(compressedBase64);
-        };
-        
-        img.onerror = function() {
-            console.error('Fehler beim Laden des Bildes zur Komprimierung');
-            callback(base64); // Originalbild zurückgeben im Fehlerfall
-        };
-    }
-
-    /**
-     * Validiert das Fragenformular
-     * @returns {boolean} True, wenn das Formular gültig ist
-     */
-    function validateForm() {
-        // Kategorie prüfen
-        if (!categorySelect.value) {
-            showError('Bitte wähle eine Kategorie aus.');
-            return false;
-        }
-        
-        // Gruppe prüfen
-        if (!groupSelect.value) {
-            showError('Bitte wähle eine Gruppe aus.');
-            return false;
-        }
-        
-        // Fragetext prüfen
-        if (!questionTextInput.value.trim()) {
-            showError('Bitte gib einen Fragetext ein.');
-            questionTextInput.focus();
-            return false;
-        }
-        
-        // Richtige Antwort prüfen
-        const correctAnswer = document.getElementById('answer-0');
-        if (!correctAnswer.value.trim()) {
-            showError('Bitte gib eine richtige Antwort ein.');
-            correctAnswer.focus();
-            return false;
-        }
-        
-        return true;
-    }
-
-    /**
-     * Setzt das Formular zurück
-     */
-    function resetForm() {
-        // Texteingaben zurücksetzen
-        questionTextInput.value = '';
-        explanationInput.value = '';
-        
-        // Bild zurücksetzen
-        questionImageInput.value = '';
-        imagePreview.innerHTML = '';
-        imagePreview.style.display = 'none';
-        imagePreview.classList.remove('has-image');
-        document.getElementById('image-name').textContent = '';
-        imageBase64 = null;
-        
-        // Schwierigkeitsgrad zurücksetzen
-        difficultyInput.value = 3;
-        
-        // Richtige Antwort zurücksetzen
-        document.getElementById('answer-0').value = '';
-    }
-});
-// Die lokale Speicherung und JSON-Logik wurde entfernt.
-// Die Frage-Erstellung nutzt jetzt Supabase für alle Datenoperationen.
-// question-creator.js - Verwaltung der Fragenerstellung
-
-document.addEventListener('DOMContentLoaded', function() {
-    // Prüfen, ob der Benutzer eingeloggt ist
-    const isLoggedIn = (window.storage && typeof window.storage.isLoggedIn === 'function') ? window.storage.isLoggedIn() : (localStorage.getItem('loggedIn') === 'true');
-    const username = (window.storage && typeof window.storage.getUsername === 'function') ? window.storage.getUsername() : localStorage.getItem('username');
-    
-    if (!isLoggedIn || !username) {
-        // Nicht eingeloggt - zurück zur Login-Seite
-        window.location.href = 'login.html';
-        return;
-    }
-
-    // Elemente für das Fragenformular
-    const questionForm = document.getElementById('question-form');
-    const categorySelect = document.getElementById('question-category');
-       const groupSelect = document.getElementById('question-group');
-    const questionTextInput = document.getElementById('question-text');
-    const questionImageInput = document.getElementById('question-image');
-    const imagePreview = document.getElementById('image-preview');
-    const explanationInput = document.getElementById('question-explanation');
-    const difficultyInput = document.getElementById('question-difficulty');
-    const groupQuestionsList = document.getElementById('group-questions-list');
-
-    // Elemente für Kategorie- und Gruppenauswahl
-    const categoryTree = document.getElementById('category-tree');
-
-    // Base64-kodiertes Bild
-    let imageBase64 = null;
-
-    // Initialisierung
-    initializePage();
-    
-    // Supabase-konforme Frage-Erstellung und Anzeige
-    if (questionForm) {
-        questionForm.addEventListener('submit', async function(e) {
-            e.preventDefault();
-            if (!validateForm()) return;
-            const correctAnswerText = document.getElementById('answer-0').value.trim();
-            if (!correctAnswerText) {
-                showError('Bitte gib eine richtige Antwort ein.');
-                return;
-            }
-            const groupId = groupSelect.value;
-            const ownerId = await window.supabase.auth.getUser().then(u => u.data.user.id);
-            let imageUrl = null;
-            // Bild-Upload zu Supabase Storage (falls vorhanden)
-            if (questionImageInput.files && questionImageInput.files[0]) {
-                const file = questionImageInput.files[0];
-                const fileName = 'question-images/' + Date.now() + '_' + file.name;
-                const { data, error } = await window.supabase.storage.from('question-images').upload(fileName, file);
-                if (!error && data && data.path) {
-                    imageUrl = window.supabase.storage.from('question-images').getPublicUrl(data.path).publicUrl;
-                } else {
-                    showError('Fehler beim Bild-Upload: ' + (error?.message || ''));
-                }
-            }
-            // Tags aus dem Tag-Input holen (z. B. Komma-getrennt)
-            const tagsInput = document.getElementById('question-tags');
-            const tags = tagsInput ? tagsInput.value.split(',').map(t => t.trim()).filter(Boolean) : [];
-            // Typ aus dem Typ-Input holen
-            const typeInput = document.getElementById('question-type');
-            const type = typeInput ? typeInput.value : 'text';
-            // Schwierigkeitsgrad
-            const difficulty = parseInt(difficultyInput.value, 10) || 1;
-            const questionData = {
-                question: questionTextInput.value.trim(),
-                answer: correctAnswerText,
-                additionalInfo: explanationInput.value.trim(),
-                type,
-                difficulty,
-                tags,
-                imageUrl: imageUrl || '',
-                group_id: groupId,
-                owner: ownerId
-            };
-            try {
-                const submitButton = questionForm.querySelector('button[type="submit"]');
-                const originalButtonText = submitButton.innerHTML;
-                submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Wird gespeichert...';
-                submitButton.disabled = true;
-                const { error } = await window.supabase.from('questions').insert([ mapQuestionForDb(questionData) ]);
-                if (!error) {
-                    showSuccess('Frage wurde erfolgreich erstellt!');
-                    resetForm();
-                    if (groupSelect.value) await loadQuestionsForGroup(groupSelect.value);
-                } else {
-                    showError('Fehler beim Erstellen der Frage: ' + error.message);
-                }
-                submitButton.innerHTML = originalButtonText;
-                submitButton.disabled = false;
-            } catch (err) {
-                showError('Fehler: ' + err.message);
-                const submitButton = questionForm.querySelector('button[type="submit"]');
-                if (submitButton) {
-                    submitButton.innerHTML = '<i class="fas fa-save"></i> Frage speichern';
-                    submitButton.disabled = false;
-                }
-            }
-        });
-    }
-
-    /**
-     * Lädt die Fragen für eine bestimmte Gruppe und zeigt sie an
-     */
-    async function loadQuestionsForGroup(groupId) {
-        try {
-            if (!groupId) {
-                groupQuestionsList.innerHTML = '<p class="info-text">Wähle eine Gruppe aus, um deren Fragen zu sehen</p>';
-                return;
-            }
-            
-            groupQuestionsList.innerHTML = '<p class="loading-info">Fragen werden geladen...</p>';
-            
-            // Alle Fragen laden
-            const questions = await window.quizDB.loadQuestions();
-            
-            // Fragen für die ausgewählte Gruppe filtern
-            const groupQuestions = questions.filter(q => q.group_id === groupId);
-            
-            if (groupQuestions.length === 0) {
-                groupQuestionsList.innerHTML = '<p class="info-text">Keine Fragen in dieser Gruppe vorhanden</p>';
-                return;
-            }
-            
-            // Liste der Fragen erzeugen
-            let html = '';
-            
-            groupQuestions.forEach(question => {
-                const hasImage = question.imageUrl && question.imageUrl.trim() !== '';
-                const questionText = question.question && question.question.trim() !== '' 
-                    ? question.question 
-                    : 'Bildfrage ohne Text';
-                
-                html += `
-                    <div class="question-list-item" data-id="${question.id}">
-                        <p class="question-text">${questionText}</p>
-                        <div class="question-meta">
-                            <span>${hasImage ? '<span class="question-has-image"><i class="fas fa-image"></i> Bild: ja</span>' : ''}</span>
-                            <span>Schwierigkeit: ${question.difficulty}/5</span>
-                            <span>Typ: ${question.type || 'text'}</span>
-                            <span>Tags: ${question.tags ? question.tags.join(', ') : ''}</span>
-                        </div>
-                    </div>
-                `;
-            });
-            
-            groupQuestionsList.innerHTML = html;
-        } catch (error) {
-            console.error('Fehler beim Laden der Gruppenfragen:', error);
-            groupQuestionsList.innerHTML = '<p class="error-text">Fehler beim Laden der Fragen.</p>';
-        }
-    }
-    
-    // Event Listener für Fenstergrößenänderung
-    window.addEventListener('resize', function() {
-        adjustCategoryTreeHeight();
-    });
-
-    // Event-Listener für Bildupload bleibt erhalten
-
-    // Event Listener für Bild-Upload
-    if (questionImageInput) {
-        questionImageInput.addEventListener('change', handleImageUpload);
-    }
-
-    // Verzeichnisbaum für Kategorien und Gruppen erstellen
-    async function renderCategoryTree() {
-        try {
-            categoryTree.innerHTML = '<p class="loading-info">Kategorien werden geladen...</p>';
-            
-            const [categories, groups] = await Promise.all([
-                window.loadCategories(),
-                window.loadGroups()
-            ]);
-            
-            // Nur benutzerdefinierte Kategorien verwenden (keine Systemkategorien)
-            const userCategories = categories.filter(category => category.createdBy !== 'system');
-            
-            if (userCategories.length === 0) {
-                categoryTree.innerHTML = `
-                    <p class="info-text">Keine Kategorien gefunden. 
-                    Erstellen Sie Kategorien in der <a href="category-management.html">Kategorie-Verwaltung</a>.</p>
-                `;
-                return;
-            }
-            
-            // Kategorien nach Namen sortieren
-            userCategories.sort((a, b) => a.name.localeCompare(b.name));
-            
-            let html = '';
-            
-            userCategories.forEach(category => {
-                // Gruppieren der Gruppen nach Kategorie
-                const categoryGroups = groups.filter(group => group.category_id == category.id);
-                categoryGroups.sort((a, b) => a.name.localeCompare(b.name));
-                
-                html += `
-                    <div class="tree-item tree-item-category" data-id="${category.id}">
-                        <span class="tree-item-toggle"><i class="fas fa-chevron-right"></i></span>
-                        <span class="tree-item-icon"><i class="fas fa-folder"></i></span>
-                        ${category.name}
-                    </div>
-                    <div class="tree-group-container" style="display: none;" data-category-id="${category.id}">
-                `;
-                
-                if (categoryGroups.length > 0) {
-                    categoryGroups.forEach(group => {
-                        html += `
-                            <div class="tree-item tree-item-group" data-category-id="${category.id}" data-id="${group.id}">
-                                <span class="tree-item-icon"><i class="fas fa-tag"></i></span>
-                                ${group.name}
-                            </div>
-                        `;
-                    });
-                } else {
-                    html += `
-                        <div class="tree-item-empty">
-                            <span class="tree-item-icon"><i class="fas fa-info-circle"></i></span>
-                            Keine Gruppen in dieser Kategorie
-                        </div>
-                    `;
-                }
-                
-                html += '</div>';
-            });
-            
-            categoryTree.innerHTML = html;
-            
-            // Event-Listener für Kategorien im Baum
-            document.querySelectorAll('.tree-item-category').forEach(item => {
-                item.addEventListener('click', function(e) {
-                    const categoryId = this.getAttribute('data-id');
-                    
-                    // Alle anderen Kategorien einklappen
-                    document.querySelectorAll('.tree-item-category').forEach(category => {
-                        const catId = category.getAttribute('data-id');
-                        if (catId !== categoryId) {
-                            // Andere Kategorie als die angeklickte
-                            const otherGroupContainer = document.querySelector(`.tree-group-container[data-category-id="${catId}"]`);
-                            const otherToggleIcon = category.querySelector('.tree-item-toggle i');
-                            
-                            // Nur einklappen, wenn sie aktuell ausgeklappt ist
-                            if (otherGroupContainer && otherGroupContainer.style.display !== 'none') {
-                                otherGroupContainer.style.display = 'none';
-                                if (otherToggleIcon) {
-                                    otherToggleIcon.className = 'fas fa-chevron-right';
-                                }
-                            }
-                        }
-                    });
-                    
-                    // Die angeklickte Kategorie immer ausklappen
-                    const groupContainer = document.querySelector(`.tree-group-container[data-category-id="${categoryId}"]`);
-                    const toggleIcon = this.querySelector('.tree-item-toggle i');
-                    
-                    if (groupContainer) {
-                        // Immer ausklappen (nicht umschalten)
-                        groupContainer.style.display = 'block';
-                        
-                        // Icon immer auf ausgeklappt setzen
-                        if (toggleIcon) {
-                            toggleIcon.className = 'fas fa-chevron-down';
-                        }
-                    }
-                    
-                    // Kategorie auswählen
-                    document.querySelectorAll('.tree-item-category').forEach(cat => {
-                        cat.classList.remove('active');
-                    });
-                    this.classList.add('active');
-                    
-                    // Werte im Hidden-Input setzen
-                    categorySelect.value = categoryId;
-                    
-                    // Verhindern, dass ein Klick auf das Toggle-Icon auch die Kategorie auswählt
-                    if (e.target.closest('.tree-item-toggle')) {
-                        e.stopPropagation();
-                    }
-                });
-            });
-            
-            // Event-Listener für Gruppen im Baum
-            document.querySelectorAll('.tree-item-group').forEach(item => {
-                item.addEventListener('click', function() {
-                    const categoryId = this.getAttribute('data-category-id');
-                    const groupId = this.getAttribute('data-id');
-                    
-                    // Klassen für aktive Elemente setzen
-                    document.querySelectorAll('.tree-item-category').forEach(cat => {
-                        cat.classList.remove('active');
-                    });
-                    document.querySelectorAll('.tree-item-group').forEach(group => {
-                        group.classList.remove('active');
-                    });
-                    
-                    // Aktive Kategorie finden und markieren
-                    const parentCategory = document.querySelector(`.tree-item-category[data-id="${categoryId}"]`);
-                    if (parentCategory) {
-                        parentCategory.classList.add('active');
-                    }
-                    
-                    // Aktive Gruppe markieren
-                    this.classList.add('active');
-                    
-                    // Werte in Hidden-Inputs setzen
-                    categorySelect.value = categoryId;
-                    groupSelect.value = groupId;
-                    
-                    // Fragen für diese Gruppe laden und anzeigen
-                    loadQuestionsForGroup(groupId);
-                });
-            });
-            
-        } catch (error) {
-            console.error('Fehler beim Rendern des Kategorie-Baums:', error);
-            categoryTree.innerHTML = '<p class="error-text">Fehler beim Laden der Kategorien und Gruppen.</p>';
-        }
-    }
-    
-    // Event Listener für Bild-Upload
-    if (questionImageInput) {
-        questionImageInput.addEventListener('change', handleImageUpload);
-    }    // Event Listener für das Fragen-Formular
-    // Fragen-Erstellung: Bild als imageurl speichern
-    if (questionForm) {
-        questionForm.addEventListener('submit', async function(e) {
-            e.preventDefault();
-            if (!validateForm()) return;
-            const correctAnswerText = document.getElementById('answer-0').value.trim();
-            if (!correctAnswerText) {
-                showError('Bitte gib eine richtige Antwort ein.');
-                return;
-            }
-            const groupId = groupSelect.value;
-            const ownerId = await window.supabase.auth.getUser().then(u => u.data.user.id);
-            let imageUrl = null;
-            // Bild-Upload zu Supabase Storage (falls vorhanden)
-            if (questionImageInput.files && questionImageInput.files[0]) {
-                const file = questionImageInput.files[0];
-                const fileName = 'question-images/' + Date.now() + '_' + file.name;
-                const { data, error } = await window.supabase.storage.from('question-images').upload(fileName, file);
-                if (!error && data && data.path) {
-                    imageUrl = window.supabase.storage.from('question-images').getPublicUrl(data.path).publicUrl;
-                } else {
-                    showError('Fehler beim Bild-Upload: ' + (error?.message || '')); // Bild-Upload Fehler anzeigen
-                }
-            }
-            const questionData = {
-                question: questionTextInput.value.trim(),
-                answer: correctAnswerText,
-                additionalinfo: explanationInput.value.trim(),
-                imageurl: imageUrl || '',
-                group_id: groupId,
-                owner: ownerId
-                // collaborators: [] // Optional
-            };
-            try {
-                const submitButton = questionForm.querySelector('button[type="submit"]');
-                const originalButtonText = submitButton.innerHTML;
-                submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Wird gespeichert...';
-                submitButton.disabled = true;
-                const { error } = await window.supabase.from('questions').insert([ mapQuestionForDb(questionData) ]);
-                if (!error) {
-                    showSuccess('Frage wurde erfolgreich erstellt!');
-                    resetForm();
-                    if (groupSelect.value) await loadQuestionsForGroup(groupSelect.value);
-                } else {
-                    showError('Fehler beim Erstellen der Frage: ' + error.message);
-                }
-                submitButton.innerHTML = originalButtonText;
-                submitButton.disabled = false;
-            } catch (err) {
-                showError('Fehler: ' + err.message);
-                const submitButton = questionForm.querySelector('button[type="submit"]');
-                if (submitButton) {
-                    submitButton.innerHTML = '<i class="fas fa-save"></i> Frage speichern';
-                    submitButton.disabled = false;
-                }
-            }
-        });
-    }
-
-    /**
-     * Initialisiert die Seite
-     */
-    async function initializePage() {
-        try {
-            // Kategorie-Verzeichnisbaum rendern
-            await renderCategoryTree();
-            
-            // Fragen der ausgewählten Gruppe laden (falls eine ausgewählt ist)
-            if (groupSelect.value) {
-                await loadQuestionsForGroup(groupSelect.value);
-            }
-            
-            // Höhe des Kategorie-Baums dynamisch anpassen
-            adjustCategoryTreeHeight();
-            
-            // Breadcrumbs initialisieren, falls verfügbar
-            if (window.breadcrumbs) {
-                window.breadcrumbs.set([
-                    { label: 'Verwaltung', url: 'admin.html' },
-                    { label: 'Fragen erstellen', url: 'question-creator.html' }
-                ]);
-            }
-        } catch (error) {
-            console.error('Fehler beim Initialisieren der Seite:', error);
-            showError('Fehler beim Laden der Daten. Bitte aktualisiere die Seite.');
-        }
-    }
-    
-    /**
-     * Passt die Höhe des Kategorie-Baums an die Bildschirmhöhe an
-     */
-    function adjustCategoryTreeHeight() {
-        const categoryTree = document.getElementById('category-tree');
-        if (!categoryTree) return;
-        
-        // Verfügbare Höhe berechnen (abzüglich Header und anderer Elemente)
-        const windowHeight = window.innerHeight;
-        const headerHeight = document.querySelector('#header-container')?.offsetHeight || 0;
-        const footerHeight = document.querySelector('#footer-container')?.offsetHeight || 0;
-        
-        // Abstand von oben und andere UI-Elemente berücksichtigen
-        const treeContainer = categoryTree.parentElement;
-        const treeContainerRect = treeContainer.getBoundingClientRect();
-        const topOffset = treeContainerRect.top;
-        
-        // Maximale Höhe berechnen (mit Puffer)
-        const maxHeight = windowHeight - topOffset - footerHeight - 80; // 80px Puffer
-        
-        // Höhe setzen, mindestens 200px, maximal berechnete Höhe
-        const newHeight = Math.max(200, Math.min(maxHeight, 600)); // Zwischen 200px und 600px
-        categoryTree.style.maxHeight = `${newHeight}px`;
-    }
-
-    /**
-     * Aktualisiert die Kategorie-Dropdown-Menüs
-     * Diese Funktion wird nicht mehr benötigt, da wir nur noch den Verzeichnisbaum verwenden
-     */
-    async function updateCategoryDropdowns() {
-        try {
-            // Nur noch für das Logging - Kein UI-Update mehr
-            const categories = await window.quizDB.loadCategories();
-            console.log('Kategorien geladen:', categories.length);
-        } catch (error) {
-            console.error('Fehler beim Aktualisieren der Kategorie-Auswahlfelder:', error);
-        }
-    }
-
-    /**
-     * Aktualisiert die Gruppen-Dropdown basierend auf der ausgewählten Kategorie
-     * Diese Funktion wird nicht mehr benötigt, da wir nur noch den Verzeichnisbaum verwenden
-     */
-    async function updateGroupDropdown(categoryId) {
-        try {
-            // Nur noch für das Logging - Kein UI-Update mehr
-            if (!categoryId) {
-                return;
-            }
-            
-            // Gruppen laden
-            const groups = await window.quizDB.loadGroups();
-            
-            // Gruppen für die gewählte Kategorie filtern
-            const filteredGroups = groups.filter(group => group.categoryId === categoryId);
-            console.log('Gruppen für Kategorie geladen:', filteredGroups.length);
-        } catch (error) {
-            console.error('Fehler beim Aktualisieren des Gruppen-Auswahlfelds:', error);
-        }
-    }
-
-    /**
-     * Verarbeitet den Bild-Upload und erstellt eine Vorschau
-     */
-    function handleImageUpload() {
-        const file = questionImageInput.files[0];
-        const imageNameElement = document.getElementById('image-name');
-        
-        if (!file) {
-            imagePreview.style.display = 'none';
-            imagePreview.innerHTML = '';
-            imagePreview.classList.remove('has-image');
-            imageNameElement.textContent = '';
-            imageBase64 = null;
-            return;
-        }
-        
-        if (!file.type.startsWith('image/')) {
-            showError('Bitte wähle eine Bilddatei aus.');
-            questionImageInput.value = '';
-            imagePreview.style.display = 'none';
-            imagePreview.innerHTML = '';
-            imagePreview.classList.remove('has-image');
-            imageNameElement.textContent = '';
-            imageBase64 = null;
-            return;
-        }
-        
-        // Größe prüfen (max. 5 MB)
-        if (file.size > 5 * 1024 * 1024) {
-            showError('Das Bild ist zu groß. Maximale Größe: 5 MB.');
-            questionImageInput.value = '';
-            imagePreview.style.display = 'none';
-            imagePreview.innerHTML = '';
-            imagePreview.classList.remove('has-image');
-            imageNameElement.textContent = '';
-            imageBase64 = null;
-            return;
-        }
-        
-        const reader = new FileReader();
-        
-        reader.onload = function(e) {
-            // Wir komprimieren das Bild mit einer Hilfsfunktion
-            compressImage(e.target.result, file.type, (compressedBase64) => {
-                // Base64-kodiertes komprimiertes Bild speichern
-                imageBase64 = compressedBase64;
-                
-                // Vorschau erstellen und anzeigen
-                imagePreview.style.display = 'block';
-                imagePreview.classList.add('has-image');
-                imagePreview.innerHTML = `<img src="${imageBase64}" alt="Vorschau">`;
-                
-                // Bildnamen anzeigen
-                imageNameElement.textContent = file.name;
-                
-                // Größe des komprimierten Bildes anzeigen (optional)
-                const sizeKB = Math.round(compressedBase64.length / 1024);
-                console.log(`Bildgröße nach Komprimierung: ${sizeKB} KB`);
-            });
-        };
-        
-        reader.onerror = function() {
-            showError('Fehler beim Lesen der Bilddatei.');
-            imagePreview.style.display = 'none';
-            imagePreview.innerHTML = '';
-            imagePreview.classList.remove('has-image');
-            imageNameElement.textContent = '';
-            imageBase64 = null;
-        };
-        
-        reader.readAsDataURL(file);
-    }
-    
-    /**
-     * Komprimiert ein Bild mit Canvas
-     * @param {string} base64 - Das Originalbild als Base64-String
-     * @param {string} type - Der MIME-Typ des Bildes
-     * @param {function} callback - Callback-Funktion mit dem komprimierten Bild
-     */
-    function compressImage(base64, type, callback) {
-        const img = new Image();
-        img.src = base64;
-        
-        img.onload = function() {
-            // Maximale Größe für Quizbilder festlegen (z.B. 800x600)
-            const MAX_WIDTH = 800;
-            const MAX_HEIGHT = 600;
-            
-            let width = img.width;
-            let height = img.height;
-            
-            // Verhältnis beibehalten, aber Größe reduzieren
-            if (width > MAX_WIDTH) {
-                height = Math.round(height * (MAX_WIDTH / width));
-                width = MAX_WIDTH;
-            }
-            
-            if (height > MAX_HEIGHT) {
-                width = Math.round(width * (MAX_HEIGHT / height));
-                height = MAX_HEIGHT;
-            }
-            
-            // Canvas für die Komprimierung erstellen
-            const canvas = document.createElement('canvas');
-            canvas.width = width;
-            canvas.height = height;
-            
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(img, 0, 0, width, height);
-            
-            // Qualität auf 0.7 (70%) setzen für JPEG, 0.8 für andere Formate
-            const quality = type === 'image/jpeg' ? 0.7 : 0.8;
-            
-            // Komprimiertes Bild als Base64 zurückgeben
-            const compressedBase64 = canvas.toDataURL(type, quality);
-            callback(compressedBase64);
-        };
-        
-        img.onerror = function() {
-            console.error('Fehler beim Laden des Bildes zur Komprimierung');
-            callback(base64); // Originalbild zurückgeben im Fehlerfall
-        };
-    }
-
-    /**
-     * Validiert das Fragenformular
-     * @returns {boolean} True, wenn das Formular gültig ist
-     */
-    function validateForm() {
-        // Kategorie prüfen
-        if (!categorySelect.value) {
-            showError('Bitte wähle eine Kategorie aus.');
-            return false;
-        }
-        
-        // Gruppe prüfen
-        if (!groupSelect.value) {
-            showError('Bitte wähle eine Gruppe aus.');
-            return false;
-        }
-        
-        // Fragetext prüfen
-        if (!questionTextInput.value.trim()) {
-            showError('Bitte gib einen Fragetext ein.');
-            questionTextInput.focus();
-            return false;
-        }
-        
-        // Richtige Antwort prüfen
-        const correctAnswer = document.getElementById('answer-0');
-        if (!correctAnswer.value.trim()) {
-            showError('Bitte gib eine richtige Antwort ein.');
-            correctAnswer.focus();
-            return false;
-        }
-        
-        return true;
-    }
-
-    /**
-     * Setzt das Formular zurück
-     */
-    function resetForm() {
-        // Texteingaben zurücksetzen
-        questionTextInput.value = '';
-        explanationInput.value = '';
-        
-        // Bild zurücksetzen
-        questionImageInput.value = '';
-        imagePreview.innerHTML = '';
-        imagePreview.style.display = 'none';
-        imagePreview.classList.remove('has-image');
-        document.getElementById('image-name').textContent = '';
-        imageBase64 = null;
-        
-        // Schwierigkeitsgrad zurücksetzen
-        difficultyInput.value = 3;
-        
-        // Richtige Antwort zurücksetzen
-        document.getElementById('answer-0').value = '';
-    }
-});
+  };
+}
