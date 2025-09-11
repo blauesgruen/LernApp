@@ -5,8 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Profil</title>
     <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="css/profile-borders.css">
-    <link rel="stylesheet" href="css/rahmen-farben.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.7/dist/umd/supabase.min.js"></script>
     <script src="js/app-core.js"></script>
@@ -23,7 +21,7 @@
                 <span id="profile-user-email"></span>
             </div>
             <div id="profile-columns">
-                <div class="profile-col rahmen-blau profile-info">
+                <div class="profile-col profile-info">
                     <h2>Profil</h2>
                     <!-- Eingabefelder und Button, keine Anzeige von Nickname/Email mehr hier -->
                     <label for="nickname">Nickname:</label>
@@ -35,7 +33,7 @@
                     <div id="nicknameMessage"></div>
                     <div id="passwordMessage"></div>
                 </div>
-                <div class="profile-col rahmen-gelb profile-db">
+                <div class="profile-col profile-db">
                     <h2>Datenbank</h2>
                     <button id="exportDb" class="btn-secondary" style="margin-top:18px;">Exportieren</button>
                     <input type="file" id="importDbFile" style="display:none">
@@ -58,7 +56,7 @@
                         <div id="importQuestionsStatus"></div>
                     </div>
                 </div>
-                <div class="profile-col rahmen-rot profile-danger">
+                <div class="profile-col profile-danger">
                     <h2>Gefahrenbereich</h2>
                     <button id="deleteDb" class="btn-danger">Datenbank löschen</button>
                     <div id="deleteDbMessage"></div>

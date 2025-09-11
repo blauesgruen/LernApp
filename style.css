@@ -441,14 +441,32 @@ img.icon {
     min-height: 420px;
     height: 100%; /* Karten sind immer gleich hoch wie der Container */
 }
-/* Entfernt alle farbigen Streifen aus .profile-col::before */
-.profile-col::before,
-.profile-col.profile-db::before,
+.profile-col::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 10px;
+    height: 100%;
+    border-radius: 12px 0 0 12px;
+    background: #1976d2; /* Standard: blau */
+}
+.profile-col.profile-db::before {
+    background: #388e3c !important; /* Dunkelgrün für mittlere Spalte */
+}
+.profile-col.profile-danger {
+    background: #fff;
+    border: none; /* keine rote Umrandung */
+    box-shadow: 0 2px 12px rgba(0,0,0,0.07); /* wie die anderen Karten */
+    min-height: 420px;
+    border-radius: 12px;
+    position: relative;
+    box-sizing: border-box;
+    padding: 24px 18px 18px 18px; /* exakt wie die anderen Karten */
+    margin-top: 0 !important; /* kein zusätzlicher Abstand nach oben */
+}
 .profile-col.profile-danger::before {
-    content: none !important;
-    background: none !important;
-    border: none !important;
-    display: none !important;
+    background: #8bc34a !important; /* Hellgrün für rechte Spalte */
 }
 .profile-col h2 {
     font-size: 1.15rem;
