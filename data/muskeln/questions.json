@@ -5,7 +5,7 @@
     "additionalInfo": "Dazu gehören u. a. M. erector spinae, M. multifidus und M. rotatores.",
     "type": "text",
     "difficulty": 2,
-    "tags": ["Rumpf", "Rücken", "Anatomie"]
+    "tags": ["Rumpf"]
   },
   {
     "question": "Welcher Muskel ist der wichtigste Atemmuskel?",
@@ -13,7 +13,7 @@
     "additionalInfo": "Trennt Brust- und Bauchraum, kontrahiert bei Inspiration.",
     "type": "text",
     "difficulty": 1,
-    "tags": ["Rumpf", "Atmung", "Anatomie"]
+    "tags": ["Rumpf"]
   },
   {
     "question": "Welche Bauchmuskeln sind für die Flexion und Rotation des Rumpfes zuständig?",
@@ -21,7 +21,7 @@
     "additionalInfo": "Sorgen für Bauchpresse, Rumpfbeugung und Rotation.",
     "type": "text",
     "difficulty": 2,
-    "tags": ["Rumpf", "Bauch", "Anatomie"]
+    "tags": ["Rumpf"]
   },
   {
     "question": "Welcher Muskel ist der wichtigste Armheber bis 90° Abduktion?",
@@ -29,7 +29,7 @@
     "additionalInfo": "Unterteilt in Pars clavicularis, acromialis und spinalis.",
     "type": "text",
     "difficulty": 1,
-    "tags": ["Schulter", "Anatomie"]
+    "tags": ["Schulter"]
   },
   {
     "question": "Welcher Muskel fixiert das Schulterblatt an der Thoraxwand?",
@@ -37,7 +37,7 @@
     "additionalInfo": "Ermöglicht die Elevation des Arms über 90°.",
     "type": "text",
     "difficulty": 2,
-    "tags": ["Schulter", "Anatomie"]
+    "tags": ["Schulter"]
   },
   {
     "question": "Welche Muskeln bilden die Rotatorenmanschette?",
@@ -45,7 +45,7 @@
     "additionalInfo": "Stabilisieren das Schultergelenk aktiv.",
     "type": "text",
     "difficulty": 3,
-    "tags": ["Schulter", "Anatomie", "Gelenk"]
+    "tags": ["Schulter"]
   },
   {
     "question": "Welcher Muskel beugt den Unterarm im Ellbogengelenk?",
@@ -53,7 +53,7 @@
     "additionalInfo": "Hat zusätzlich eine supinierende Wirkung.",
     "type": "text",
     "difficulty": 1,
-    "tags": ["Arm", "Anatomie", "Ellbogen"]
+    "tags": ["Arm"]
   },
   {
     "question": "Welcher Muskel ist der wichtigste Strecker im Ellbogengelenk?",
@@ -61,7 +61,7 @@
     "additionalInfo": "Hat drei Köpfe (Caput longum, laterale, mediale).",
     "type": "text",
     "difficulty": 1,
-    "tags": ["Arm", "Anatomie", "Ellbogen"]
+    "tags": ["Arm"]
   },
   {
     "question": "Welcher Muskel opponiert den Daumen?",
@@ -69,7 +69,7 @@
     "additionalInfo": "Ermöglicht die Greiffunktion.",
     "type": "text",
     "difficulty": 2,
-    "tags": ["Hand", "Anatomie", "Daumen"]
+    "tags": ["Hand"]
   },
   {
     "question": "Welche Muskeln bewegen die Finger seitlich (Abduktion/Adduktion)?",
@@ -77,7 +77,7 @@
     "additionalInfo": "Dorsale spreizen die Finger, palmare schließen sie.",
     "type": "text",
     "difficulty": 3,
-    "tags": ["Hand", "Anatomie", "Finger"]
+    "tags": ["Hand"]
   },
   {
     "question": "Welche Muskeln beugen die Fingergrundgelenke und strecken die Mittel- und Endgelenke?",
@@ -85,7 +85,7 @@
     "additionalInfo": "Wichtig für die Feinmotorik.",
     "type": "text",
     "difficulty": 3,
-    "tags": ["Hand", "Anatomie", "Finger"]
+    "tags": ["Hand"]
   },
   {
     "question": "Welcher Muskel ist der stärkste Hüftstrecker?",
@@ -93,7 +93,7 @@
     "additionalInfo": "Wichtig für Treppensteigen und Aufrichten.",
     "type": "text",
     "difficulty": 1,
-    "tags": ["Hüfte", "Anatomie", "Gesäß"]
+    "tags": ["Hüfte"]
   },
   {
     "question": "Welche Muskeln gehören zur Adduktorengruppe am Oberschenkel?",
@@ -101,7 +101,7 @@
     "additionalInfo": "Führen das Bein zur Körpermitte.",
     "type": "text",
     "difficulty": 3,
-    "tags": ["Oberschenkel", "Anatomie", "Adduktoren"]
+    "tags": ["Hüfte"]
   },
   {
     "question": "Welcher Muskel ist der wichtigste Hüftbeuger?",
@@ -109,7 +109,7 @@
     "additionalInfo": "Spielt eine große Rolle beim Sitzen und Aufstehen.",
     "type": "text",
     "difficulty": 2,
-    "tags": ["Hüfte", "Anatomie", "Beuger"]
+    "tags": ["Hüfte"]
   },
   {
     "question": "Welche Muskeln sind die wichtigsten Kniestrecker?",
@@ -117,7 +117,7 @@
     "additionalInfo": "Strecken das Bein, Ansatz an Patellarsehne.",
     "type": "text",
     "difficulty": 2,
-    "tags": ["Knie", "Anatomie", "Oberschenkel"]
+    "tags": ["Knie"]
   },
   {
     "question": "Welcher Muskel ist der wichtigste Kniebeuger?",
@@ -125,7 +125,7 @@
     "additionalInfo": "Gehört zur ischiocruralen Muskulatur.",
     "type": "text",
     "difficulty": 2,
-    "tags": ["Knie", "Anatomie", "Oberschenkel"]
+    "tags": ["Knie"]
   },
   {
     "question": "Welcher Muskel ist der wichtigste Plantarflexor?",
@@ -133,7 +133,7 @@
     "additionalInfo": "Ansatz an Achillessehne, wichtig für Abstoß beim Gehen.",
     "type": "text",
     "difficulty": 2,
-    "tags": ["Fuß", "Anatomie", "Unterschenkel"]
+    "tags": ["Fuß"]
   },
   {
     "question": "Welche Muskeln sind für die Fußhebung (Dorsalextension) verantwortlich?",
@@ -141,22 +141,6 @@
     "additionalInfo": "Sorgen dafür, dass die Zehen beim Gehen nicht schleifen.",
     "type": "text",
     "difficulty": 2,
-    "tags": ["Fuß", "Anatomie", "Unterschenkel"]
-  },
-  {
-    "question": "Vorschlag für die Import-UI und Logik im Profilbereich:",
-    "answer": "",
-    "additionalInfo": "1. UI-Erweiterung (HTML, z.B. im profile.html):\n<div class=\"import-section\">\n  <h3>Daten importieren</h3>\n  <input type=\"file\" id=\"importFile\" accept=\".json\" multiple>\n  <button id=\"importBtn\">Import starten</button>\n  <div id=\"importStatus\"></div>\n</div>\n\n2. Import-Logik (JavaScript, z.B. in profile.js):\ndocument.getElementById('importBtn').addEventListener('click', function() {\n  var fileInput = document.getElementById('importFile');\n  var statusDiv = document.getElementById('importStatus');\n  if (!fileInput.files.length) {\n    statusDiv.textContent = 'Bitte mindestens eine JSON-Datei auswählen.';\n    return;\n  }\n  Array.from(fileInput.files).forEach(function(file) {\n    var reader = new FileReader();\n    reader.onload = function(e) {\n      try {\n        var data = JSON.parse(e.target.result);\n        // Hier: Erkenne anhand des Dateinamens oder der Struktur, ob es Kategorien, Gruppen oder Fragen sind\n        // Beispiel: Importiere Kategorie, dann Gruppen, dann Fragen\n        // Die Zuordnung der IDs erfolgt nach dem Insert\n        // ...Supabase-Insert-Logik...\n        statusDiv.textContent = 'Import erfolgreich: ' + file.name;\n      } catch (err) {\n        statusDiv.textContent = 'Fehler beim Import: ' + file.name;\n      }\n    };\n    reader.readAsText(file);\n  });\n});",
-    "type": "text",
-    "difficulty": 1,
-    "tags": ["Import", "Profil", "UI"]
-  },
-  {
-    "question": "Erweiterung für Gruppen-Import mit Kategorie-Auswahl",
-    "answer": "",
-    "additionalInfo": "// (HTML für profile.html)\n// <div class=\"import-section\">\n//   <h3>Gruppen importieren</h3>\n//   <select id=\"importCategorySelect\"></select>\n//   <input type=\"file\" id=\"importGroupsFile\" accept=\".json\">\n//   <button id=\"importGroupsBtn\">Gruppen importieren</button>\n//   <div id=\"importGroupsStatus\"></div>\n// </div>\n// \n// (JavaScript für profile.js)\n// async function loadCategoryOptions() {\n//   const user = await window.supabase.auth.getUser();\n//   if (!user?.data?.user?.id) return;\n//   const { data, error } = await window.supabase.from('categories').select('id, name').eq('owner', user.data.user.id);\n//   var select = document.getElementById('importCategorySelect');\n//   if (!select) return;\n//   select.innerHTML = '';\n//   if (data) {\n//     data.forEach(function(cat) {\n//       var opt = document.createElement('option');\n//       opt.value = cat.id;\n//       opt.textContent = cat.name;\n//       select.appendChild(opt);\n//     });\n//   }\n// }\n// if (document.getElementById('importCategorySelect')) loadCategoryOptions();\n// \n// document.getElementById('importGroupsBtn').addEventListener('click', function() {\n//   var fileInput = document.getElementById('importGroupsFile');\n//   var statusDiv = document.getElementById('importGroupsStatus');\n//   var select = document.getElementById('importCategorySelect');\n//   if (!fileInput.files.length) {\n//     statusDiv.textContent = 'Bitte eine Gruppen-JSON auswählen.';\n//     return;\n//   }\n//   var categoryId = select.value;\n//   Array.from(fileInput.files).forEach(function(file) {\n//     var reader = new FileReader();\n//     reader.onload = async function(e) {\n//       try {\n//         var data = JSON.parse(e.target.result);\n//         const user = await window.supabase.auth.getUser();\n//         let errorMsg = '';\n//         for (const group of data) {\n//           group.category_id = categoryId;\n//           group.owner = user.data.user.id;\n//           const { error } = await window.supabase.from('groups').upsert(group);\n//           if (error) errorMsg += error.message + '\\n';\n//         }\n//         if (errorMsg) statusDiv.textContent = 'Fehler: ' + errorMsg;\n//         else statusDiv.textContent = 'Import erfolgreich!';\n//       } catch (err) {\n//         statusDiv.textContent = 'Fehler beim Import: ' + file.name;\n//       }\n//     };\n//     reader.readAsText(file);\n//   });\n// });",
-    "type": "text",
-    "difficulty": 1,
-    "tags": ["Import", "Gruppen", "UI"]
+    "tags": ["Fuß"]
   }
 ]

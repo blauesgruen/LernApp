@@ -33,6 +33,75 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initialisierung
     initializePage();
     
+    // Supabase-konforme Frage-Erstellung und Anzeige
+    if (questionForm) {
+        questionForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            if (!validateForm()) return;
+            const correctAnswerText = document.getElementById('answer-0').value.trim();
+            if (!correctAnswerText) {
+                showError('Bitte gib eine richtige Antwort ein.');
+                return;
+            }
+            const groupId = groupSelect.value;
+            const ownerId = await window.supabase.auth.getUser().then(u => u.data.user.id);
+            let imageUrl = null;
+            // Bild-Upload zu Supabase Storage (falls vorhanden)
+            if (questionImageInput.files && questionImageInput.files[0]) {
+                const file = questionImageInput.files[0];
+                const fileName = 'question-images/' + Date.now() + '_' + file.name;
+                const { data, error } = await window.supabase.storage.from('question-images').upload(fileName, file);
+                if (!error && data && data.path) {
+                    imageUrl = window.supabase.storage.from('question-images').getPublicUrl(data.path).publicUrl;
+                } else {
+                    showError('Fehler beim Bild-Upload: ' + (error?.message || ''));
+                }
+            }
+            // Tags aus dem Tag-Input holen (z. B. Komma-getrennt)
+            const tagsInput = document.getElementById('question-tags');
+            const tags = tagsInput ? tagsInput.value.split(',').map(t => t.trim()).filter(Boolean) : [];
+            // Typ aus dem Typ-Input holen
+            const typeInput = document.getElementById('question-type');
+            const type = typeInput ? typeInput.value : 'text';
+            // Schwierigkeitsgrad
+            const difficulty = parseInt(difficultyInput.value, 10) || 1;
+            const questionData = {
+                question: questionTextInput.value.trim(),
+                answer: correctAnswerText,
+                additionalInfo: explanationInput.value.trim(),
+                type,
+                difficulty,
+                tags,
+                imageUrl: imageUrl || '',
+                group_id: groupId,
+                owner: ownerId
+            };
+            try {
+                const submitButton = questionForm.querySelector('button[type="submit"]');
+                const originalButtonText = submitButton.innerHTML;
+                submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Wird gespeichert...';
+                submitButton.disabled = true;
+                const { error } = await window.supabase.from('questions').insert([questionData]);
+                if (!error) {
+                    showSuccess('Frage wurde erfolgreich erstellt!');
+                    resetForm();
+                    if (groupSelect.value) await loadQuestionsForGroup(groupSelect.value);
+                } else {
+                    showError('Fehler beim Erstellen der Frage: ' + error.message);
+                }
+                submitButton.innerHTML = originalButtonText;
+                submitButton.disabled = false;
+            } catch (err) {
+                showError('Fehler: ' + err.message);
+                const submitButton = questionForm.querySelector('button[type="submit"]');
+                if (submitButton) {
+                    submitButton.innerHTML = '<i class="fas fa-save"></i> Frage speichern';
+                    submitButton.disabled = false;
+                }
+            }
+        });
+    }
+
     /**
      * Lädt die Fragen für eine bestimmte Gruppe und zeigt sie an
      */
@@ -49,7 +118,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const questions = await window.quizDB.loadQuestions();
             
             // Fragen für die ausgewählte Gruppe filtern
-            const groupQuestions = questions.filter(q => q.groupId === groupId);
+            const groupQuestions = questions.filter(q => q.group_id === groupId);
             
             if (groupQuestions.length === 0) {
                 groupQuestionsList.innerHTML = '<p class="info-text">Keine Fragen in dieser Gruppe vorhanden</p>';
@@ -61,8 +130,8 @@ document.addEventListener('DOMContentLoaded', function() {
             
             groupQuestions.forEach(question => {
                 const hasImage = question.imageUrl && question.imageUrl.trim() !== '';
-                const questionText = question.text && question.text.trim() !== '' 
-                    ? question.text 
+                const questionText = question.question && question.question.trim() !== '' 
+                    ? question.question 
                     : 'Bildfrage ohne Text';
                 
                 html += `
@@ -71,6 +140,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="question-meta">
                             <span>${hasImage ? '<span class="question-has-image"><i class="fas fa-image"></i> Bild: ja</span>' : ''}</span>
                             <span>Schwierigkeit: ${question.difficulty}/5</span>
+                            <span>Typ: ${question.type || 'text'}</span>
+                            <span>Tags: ${question.tags ? question.tags.join(', ') : ''}</span>
                         </div>
                     </div>
                 `;
@@ -253,89 +324,56 @@ document.addEventListener('DOMContentLoaded', function() {
     if (questionImageInput) {
         questionImageInput.addEventListener('change', handleImageUpload);
     }    // Event Listener für das Fragen-Formular
+    // Fragen-Erstellung: Bild als imageurl speichern
     if (questionForm) {
         questionForm.addEventListener('submit', async function(e) {
             e.preventDefault();
-            
-            // Prüfen, ob alle Felder ausgefüllt sind
-            if (!validateForm()) {
-                return;
-            }
-            
-            // Antwortoptionen sammeln - nur die richtige Antwort
+            if (!validateForm()) return;
             const correctAnswerText = document.getElementById('answer-0').value.trim();
-            
             if (!correctAnswerText) {
                 showError('Bitte gib eine richtige Antwort ein.');
                 return;
             }
-            
-            // Nur die richtige Antwort wird angegeben
-            const options = [
-                {
-                    text: correctAnswerText,
-                    isCorrect: true
+            const groupId = groupSelect.value;
+            const ownerId = await window.supabase.auth.getUser().then(u => u.data.user.id);
+            let imageUrl = null;
+            // Bild-Upload zu Supabase Storage (falls vorhanden)
+            if (questionImageInput.files && questionImageInput.files[0]) {
+                const file = questionImageInput.files[0];
+                const fileName = 'question-images/' + Date.now() + '_' + file.name;
+                const { data, error } = await window.supabase.storage.from('question-images').upload(fileName, file);
+                if (!error && data && data.path) {
+                    imageUrl = window.supabase.storage.from('question-images').getPublicUrl(data.path).publicUrl;
+                } else {
+                    showError('Fehler beim Bild-Upload: ' + (error?.message || '')); // Bild-Upload Fehler anzeigen
                 }
-            ];
-            
-            // Kategorie-Typ ermitteln
-            const categoryId = categorySelect.value;
-            const categories = await window.quizDB.loadCategories();
-            const selectedCategory = categories.find(cat => cat.id === categoryId);
-            
-            // Fragedaten erstellen
-            const questionData = {
-                text: questionTextInput.value.trim(),
-                imageUrl: imageBase64 || "",  // Stellt sicher, dass null-Werte als leerer String gespeichert werden
-                options: options,
-                explanation: explanationInput.value.trim(),
-                categoryId: categoryId,
-                groupId: groupSelect.value,
-                difficulty: parseInt(difficultyInput.value),
-                createdBy: username
-            };
-            
-            // Sicherstellen, dass entweder Text oder Bild vorhanden ist
-            const hasText = questionData.text && questionData.text.trim() !== '';
-            const hasImage = questionData.imageUrl && questionData.imageUrl.trim() !== '';
-            
-            if (!hasText && !hasImage) {
-                showError('Eine Frage benötigt entweder einen Fragetext oder ein Bild.');
-                return;
             }
-            
+            const questionData = {
+                question: questionTextInput.value.trim(),
+                answer: correctAnswerText,
+                additionalinfo: explanationInput.value.trim(),
+                imageurl: imageUrl || '',
+                group_id: groupId,
+                owner: ownerId
+                // collaborators: [] // Optional
+            };
             try {
-                // Zeige Ladeanzeige
                 const submitButton = questionForm.querySelector('button[type="submit"]');
                 const originalButtonText = submitButton.innerHTML;
                 submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Wird gespeichert...';
                 submitButton.disabled = true;
-                
-                // Frage erstellen
-                const newQuestion = await window.quizDB.createQuestion(questionData);
-                
-                if (newQuestion) {
+                const { error } = await window.supabase.from('questions').insert([questionData]);
+                if (!error) {
                     showSuccess('Frage wurde erfolgreich erstellt!');
-                    
-                    // Formular zurücksetzen
                     resetForm();
-                    
-                    // Fragen der aktuell ausgewählten Gruppe aktualisieren
-                    if (groupSelect.value) {
-                        await loadQuestionsForGroup(groupSelect.value);
-                    }
+                    if (groupSelect.value) await loadQuestionsForGroup(groupSelect.value);
                 } else {
-                    showError('Fehler beim Erstellen der Frage.');
+                    showError('Fehler beim Erstellen der Frage: ' + error.message);
                 }
-                
-                // Button zurücksetzen
                 submitButton.innerHTML = originalButtonText;
                 submitButton.disabled = false;
-            } catch (error) {
-                console.error('Fehler beim Erstellen der Frage:', error);
-                showError(`Fehler: ${error.message}`);
-                
-                // Button zurücksetzen
+            } catch (err) {
+                showError('Fehler: ' + err.message);
                 const submitButton = questionForm.querySelector('button[type="submit"]');
                 if (submitButton) {
                     submitButton.innerHTML = '<i class="fas fa-save"></i> Frage speichern';
@@ -652,6 +690,75 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initialisierung
     initializePage();
     
+    // Supabase-konforme Frage-Erstellung und Anzeige
+    if (questionForm) {
+        questionForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            if (!validateForm()) return;
+            const correctAnswerText = document.getElementById('answer-0').value.trim();
+            if (!correctAnswerText) {
+                showError('Bitte gib eine richtige Antwort ein.');
+                return;
+            }
+            const groupId = groupSelect.value;
+            const ownerId = await window.supabase.auth.getUser().then(u => u.data.user.id);
+            let imageUrl = null;
+            // Bild-Upload zu Supabase Storage (falls vorhanden)
+            if (questionImageInput.files && questionImageInput.files[0]) {
+                const file = questionImageInput.files[0];
+                const fileName = 'question-images/' + Date.now() + '_' + file.name;
+                const { data, error } = await window.supabase.storage.from('question-images').upload(fileName, file);
+                if (!error && data && data.path) {
+                    imageUrl = window.supabase.storage.from('question-images').getPublicUrl(data.path).publicUrl;
+                } else {
+                    showError('Fehler beim Bild-Upload: ' + (error?.message || ''));
+                }
+            }
+            // Tags aus dem Tag-Input holen (z. B. Komma-getrennt)
+            const tagsInput = document.getElementById('question-tags');
+            const tags = tagsInput ? tagsInput.value.split(',').map(t => t.trim()).filter(Boolean) : [];
+            // Typ aus dem Typ-Input holen
+            const typeInput = document.getElementById('question-type');
+            const type = typeInput ? typeInput.value : 'text';
+            // Schwierigkeitsgrad
+            const difficulty = parseInt(difficultyInput.value, 10) || 1;
+            const questionData = {
+                question: questionTextInput.value.trim(),
+                answer: correctAnswerText,
+                additionalInfo: explanationInput.value.trim(),
+                type,
+                difficulty,
+                tags,
+                imageUrl: imageUrl || '',
+                group_id: groupId,
+                owner: ownerId
+            };
+            try {
+                const submitButton = questionForm.querySelector('button[type="submit"]');
+                const originalButtonText = submitButton.innerHTML;
+                submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Wird gespeichert...';
+                submitButton.disabled = true;
+                const { error } = await window.supabase.from('questions').insert([questionData]);
+                if (!error) {
+                    showSuccess('Frage wurde erfolgreich erstellt!');
+                    resetForm();
+                    if (groupSelect.value) await loadQuestionsForGroup(groupSelect.value);
+                } else {
+                    showError('Fehler beim Erstellen der Frage: ' + error.message);
+                }
+                submitButton.innerHTML = originalButtonText;
+                submitButton.disabled = false;
+            } catch (err) {
+                showError('Fehler: ' + err.message);
+                const submitButton = questionForm.querySelector('button[type="submit"]');
+                if (submitButton) {
+                    submitButton.innerHTML = '<i class="fas fa-save"></i> Frage speichern';
+                    submitButton.disabled = false;
+                }
+            }
+        });
+    }
+
     /**
      * Lädt die Fragen für eine bestimmte Gruppe und zeigt sie an
      */
@@ -668,7 +775,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const questions = await window.quizDB.loadQuestions();
             
             // Fragen für die ausgewählte Gruppe filtern
-            const groupQuestions = questions.filter(q => q.groupId === groupId);
+            const groupQuestions = questions.filter(q => q.group_id === groupId);
             
             if (groupQuestions.length === 0) {
                 groupQuestionsList.innerHTML = '<p class="info-text">Keine Fragen in dieser Gruppe vorhanden</p>';
@@ -680,8 +787,8 @@ document.addEventListener('DOMContentLoaded', function() {
             
             groupQuestions.forEach(question => {
                 const hasImage = question.imageUrl && question.imageUrl.trim() !== '';
-                const questionText = question.text && question.text.trim() !== '' 
-                    ? question.text 
+                const questionText = question.question && question.question.trim() !== '' 
+                    ? question.question 
                     : 'Bildfrage ohne Text';
                 
                 html += `
@@ -690,6 +797,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="question-meta">
                             <span>${hasImage ? '<span class="question-has-image"><i class="fas fa-image"></i> Bild: ja</span>' : ''}</span>
                             <span>Schwierigkeit: ${question.difficulty}/5</span>
+                            <span>Typ: ${question.type || 'text'}</span>
+                            <span>Tags: ${question.tags ? question.tags.join(', ') : ''}</span>
                         </div>
                     </div>
                 `;
@@ -872,89 +981,56 @@ document.addEventListener('DOMContentLoaded', function() {
     if (questionImageInput) {
         questionImageInput.addEventListener('change', handleImageUpload);
     }    // Event Listener für das Fragen-Formular
+    // Fragen-Erstellung: Bild als imageurl speichern
     if (questionForm) {
         questionForm.addEventListener('submit', async function(e) {
             e.preventDefault();
-            
-            // Prüfen, ob alle Felder ausgefüllt sind
-            if (!validateForm()) {
-                return;
-            }
-            
-            // Antwortoptionen sammeln - nur die richtige Antwort
+            if (!validateForm()) return;
             const correctAnswerText = document.getElementById('answer-0').value.trim();
-            
             if (!correctAnswerText) {
                 showError('Bitte gib eine richtige Antwort ein.');
                 return;
             }
-            
-            // Nur die richtige Antwort wird angegeben
-            const options = [
-                {
-                    text: correctAnswerText,
-                    isCorrect: true
+            const groupId = groupSelect.value;
+            const ownerId = await window.supabase.auth.getUser().then(u => u.data.user.id);
+            let imageUrl = null;
+            // Bild-Upload zu Supabase Storage (falls vorhanden)
+            if (questionImageInput.files && questionImageInput.files[0]) {
+                const file = questionImageInput.files[0];
+                const fileName = 'question-images/' + Date.now() + '_' + file.name;
+                const { data, error } = await window.supabase.storage.from('question-images').upload(fileName, file);
+                if (!error && data && data.path) {
+                    imageUrl = window.supabase.storage.from('question-images').getPublicUrl(data.path).publicUrl;
+                } else {
+                    showError('Fehler beim Bild-Upload: ' + (error?.message || '')); // Bild-Upload Fehler anzeigen
                 }
-            ];
-            
-            // Kategorie-Typ ermitteln
-            const categoryId = categorySelect.value;
-            const categories = await window.quizDB.loadCategories();
-            const selectedCategory = categories.find(cat => cat.id === categoryId);
-            
-            // Fragedaten erstellen
-            const questionData = {
-                text: questionTextInput.value.trim(),
-                imageUrl: imageBase64 || "",  // Stellt sicher, dass null-Werte als leerer String gespeichert werden
-                options: options,
-                explanation: explanationInput.value.trim(),
-                categoryId: categoryId,
-                groupId: groupSelect.value,
-                difficulty: parseInt(difficultyInput.value),
-                createdBy: username
-            };
-            
-            // Sicherstellen, dass entweder Text oder Bild vorhanden ist
-            const hasText = questionData.text && questionData.text.trim() !== '';
-            const hasImage = questionData.imageUrl && questionData.imageUrl.trim() !== '';
-            
-            if (!hasText && !hasImage) {
-                showError('Eine Frage benötigt entweder einen Fragetext oder ein Bild.');
-                return;
             }
-            
+            const questionData = {
+                question: questionTextInput.value.trim(),
+                answer: correctAnswerText,
+                additionalinfo: explanationInput.value.trim(),
+                imageurl: imageUrl || '',
+                group_id: groupId,
+                owner: ownerId
+                // collaborators: [] // Optional
+            };
             try {
-                // Zeige Ladeanzeige
                 const submitButton = questionForm.querySelector('button[type="submit"]');
                 const originalButtonText = submitButton.innerHTML;
                 submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Wird gespeichert...';
                 submitButton.disabled = true;
-                
-                // Frage erstellen
-                const newQuestion = await window.quizDB.createQuestion(questionData);
-                
-                if (newQuestion) {
+                const { error } = await window.supabase.from('questions').insert([questionData]);
+                if (!error) {
                     showSuccess('Frage wurde erfolgreich erstellt!');
-                    
-                    // Formular zurücksetzen
                     resetForm();
-                    
-                    // Fragen der aktuell ausgewählten Gruppe aktualisieren
-                    if (groupSelect.value) {
-                        await loadQuestionsForGroup(groupSelect.value);
-                    }
+                    if (groupSelect.value) await loadQuestionsForGroup(groupSelect.value);
                 } else {
-                    showError('Fehler beim Erstellen der Frage.');
+                    showError('Fehler beim Erstellen der Frage: ' + error.message);
                 }
-                
-                // Button zurücksetzen
                 submitButton.innerHTML = originalButtonText;
                 submitButton.disabled = false;
-            } catch (error) {
-                console.error('Fehler beim Erstellen der Frage:', error);
-                showError(`Fehler: ${error.message}`);
-                
-                // Button zurücksetzen
+            } catch (err) {
+                showError('Fehler: ' + err.message);
                 const submitButton = questionForm.querySelector('button[type="submit"]');
                 if (submitButton) {
                     submitButton.innerHTML = '<i class="fas fa-save"></i> Frage speichern';
@@ -1271,6 +1347,75 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initialisierung
     initializePage();
     
+    // Supabase-konforme Frage-Erstellung und Anzeige
+    if (questionForm) {
+        questionForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            if (!validateForm()) return;
+            const correctAnswerText = document.getElementById('answer-0').value.trim();
+            if (!correctAnswerText) {
+                showError('Bitte gib eine richtige Antwort ein.');
+                return;
+            }
+            const groupId = groupSelect.value;
+            const ownerId = await window.supabase.auth.getUser().then(u => u.data.user.id);
+            let imageUrl = null;
+            // Bild-Upload zu Supabase Storage (falls vorhanden)
+            if (questionImageInput.files && questionImageInput.files[0]) {
+                const file = questionImageInput.files[0];
+                const fileName = 'question-images/' + Date.now() + '_' + file.name;
+                const { data, error } = await window.supabase.storage.from('question-images').upload(fileName, file);
+                if (!error && data && data.path) {
+                    imageUrl = window.supabase.storage.from('question-images').getPublicUrl(data.path).publicUrl;
+                } else {
+                    showError('Fehler beim Bild-Upload: ' + (error?.message || ''));
+                }
+            }
+            // Tags aus dem Tag-Input holen (z. B. Komma-getrennt)
+            const tagsInput = document.getElementById('question-tags');
+            const tags = tagsInput ? tagsInput.value.split(',').map(t => t.trim()).filter(Boolean) : [];
+            // Typ aus dem Typ-Input holen
+            const typeInput = document.getElementById('question-type');
+            const type = typeInput ? typeInput.value : 'text';
+            // Schwierigkeitsgrad
+            const difficulty = parseInt(difficultyInput.value, 10) || 1;
+            const questionData = {
+                question: questionTextInput.value.trim(),
+                answer: correctAnswerText,
+                additionalInfo: explanationInput.value.trim(),
+                type,
+                difficulty,
+                tags,
+                imageUrl: imageUrl || '',
+                group_id: groupId,
+                owner: ownerId
+            };
+            try {
+                const submitButton = questionForm.querySelector('button[type="submit"]');
+                const originalButtonText = submitButton.innerHTML;
+                submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Wird gespeichert...';
+                submitButton.disabled = true;
+                const { error } = await window.supabase.from('questions').insert([questionData]);
+                if (!error) {
+                    showSuccess('Frage wurde erfolgreich erstellt!');
+                    resetForm();
+                    if (groupSelect.value) await loadQuestionsForGroup(groupSelect.value);
+                } else {
+                    showError('Fehler beim Erstellen der Frage: ' + error.message);
+                }
+                submitButton.innerHTML = originalButtonText;
+                submitButton.disabled = false;
+            } catch (err) {
+                showError('Fehler: ' + err.message);
+                const submitButton = questionForm.querySelector('button[type="submit"]');
+                if (submitButton) {
+                    submitButton.innerHTML = '<i class="fas fa-save"></i> Frage speichern';
+                    submitButton.disabled = false;
+                }
+            }
+        });
+    }
+
     /**
      * Lädt die Fragen für eine bestimmte Gruppe und zeigt sie an
      */
@@ -1287,7 +1432,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const questions = await window.quizDB.loadQuestions();
             
             // Fragen für die ausgewählte Gruppe filtern
-            const groupQuestions = questions.filter(q => q.groupId === groupId);
+            const groupQuestions = questions.filter(q => q.group_id === groupId);
             
             if (groupQuestions.length === 0) {
                 groupQuestionsList.innerHTML = '<p class="info-text">Keine Fragen in dieser Gruppe vorhanden</p>';
@@ -1299,8 +1444,8 @@ document.addEventListener('DOMContentLoaded', function() {
             
             groupQuestions.forEach(question => {
                 const hasImage = question.imageUrl && question.imageUrl.trim() !== '';
-                const questionText = question.text && question.text.trim() !== '' 
-                    ? question.text 
+                const questionText = question.question && question.question.trim() !== '' 
+                    ? question.question 
                     : 'Bildfrage ohne Text';
                 
                 html += `
@@ -1309,6 +1454,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="question-meta">
                             <span>${hasImage ? '<span class="question-has-image"><i class="fas fa-image"></i> Bild: ja</span>' : ''}</span>
                             <span>Schwierigkeit: ${question.difficulty}/5</span>
+                            <span>Typ: ${question.type || 'text'}</span>
+                            <span>Tags: ${question.tags ? question.tags.join(', ') : ''}</span>
                         </div>
                     </div>
                 `;
@@ -1491,89 +1638,56 @@ document.addEventListener('DOMContentLoaded', function() {
     if (questionImageInput) {
         questionImageInput.addEventListener('change', handleImageUpload);
     }    // Event Listener für das Fragen-Formular
+    // Fragen-Erstellung: Bild als imageurl speichern
     if (questionForm) {
         questionForm.addEventListener('submit', async function(e) {
             e.preventDefault();
-            
-            // Prüfen, ob alle Felder ausgefüllt sind
-            if (!validateForm()) {
-                return;
-            }
-            
-            // Antwortoptionen sammeln - nur die richtige Antwort
+            if (!validateForm()) return;
             const correctAnswerText = document.getElementById('answer-0').value.trim();
-            
             if (!correctAnswerText) {
                 showError('Bitte gib eine richtige Antwort ein.');
                 return;
             }
-            
-            // Nur die richtige Antwort wird angegeben
-            const options = [
-                {
-                    text: correctAnswerText,
-                    isCorrect: true
+            const groupId = groupSelect.value;
+            const ownerId = await window.supabase.auth.getUser().then(u => u.data.user.id);
+            let imageUrl = null;
+            // Bild-Upload zu Supabase Storage (falls vorhanden)
+            if (questionImageInput.files && questionImageInput.files[0]) {
+                const file = questionImageInput.files[0];
+                const fileName = 'question-images/' + Date.now() + '_' + file.name;
+                const { data, error } = await window.supabase.storage.from('question-images').upload(fileName, file);
+                if (!error && data && data.path) {
+                    imageUrl = window.supabase.storage.from('question-images').getPublicUrl(data.path).publicUrl;
+                } else {
+                    showError('Fehler beim Bild-Upload: ' + (error?.message || '')); // Bild-Upload Fehler anzeigen
                 }
-            ];
-            
-            // Kategorie-Typ ermitteln
-            const categoryId = categorySelect.value;
-            const categories = await window.quizDB.loadCategories();
-            const selectedCategory = categories.find(cat => cat.id === categoryId);
-            
-            // Fragedaten erstellen
-            const questionData = {
-                text: questionTextInput.value.trim(),
-                imageUrl: imageBase64 || "",  // Stellt sicher, dass null-Werte als leerer String gespeichert werden
-                options: options,
-                explanation: explanationInput.value.trim(),
-                categoryId: categoryId,
-                groupId: groupSelect.value,
-                difficulty: parseInt(difficultyInput.value),
-                createdBy: username
-            };
-            
-            // Sicherstellen, dass entweder Text oder Bild vorhanden ist
-            const hasText = questionData.text && questionData.text.trim() !== '';
-            const hasImage = questionData.imageUrl && questionData.imageUrl.trim() !== '';
-            
-            if (!hasText && !hasImage) {
-                showError('Eine Frage benötigt entweder einen Fragetext oder ein Bild.');
-                return;
             }
-            
+            const questionData = {
+                question: questionTextInput.value.trim(),
+                answer: correctAnswerText,
+                additionalinfo: explanationInput.value.trim(),
+                imageurl: imageUrl || '',
+                group_id: groupId,
+                owner: ownerId
+                // collaborators: [] // Optional
+            };
             try {
-                // Zeige Ladeanzeige
                 const submitButton = questionForm.querySelector('button[type="submit"]');
                 const originalButtonText = submitButton.innerHTML;
                 submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Wird gespeichert...';
                 submitButton.disabled = true;
-                
-                // Frage erstellen
-                const newQuestion = await window.quizDB.createQuestion(questionData);
-                
-                if (newQuestion) {
+                const { error } = await window.supabase.from('questions').insert([questionData]);
+                if (!error) {
                     showSuccess('Frage wurde erfolgreich erstellt!');
-                    
-                    // Formular zurücksetzen
                     resetForm();
-                    
-                    // Fragen der aktuell ausgewählten Gruppe aktualisieren
-                    if (groupSelect.value) {
-                        await loadQuestionsForGroup(groupSelect.value);
-                    }
+                    if (groupSelect.value) await loadQuestionsForGroup(groupSelect.value);
                 } else {
-                    showError('Fehler beim Erstellen der Frage.');
+                    showError('Fehler beim Erstellen der Frage: ' + error.message);
                 }
-                
-                // Button zurücksetzen
                 submitButton.innerHTML = originalButtonText;
                 submitButton.disabled = false;
-            } catch (error) {
-                console.error('Fehler beim Erstellen der Frage:', error);
-                showError(`Fehler: ${error.message}`);
-                
-                // Button zurücksetzen
+            } catch (err) {
+                showError('Fehler: ' + err.message);
                 const submitButton = questionForm.querySelector('button[type="submit"]');
                 if (submitButton) {
                     submitButton.innerHTML = '<i class="fas fa-save"></i> Frage speichern';
@@ -1873,7 +1987,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Elemente für das Fragenformular
     const questionForm = document.getElementById('question-form');
     const categorySelect = document.getElementById('question-category');
-    const groupSelect = document.getElementById('question-group');
+       const groupSelect = document.getElementById('question-group');
     const questionTextInput = document.getElementById('question-text');
     const questionImageInput = document.getElementById('question-image');
     const imagePreview = document.getElementById('image-preview');
@@ -1890,6 +2004,75 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initialisierung
     initializePage();
     
+    // Supabase-konforme Frage-Erstellung und Anzeige
+    if (questionForm) {
+        questionForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            if (!validateForm()) return;
+            const correctAnswerText = document.getElementById('answer-0').value.trim();
+            if (!correctAnswerText) {
+                showError('Bitte gib eine richtige Antwort ein.');
+                return;
+            }
+            const groupId = groupSelect.value;
+            const ownerId = await window.supabase.auth.getUser().then(u => u.data.user.id);
+            let imageUrl = null;
+            // Bild-Upload zu Supabase Storage (falls vorhanden)
+            if (questionImageInput.files && questionImageInput.files[0]) {
+                const file = questionImageInput.files[0];
+                const fileName = 'question-images/' + Date.now() + '_' + file.name;
+                const { data, error } = await window.supabase.storage.from('question-images').upload(fileName, file);
+                if (!error && data && data.path) {
+                    imageUrl = window.supabase.storage.from('question-images').getPublicUrl(data.path).publicUrl;
+                } else {
+                    showError('Fehler beim Bild-Upload: ' + (error?.message || ''));
+                }
+            }
+            // Tags aus dem Tag-Input holen (z. B. Komma-getrennt)
+            const tagsInput = document.getElementById('question-tags');
+            const tags = tagsInput ? tagsInput.value.split(',').map(t => t.trim()).filter(Boolean) : [];
+            // Typ aus dem Typ-Input holen
+            const typeInput = document.getElementById('question-type');
+            const type = typeInput ? typeInput.value : 'text';
+            // Schwierigkeitsgrad
+            const difficulty = parseInt(difficultyInput.value, 10) || 1;
+            const questionData = {
+                question: questionTextInput.value.trim(),
+                answer: correctAnswerText,
+                additionalInfo: explanationInput.value.trim(),
+                type,
+                difficulty,
+                tags,
+                imageUrl: imageUrl || '',
+                group_id: groupId,
+                owner: ownerId
+            };
+            try {
+                const submitButton = questionForm.querySelector('button[type="submit"]');
+                const originalButtonText = submitButton.innerHTML;
+                submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Wird gespeichert...';
+                submitButton.disabled = true;
+                const { error } = await window.supabase.from('questions').insert([questionData]);
+                if (!error) {
+                    showSuccess('Frage wurde erfolgreich erstellt!');
+                    resetForm();
+                    if (groupSelect.value) await loadQuestionsForGroup(groupSelect.value);
+                } else {
+                    showError('Fehler beim Erstellen der Frage: ' + error.message);
+                }
+                submitButton.innerHTML = originalButtonText;
+                submitButton.disabled = false;
+            } catch (err) {
+                showError('Fehler: ' + err.message);
+                const submitButton = questionForm.querySelector('button[type="submit"]');
+                if (submitButton) {
+                    submitButton.innerHTML = '<i class="fas fa-save"></i> Frage speichern';
+                    submitButton.disabled = false;
+                }
+            }
+        });
+    }
+
     /**
      * Lädt die Fragen für eine bestimmte Gruppe und zeigt sie an
      */
@@ -1906,7 +2089,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const questions = await window.quizDB.loadQuestions();
             
             // Fragen für die ausgewählte Gruppe filtern
-            const groupQuestions = questions.filter(q => q.groupId === groupId);
+            const groupQuestions = questions.filter(q => q.group_id === groupId);
             
             if (groupQuestions.length === 0) {
                 groupQuestionsList.innerHTML = '<p class="info-text">Keine Fragen in dieser Gruppe vorhanden</p>';
@@ -1918,8 +2101,8 @@ document.addEventListener('DOMContentLoaded', function() {
             
             groupQuestions.forEach(question => {
                 const hasImage = question.imageUrl && question.imageUrl.trim() !== '';
-                const questionText = question.text && question.text.trim() !== '' 
-                    ? question.text 
+                const questionText = question.question && question.question.trim() !== '' 
+                    ? question.question 
                     : 'Bildfrage ohne Text';
                 
                 html += `
@@ -1928,6 +2111,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="question-meta">
                             <span>${hasImage ? '<span class="question-has-image"><i class="fas fa-image"></i> Bild: ja</span>' : ''}</span>
                             <span>Schwierigkeit: ${question.difficulty}/5</span>
+                            <span>Typ: ${question.type || 'text'}</span>
+                            <span>Tags: ${question.tags ? question.tags.join(', ') : ''}</span>
                         </div>
                     </div>
                 `;
@@ -2110,89 +2295,56 @@ document.addEventListener('DOMContentLoaded', function() {
     if (questionImageInput) {
         questionImageInput.addEventListener('change', handleImageUpload);
     }    // Event Listener für das Fragen-Formular
+    // Fragen-Erstellung: Bild als imageurl speichern
     if (questionForm) {
         questionForm.addEventListener('submit', async function(e) {
             e.preventDefault();
-            
-            // Prüfen, ob alle Felder ausgefüllt sind
-            if (!validateForm()) {
-                return;
-            }
-            
-            // Antwortoptionen sammeln - nur die richtige Antwort
+            if (!validateForm()) return;
             const correctAnswerText = document.getElementById('answer-0').value.trim();
-            
             if (!correctAnswerText) {
                 showError('Bitte gib eine richtige Antwort ein.');
                 return;
             }
-            
-            // Nur die richtige Antwort wird angegeben
-            const options = [
-                {
-                    text: correctAnswerText,
-                    isCorrect: true
+            const groupId = groupSelect.value;
+            const ownerId = await window.supabase.auth.getUser().then(u => u.data.user.id);
+            let imageUrl = null;
+            // Bild-Upload zu Supabase Storage (falls vorhanden)
+            if (questionImageInput.files && questionImageInput.files[0]) {
+                const file = questionImageInput.files[0];
+                const fileName = 'question-images/' + Date.now() + '_' + file.name;
+                const { data, error } = await window.supabase.storage.from('question-images').upload(fileName, file);
+                if (!error && data && data.path) {
+                    imageUrl = window.supabase.storage.from('question-images').getPublicUrl(data.path).publicUrl;
+                } else {
+                    showError('Fehler beim Bild-Upload: ' + (error?.message || '')); // Bild-Upload Fehler anzeigen
                 }
-            ];
-            
-            // Kategorie-Typ ermitteln
-            const categoryId = categorySelect.value;
-            const categories = await window.quizDB.loadCategories();
-            const selectedCategory = categories.find(cat => cat.id === categoryId);
-            
-            // Fragedaten erstellen
-            const questionData = {
-                text: questionTextInput.value.trim(),
-                imageUrl: imageBase64 || "",  // Stellt sicher, dass null-Werte als leerer String gespeichert werden
-                options: options,
-                explanation: explanationInput.value.trim(),
-                categoryId: categoryId,
-                groupId: groupSelect.value,
-                difficulty: parseInt(difficultyInput.value),
-                createdBy: username
-            };
-            
-            // Sicherstellen, dass entweder Text oder Bild vorhanden ist
-            const hasText = questionData.text && questionData.text.trim() !== '';
-            const hasImage = questionData.imageUrl && questionData.imageUrl.trim() !== '';
-            
-            if (!hasText && !hasImage) {
-                showError('Eine Frage benötigt entweder einen Fragetext oder ein Bild.');
-                return;
             }
-            
+            const questionData = {
+                question: questionTextInput.value.trim(),
+                answer: correctAnswerText,
+                additionalinfo: explanationInput.value.trim(),
+                imageurl: imageUrl || '',
+                group_id: groupId,
+                owner: ownerId
+                // collaborators: [] // Optional
+            };
             try {
-                // Zeige Ladeanzeige
                 const submitButton = questionForm.querySelector('button[type="submit"]');
                 const originalButtonText = submitButton.innerHTML;
                 submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Wird gespeichert...';
                 submitButton.disabled = true;
-                
-                // Frage erstellen
-                const newQuestion = await window.quizDB.createQuestion(questionData);
-                
-                if (newQuestion) {
+                const { error } = await window.supabase.from('questions').insert([questionData]);
+                if (!error) {
                     showSuccess('Frage wurde erfolgreich erstellt!');
-                    
-                    // Formular zurücksetzen
                     resetForm();
-                    
-                    // Fragen der aktuell ausgewählten Gruppe aktualisieren
-                    if (groupSelect.value) {
-                        await loadQuestionsForGroup(groupSelect.value);
-                    }
+                    if (groupSelect.value) await loadQuestionsForGroup(groupSelect.value);
                 } else {
-                    showError('Fehler beim Erstellen der Frage.');
+                    showError('Fehler beim Erstellen der Frage: ' + error.message);
                 }
-                
-                // Button zurücksetzen
                 submitButton.innerHTML = originalButtonText;
                 submitButton.disabled = false;
-            } catch (error) {
-                console.error('Fehler beim Erstellen der Frage:', error);
-                showError(`Fehler: ${error.message}`);
-                
-                // Button zurücksetzen
+            } catch (err) {
+                showError('Fehler: ' + err.message);
                 const submitButton = questionForm.querySelector('button[type="submit"]');
                 if (submitButton) {
                     submitButton.innerHTML = '<i class="fas fa-save"></i> Frage speichern';

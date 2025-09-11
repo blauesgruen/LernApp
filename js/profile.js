@@ -315,20 +315,18 @@ if (document.getElementById('importQuestionsBtn')) {
                     let errorMsg = '';
                     let importedCount = 0;
                     let debugData = [];
-                    // Hole alle Gruppen einmal für den User
                     const { data: groups } = await window.supabase
                         .from('groups')
                         .select('id, name')
                         .eq('owner', user.data.user.id);
                     for (const question of data) {
-                        // Nur Felder aus Supabase-Schema übernehmen
                         let filteredQuestionBase = {};
                         filteredQuestionBase.question = question.question;
                         filteredQuestionBase.answer = question.answer;
                         if (question.additionalInfo !== undefined) filteredQuestionBase.additionalinfo = question.additionalInfo;
+                        if (question.imageurl !== undefined) filteredQuestionBase.imageurl = question.imageurl;
                         filteredQuestionBase.owner = user.data.user.id;
                         if (question.collaborators) filteredQuestionBase.collaborators = question.collaborators;
-                        // Gruppenzuordnung über tags: Alle passenden Gruppen suchen
                         let foundGroups = [];
                         if (Array.isArray(question.tags) && question.tags.length > 0 && groups && groups.length > 0) {
                             for (const tag of question.tags) {
@@ -357,6 +355,75 @@ if (document.getElementById('importQuestionsBtn')) {
                     }
                     if (errorMsg) statusDiv.textContent = 'Fehler/Übersprungen: ' + errorMsg + '\nImportiert: ' + importedCount + '\nGesendete Daten: ' + JSON.stringify(debugData, null, 2);
                     else statusDiv.textContent = 'Import erfolgreich! (' + importedCount + ' Fragen)';
+                } catch (err) {
+                    statusDiv.textContent = 'Fehler beim Import: ' + file.name;
+                }
+            };
+            reader.readAsText(file);
+        });
+    });
+}
+
+// Fragen-Export: imageurl wird ausgegeben
+async function exportQuestions() {
+    const user = await window.supabase.auth.getUser();
+    const { data: questions, error } = await window.supabase
+        .from('questions')
+        .select('question, answer, additionalinfo, imageurl, group_id, owner, collaborators');
+    if (error) {
+        window.notification.show('Fehler beim Export: ' + error.message, 'error');
+        return;
+    }
+    const exportData = questions.map(q => ({
+        question: q.question,
+        answer: q.answer,
+        additionalInfo: q.additionalinfo,
+        imageurl: q.imageurl,
+        group_id: q.group_id,
+        owner: q.owner,
+        collaborators: q.collaborators
+    }));
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'questions-export.json';
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+// Kategorien-Import: Nur Supabase-Schema-Felder übernehmen
+if (document.getElementById('importCategoriesBtn')) {
+    document.getElementById('importCategoriesBtn').addEventListener('click', function() {
+        var fileInput = document.getElementById('importCategoriesFile');
+        var statusDiv = document.getElementById('importCategoriesStatus');
+        if (!fileInput.files.length) {
+            statusDiv.textContent = 'Bitte eine Kategorien-JSON auswählen.';
+            return;
+        }
+        Array.from(fileInput.files).forEach(function(file) {
+            var reader = new FileReader();
+            reader.onload = async function(e) {
+                try {
+                    var data = JSON.parse(e.target.result);
+                    const user = await window.supabase.auth.getUser();
+                    let errorMsg = '';
+                    let importedCount = 0;
+                    for (const category of data) {
+                        let filteredCategory = {};
+                        filteredCategory.name = category.name;
+                        if (category.description !== undefined) filteredCategory.description = category.description;
+                        filteredCategory.owner = user.data.user.id;
+                        if (category.collaborators) filteredCategory.collaborators = category.collaborators;
+                        const { error } = await window.supabase.from('categories').upsert(filteredCategory);
+                        if (error) {
+                            errorMsg += error.message + '\n';
+                        } else {
+                            importedCount++;
+                        }
+                    }
+                    if (errorMsg) statusDiv.textContent = 'Fehler: ' + errorMsg + '\nImportiert: ' + importedCount;
+                    else statusDiv.textContent = 'Import erfolgreich! (' + importedCount + ' Kategorien)';
                 } catch (err) {
                     statusDiv.textContent = 'Fehler beim Import: ' + file.name;
                 }

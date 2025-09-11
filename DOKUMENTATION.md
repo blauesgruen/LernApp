@@ -330,6 +330,7 @@ Letzte Änderung: Automatische Bereinigung und Umstellung auf Supabase-only (10.
 - question (Text, Pflichtfeld)
 - answer (Text, Pflichtfeld)
 - additionalinfo (Text, optional, aus JSON-Feld additionalInfo gemappt)
+- imageurl (Text, optional, URL zum Bild im Supabase Storage)
 - group_id (uuid, optional, Fremdschlüssel auf groups.id, wird über tags ermittelt)
 - owner (uuid, Pflichtfeld)
 - collaborators (uuid[] oder Text[], optional)
@@ -338,8 +339,22 @@ Letzte Änderung: Automatische Bereinigung und Umstellung auf Supabase-only (10.
 - Nur diese Felder dürfen beim Import/Export verwendet werden.
 - Die Import-Logik muss alle Felder korrekt abbilden und keine anderen Felder senden.
 - Das Feld `id` wird nicht gesetzt, sondern von Supabase generiert.
-- Alle anderen Felder wie `type`, `difficulty`, etc. werden ignoriert.
 - Die Doku und der Code müssen immer synchron gehalten werden.
+
+## SQL für die Tabelle questions (Supabase)
+
+```sql
+CREATE TABLE questions (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    question TEXT NOT NULL,
+    answer TEXT NOT NULL,
+    additionalinfo TEXT,
+    imageurl TEXT,
+    group_id uuid REFERENCES groups(id),
+    owner uuid NOT NULL,
+    collaborators uuid[]
+);
+```
 
 ## Kollaborations-/Freigabe-Konzept
 - Das Feld `collaborators` enthält User-IDs oder Team-IDs, die Zugriff auf den jeweiligen Datensatz haben.

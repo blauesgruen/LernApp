@@ -121,46 +121,29 @@ async function saveCategories(categories) {
  * @param {string} createdBy - Benutzername des Erstellers
  * @returns {Promise<object|null>} Die erstellte Kategorie oder null bei Fehler
  */
-async function createCategory(name, createdBy, mainCategory = MAIN_CATEGORY.TEXT) {
+async function createCategory(name, owner, description = '', collaborators = []) {
     if (!window.supabase) {
         console.error('Supabase-Client ist nicht verfügbar.');
         return null;
     }
     if (!name) {
-        console.error("Name der Kategorie ist erforderlich.");
+        console.error('Name der Kategorie ist erforderlich.');
         return null;
     }
-
     try {
-        // Insert and let the DB generate the id (DB should have a default/UUID)
         const { data, error } = await window.supabase.from('categories').insert({
             name,
-            // DB column is `maincategory`
-            maincategory: mainCategory,
-            // set owner (used by existing policies) and collaborators
-            owner: createdBy,
-            collaborators: [createdBy]
+            description,
+            owner,
+            collaborators
         }).select();
-        
         if (error) {
             console.error('Fehler beim Erstellen der Kategorie:', error);
             return null;
         }
-        
-        // normalize returned row to camelCase expected by the UI
-        const c = data && data[0] ? data[0] : null;
-        if (!c) return null;
-        return {
-            id: c.id,
-            name: c.name,
-            description: c.description ?? c.desc ?? '',
-            mainCategory: c.maincategory ?? c.main_category ?? c.mainCategory ?? null,
-            createdBy: c.created_by ?? c.createdBy ?? c.owner ?? null,
-            createdAt: c.created_at ?? c.createdAt ?? null,
-            ...c
-        };
+        return data && data[0] ? data[0] : null;
     } catch (error) {
-        console.error("Fehler beim Erstellen der Kategorie:", error);
+        console.error('Fehler beim Erstellen der Kategorie:', error);
         return null;
     }
 }
@@ -236,41 +219,29 @@ async function saveGroups(groups) {
  * @param {string} createdBy - Benutzername des Erstellers
  * @returns {Promise<object|null>} Die erstellte Gruppe oder null bei Fehler
  */
-async function createGroup(name, categoryId, createdBy) {
+async function createGroup(name, category_id, owner, collaborators = []) {
     if (!window.supabase) {
         console.error('Supabase-Client ist nicht verfügbar.');
         return null;
     }
-    if (!name || !categoryId) {
-        console.error("Name und Kategorie-ID sind erforderlich.");
+    if (!name || !category_id) {
+        console.error('Name und Kategorie-ID sind erforderlich.');
         return null;
     }
-
     try {
         const { data, error } = await window.supabase.from('groups').insert({
             name,
-            category_id: categoryId,
-            created_by: createdBy,
-            created_at: new Date().toISOString()
+            category_id,
+            owner,
+            collaborators
         }).select();
-        
         if (error) {
             console.error('Fehler beim Erstellen der Gruppe:', error);
             return null;
         }
-        
-        const g = data && data[0] ? data[0] : null;
-        if (!g) return null;
-        return {
-            id: g.id,
-            name: g.name,
-            categoryId: g.category_id ?? g.categoryId ?? null,
-            createdBy: g.created_by ?? g.createdBy ?? null,
-            createdAt: g.created_at ?? g.createdAt ?? null,
-            ...g
-        };
+        return data && data[0] ? data[0] : null;
     } catch (error) {
-        console.error("Fehler beim Erstellen der Gruppe:", error);
+        console.error('Fehler beim Erstellen der Gruppe:', error);
         return null;
     }
 }
