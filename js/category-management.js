@@ -1,6 +1,6 @@
 // category-management.js - Verwaltung von Kategorien und Gruppen
 
-console.log('DEBUG: category-management.js direkt gestartet');
+window.logConsole('DEBUG: category-management.js direkt gestartet', 'debug');
 // Supabase-Userverwaltung: Die lokale User-Logik wurde entfernt
 // Die Authentifizierung und Userdaten werden jetzt über Supabase gehandhabt
 
@@ -113,7 +113,7 @@ if (groupForm) {
  * Initialisiert die Seite
  */
 async function initializePage() {
-    console.log('DEBUG: initializePage wird gestartet');
+    window.logConsole('DEBUG: initializePage wird gestartet', 'debug');
     try {
         await Promise.all([
             loadCategoryTree(),
@@ -135,7 +135,7 @@ async function initializePage() {
  * Lädt alle Kategorien und zeigt sie im Baumformat an
  */
 async function loadCategoryTree() {
-    console.log('DEBUG: loadCategoryTree wird gestartet');
+    window.logConsole('DEBUG: loadCategoryTree wird gestartet', 'debug');
     try {
         // Use safe DOM methods instead of building HTML strings
         categoryTree.innerHTML = '';
@@ -144,7 +144,7 @@ async function loadCategoryTree() {
             window.quizDB.loadGroups()
         ]);
         const userCategories = categories.filter(category => category.createdBy !== 'system');
-        console.log('DEBUG: userCategories:', userCategories);
+    window.logConsole(['DEBUG: userCategories', userCategories], 'debug');
         if (userCategories.length === 0) {
             const p = document.createElement('p');
             p.className = 'info-text';
@@ -502,34 +502,6 @@ async function handleEditItemDelete() {
                 </div>
             </div>`;
             const div = document.createElement('div'); div.innerHTML = modalHtml; document.body.appendChild(div.firstElementChild);
-            document.getElementById('cascade-delete-cancel').addEventListener('click', () => {
-                const m = document.getElementById('cascade-delete-modal'); if (m) { m.style.display='none'; m.setAttribute('aria-hidden','true'); }
-            });
-            document.getElementById('cascade-delete-confirm').addEventListener('click', async () => {
-                const m = document.getElementById('cascade-delete-modal');
-                const t = m?.dataset?.type;
-                const entityId = m?.dataset?.entityId;
-                if (!t || !entityId) {
-                    if (m) { m.style.display='none'; m.setAttribute('aria-hidden','true'); }
-                    return;
-                }
-                try {
-                    document.getElementById('cascade-delete-confirm').disabled = true;
-                    if (t === 'category') {
-                        const ok = await window.quizDB.cascadeDeleteCategory(entityId);
-                        if (ok) showSuccess('Kategorie und zugehörige Inhalte gelöscht.'); else showError('Löschen fehlgeschlagen.');
-                    } else if (t === 'group') {
-                        const ok = await window.quizDB.cascadeDeleteGroup(entityId);
-                        if (ok) showSuccess('Gruppe und zugehörige Fragen gelöscht.'); else showError('Löschen fehlgeschlagen.');
-                    }
-                } catch (e) {
-                    console.error('Cascade delete error', e); showError('Fehler beim Löschen.');
-                } finally {
-                    if (m) { m.style.display='none'; m.setAttribute('aria-hidden','true'); }
-                    document.getElementById('cascade-delete-confirm').disabled = false;
-                    await loadCategoryTree(); await updateCategorySelects();
-                }
-            });
         }
 
         const modal = document.getElementById('cascade-delete-modal');
@@ -604,18 +576,7 @@ document.addEventListener('click', function(e) {
     }
 });
 
-// Fallback: if the button exists at load time, attach direct listener as well
-document.addEventListener('DOMContentLoaded', function() {
-    try {
-        const btn = document.getElementById('edit-item-delete');
-        if (btn && !btn._hasDirectDeleteHandler) {
-            btn.addEventListener('click', function(e) { e.preventDefault(); handleEditItemDelete(); });
-            btn._hasDirectDeleteHandler = true;
-        }
-    } catch (e) {
-        console.warn('Could not attach direct delete handler', e);
-    }
-});
+// Delegated click handler already ensures the delete button works even if created dynamically.
 
 /* ----------------- Scrollable hint logic ----------------- */
 /** Returns true if the element has overflowed vertical content */

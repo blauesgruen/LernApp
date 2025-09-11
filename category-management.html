@@ -78,10 +78,11 @@
 
     <div id="footer-container"></div>
 
-    <!-- Edit Item Modal -->
-    <div id="edit-item-modal" class="modal-dialog" aria-hidden="true" style="display:none;">
-        <div class="modal-content">
-            <button class="modal-close" aria-label="Schließen">×</button>
+    <!-- Edit Item Modal (overlay style like cascade modal) -->
+    <div id="edit-item-modal" role="dialog" aria-hidden="true" style="display:none;position:fixed;inset:0;z-index:2147483646;">
+        <div class="modal-backdrop" style="position:absolute;inset:0;background:rgba(0,0,0,0.45);"></div>
+        <div class="modal-panel" role="document" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:#fff;color:#222;max-width:720px;width:94%;border-radius:8px;padding:18px;box-shadow:0 12px 48px rgba(0,0,0,0.35);">
+            <button class="modal-close" aria-label="Schließen" style="position:absolute;right:12px;top:8px;background:none;border:none;font-size:20px;line-height:1;cursor:pointer;">×</button>
             <h2 id="edit-item-title">Element bearbeiten</h2>
             <div class="modal-body">
                 <form id="edit-item-form">
@@ -95,10 +96,10 @@
                         <label for="edit-item-category">Kategorie</label>
                         <select id="edit-item-category"></select>
                     </div>
-                    <div class="form-actions">
+                    <div class="form-actions" style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;">
                         <button type="submit" class="btn-primary">Speichern</button>
-                        <button type="button" id="edit-item-delete" class="btn-danger">Löschen</button>
-                        <button type="button" class="modal-close btn-secondary">Abbrechen</button>
+                        <button type="button" id="edit-item-delete" class="btn btn-danger" style="background:#d9534f;color:#fff;border:none;padding:8px 12px;border-radius:6px;">Löschen</button>
+                        <button type="button" class="modal-close btn-secondary" style="background:#eee;border:1px solid #ccc;padding:8px 12px;border-radius:6px;">Abbrechen</button>
                     </div>
                 </form>
             </div>

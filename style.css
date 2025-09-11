@@ -889,6 +889,28 @@ img.icon {
     gap: 20px;
 }
 
+/* Panel style used by the new overlay modals (.modal-panel) so they match the classic .modal-content look */
+.modal-panel {
+    background: #fff;
+    padding: 20px;
+    border-radius: 10px;
+    width: 520px;
+    max-width: calc(100% - 32px);
+    box-shadow: 0 10px 40px rgba(0,0,0,0.18);
+    position: relative;
+    box-sizing: border-box;
+}
+
+/* Ensure overlay container centers its panel like .modal-dialog does */
+#edit-item-modal, #cascade-delete-modal {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+}
+#edit-item-modal[aria-hidden="true"], #cascade-delete-modal[aria-hidden="true"] {
+    display: none !important;
+}
+
 .management-card {
     background-color: #fff;
     border-radius: 10px;
