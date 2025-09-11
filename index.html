@@ -23,17 +23,8 @@
     <div id="footer-container"></div>
     <script>
         window.checkLoginAndRedirect();
-        // Header dynamisch laden
-        fetch('partials/header.html').then(r => r.text()).then(html => {
-            document.getElementById('header-container').innerHTML = html;
-            if (window.updateNavigation) window.updateNavigation();
-            if (window.breadcrumbs) window.breadcrumbs.init();
-        });
-        // Footer dynamisch laden
-        fetch('partials/footer.html').then(r => r.text()).then(html => {
-            document.getElementById('footer-container').innerHTML = html;
-            window.initHeaderFooter();
-        });
+    // Load header and footer (centralized in app-core.js)
+    if (window.loadHeaderFooter) window.loadHeaderFooter();
         // Zentraler Supabase-Client-Check
         window.checkSupabaseClient();
     </script>

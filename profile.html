@@ -66,13 +66,12 @@
             </div>
         </section>
     </main>
-    <div id="footer-container"></div>
-    <script>
-      const SUPABASE_URL = 'https://yzyrvwmofyztwttgmyqn.supabase.co';
-      const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl6eXJ2d21vZnl6dHd0dGdteXFuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc0NjA2ODUsImV4cCI6MjA3MzAzNjY4NX0.OaFPV0q-0mf2LO4dFd7FEd-vNzRjA1nJPnEXHM3WiXw';
-      window.supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-      // Zentraler Supabase-Client-Check
-      window.checkSupabaseClient();
-    </script>
+        <div id="footer-container"></div>
+        <script>
+            // Use centralized header/footer loader
+            if (window.loadHeaderFooter) window.loadHeaderFooter();
+            // Central supabase client check
+            if (window.checkSupabaseClient) window.checkSupabaseClient();
+        </script>
 </body>
 </html>

@@ -34,16 +34,10 @@
     <div id="footer-container"></div>
 
     <script>
-        // Header und Footer laden
-        fetch('partials/header.html').then(r => r.text()).then(html => {
-            document.getElementById('header-container').innerHTML = html;
-            if (window.updateNavigation) window.updateNavigation();
-            if (window.breadcrumbs) window.breadcrumbs.init();
-        });
-        fetch('partials/footer.html').then(r => r.text()).then(html => {
-            document.getElementById('footer-container').innerHTML = html;
-            window.initHeaderFooter();
-        });
+        // Load header/footer via centralized helper
+        if (window.loadHeaderFooter) window.loadHeaderFooter();
+        if (window.checkSupabaseClient) window.checkSupabaseClient();
+    </script>
         // Registrierung-Handler mit Passwort-Vergleich
         document.getElementById('registerForm').addEventListener('submit', async (e) => {
             e.preventDefault();

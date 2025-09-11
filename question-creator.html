@@ -122,8 +122,10 @@
     <script src="js/quiz-db.js"></script>
     <script src="js/question-creator.js"></script>
     <script>
-        // Zentraler Supabase-Client-Check
-        window.checkSupabaseClient();
+    // Zentraler Supabase-Client-Check
+    window.checkSupabaseClient && window.checkSupabaseClient();
+    // Load header/footer via centralized helper
+    if (window.loadHeaderFooter) window.loadHeaderFooter();
     </script>
 </body>
 </html>

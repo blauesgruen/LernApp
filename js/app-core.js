@@ -4,20 +4,66 @@
 
 // 1. Supabase-Initialisierung
 function initSupabase() {
+    // If a client already exists on window, prefer it (backwards compatibility with pages that created a client inline)
+    if (window.supabaseClient) {
+        window.logConsole('Supabase client already present on window.supabaseClient; skipping init.', 'info');
+        return;
+    }
+    // Some older pages placed the created client on window.supabase directly (overwriting the library).
+    if (typeof window.supabase === 'object' && window.supabase !== null && typeof window.supabase.auth === 'object') {
+        window.supabaseClient = window.supabase;
+        window.logConsole('Detected existing supabase client assigned to window.supabase; using it as supabaseClient.', 'info');
+        return;
+    }
+
+    // Ensure the Supabase library is available (has createClient)
     if (typeof window.supabase === 'undefined' || typeof window.supabase.createClient !== 'function') {
         window.showError('Supabase-Bibliothek nicht geladen! Bitte Script-Tag prüfen.');
         return;
     }
-    window.supabaseClient = window.supabase.createClient(
-        'https://yzyrvwmofyztwttgmyqn.supabase.co', // Supabase-Produktiv-URL
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl6eXJ2d21vZnl6dHd0dGdteXFuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc0NjA2ODUsImV4cCI6MjA3MzAzNjY4NX0.OaFPV0q-0mf2LO4dFd7FEd-vNzRjA1nJPnEXHM3WiXw' // Supabase-Produktiv-Anon-Key
-    );
-    console.log('Supabase-Client initialisiert.');
+
+    // NOTE: Supabase credentials are embedded here by request.
+    const url = 'https://yzyrvwmofyztwttgmyqn.supabase.co';
+    const key = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl6eXJ2d21vZnl6dHd0dGdteXFuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc0NjA2ODUsImV4cCI6MjA3MzAzNjY4NX0.OaFPV0q-0mf2LO4dFd7FEd-vNzRjA1nJPnEXHM3WiXw';
+    try {
+        window.supabaseClient = window.supabase.createClient(url, key);
+        console.log('Supabase-Client initialisiert.');
+    } catch (err) {
+        window.showError('Fehler bei Supabase-Initialisierung: ' + err.message);
+    }
 }
+
+// Load header/footer central helper so pages can call it once
+window.loadHeaderFooter = function() {
+    // Guard: avoid loading header/footer multiple times
+    if (window._headerFooterLoaded) return;
+    window._headerFooterLoaded = true;
+    const headerContainer = document.getElementById('header-container');
+    const footerContainer = document.getElementById('footer-container');
+    if (headerContainer) {
+        fetch('partials/header.html').then(r => r.text()).then(html => {
+            headerContainer.innerHTML = html;
+            if (window.updateNavigation) window.updateNavigation();
+            if (window.breadcrumbs && typeof window.breadcrumbs.init === 'function') window.breadcrumbs.init();
+        }).catch(err => window.logConsole('Failed to load header: ' + err, 'error'));
+    }
+    if (footerContainer) {
+        fetch('partials/footer.html').then(r => r.text()).then(html => {
+            footerContainer.innerHTML = html;
+            if (window.initHeaderFooter) window.initHeaderFooter();
+        }).catch(err => window.logConsole('Failed to load footer: ' + err, 'error'));
+    }
+};
+
+// Auto-init on DOMContentLoaded: try to init Supabase and load header/footer
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initSupabase);
+    document.addEventListener('DOMContentLoaded', function() {
+        initSupabase();
+        if (typeof window.loadHeaderFooter === 'function') window.loadHeaderFooter();
+    });
 } else {
     initSupabase();
+    if (typeof window.loadHeaderFooter === 'function') window.loadHeaderFooter();
 }
 
 // 2. Authentifizierungs-Funktionen
