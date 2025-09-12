@@ -15,7 +15,7 @@
     <div id="header-container"></div>
 
     <main>
-    <section class="centered-section" id="question-creator-section">
+        <section class="centered-section" id="category-management-section">
             <div class="section-header">
                 <a href="dashboard.html" class="back-button">
                     <i class="fas fa-arrow-left"></i> Zurück
@@ -24,6 +24,7 @@
             </div>
 
             <div id="profile-columns">
+                <!-- Linke Spalte: Kategorie-Baum -->
                 <div class="profile-col profile-info">
                     <h2>Kategorie & Gruppe wählen</h2>
                     <!-- Versteckte Felder für die ausgewählte Kategorie und Gruppe -->
@@ -36,19 +37,22 @@
                     </div>
                 </div>
 
-                <div class="profile-col profile-db">
+                <div class="profile-col profile-question">
                     <h2>Neue Frage erstellen</h2>
                     <div class="management-card">
                         <form id="question-form">
                             <div class="form-content">
                                 <div class="form-group">
-                                    <label for="question-text">Fragetext:</label>
+                                    <!-- <h1 for="question-text">Fragetext:</h1> -->
                                     <textarea id="question-text" rows="4" required placeholder="Gib hier deine Frage ein..."></textarea>
                                 </div>
 
                                 <div class="form-group">
-                                    <label class="image-upload-label" for="question-image"><i class="fas fa-upload"></i> Bild hinzufügen (für Bilderquiz)</label>
-                                    <input type="file" id="question-image" accept="image/*" style="display:none;">
+                                    <!-- <h1 for="question-image">Frage-Bild hinzufügen:</h1> -->
+                                    <div class="form-actions">
+                                        <button type="file" id="question-image" accept="image/*" class="btn-primary"><i class="fas fa-upload"></i> Frage-Bild</button>
+                                    </div>
+                                    <!-- <input type="file" id="question-image" accept="image/*" style="display:none;"> -->
                                     <div id="image-preview" class="image-preview"></div>
                                     <div id="image-name" class="image-name"></div>
                                 </div>
@@ -57,19 +61,12 @@
                                     <label for="question-explanation">Erklärung (optional):</label>
                                     <textarea id="question-explanation" rows="3" placeholder="Erkläre die richtige Antwort..."></textarea>
                                 </div>
-
-                                <div class="form-group">
-                                    <label for="question-difficulty">Schwierigkeitsgrad:</label>
-                                    <input type="range" id="question-difficulty" min="1" max="5" value="3">
-                                </div>
-
-                                <h3>Antwort</h3>
+                                <h1>Antwort:</h1>
                                 <div id="answers-container">
                                     <div class="answer-option">
                                         <textarea id="answer-0" class="answer-text" rows="2" required placeholder="Die richtige Antwort..."></textarea>
                                     </div>
                                 </div>
-
                                 <div class="form-actions">
                                     <button type="submit" class="btn-primary"><i class="fas fa-save"></i> Frage speichern</button>
                                 </div>
@@ -78,7 +75,7 @@
                     </div>
                 </div>
 
-                <div class="profile-col profile-danger">
+                <div class="profile-col profile-question">
                     <h2>Fragen in dieser Gruppe</h2>
                     <div class="management-card">
                         <div id="group-questions-list" class="items-list">

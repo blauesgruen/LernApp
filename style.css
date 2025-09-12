@@ -1,13 +1,12 @@
 /* Stile für den Fragen-Ersteller-Bereich */
 
 .centered-section {
-    min-height: 100vh;
+    min-height: calc(100vh - 2 * var(--bar-height)); /* Vollbild minus Header und Footer */
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
     text-align: center;
-    padding-top: var(--container-padding-desktop);
     padding-left: var(--container-padding-desktop);
     padding-right: var(--container-padding-desktop);
 }
@@ -22,6 +21,7 @@
     padding-left: 0;
     margin-top: 0;
     gap: 16px;
+    padding-top: var(--container-padding-mobile);
 }
 .section-header .back-button {
     flex: 0 0 auto;
@@ -127,7 +127,7 @@ nav {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 10px;
+    padding: 0 10px;
     width: 100%; /* Sicherstellen, dass die Navigation die gesamte Breite einnimmt */
 }
 
@@ -480,11 +480,12 @@ img.icon {
     display: flex;
     gap: 32px;
     justify-content: center;
-    margin-top: 16px;
     align-items: stretch;
     width: 100vw;
     max-width: none;
     box-sizing: border-box;
+    padding-top: var(--container-padding-desktop);
+    padding-bottom: var(--container-padding-desktop);
 }
 
 .profile-col {
@@ -517,7 +518,7 @@ img.icon {
     background: #1976d2; /* Standard: blau */
 }
 .profile-col.profile-db::before {
-    background: #388e3c !important; /* Dunkelgrün für mittlere Spalte */
+    background: #778e38 !important; /* Dunkelgrün für mittlere Spalte */
 }
 .profile-col.profile-danger {
     background: #fff;
@@ -530,17 +531,29 @@ img.icon {
     padding: 24px 18px 18px 18px; /* exakt wie die anderen Karten */
     margin-top: 0 !important; /* kein zusätzlicher Abstand nach oben */
 }
-.profile-col.profile-danger::before {
+.profile-col.profile-group::before {
     background: #8bc34a !important; /* Hellgrün für rechte Spalte */
+}
+.profile-col.profile-danger::before {
+    background: #ff0000 !important; /* Rot für rechte Spalte */
+}
+.profile-col h1 {
+    font-size: 1.15rem;
+    margin-bottom: 6px;
+    font-weight: 500;
+    margin-top: 0;
 }
 .profile-col h2 {
     font-size: 1.15rem;
     margin-bottom: 18px;
-    color: #1976d2;
     font-weight: 600;
+    margin-top: 0;
 }
 .profile-col.profile-danger h2 {
     color: #e53935;
+}
+.profile-question::before {
+    background: #da059a; /* Lila */
 }
 @media (max-width: 900px) {
     #profile-columns {
@@ -552,8 +565,17 @@ img.icon {
         max-width: 98vw;
         min-height: 0;
         height: auto; /* Für mobile Ansicht, damit die Karten flexibel sind */
+        padding-top: var(--container-padding-mobile) !important;
+        padding-bottom: var(--container-padding-mobile) !important;
         padding-left: var(--container-padding-mobile) !important;
         padding-right: var(--container-padding-mobile) !important;
+    }
+    .section-header h1 {
+        flex: 0 1 auto;
+        margin: 0;
+        text-align: right;
+        font-size: 1.5rem;
+        align-self: flex-end;
     }
 }
 
@@ -747,7 +769,7 @@ img.icon {
 
 /* Form Styles für Kategorie und Gruppe */
 .form-group {
-    margin-bottom: 20px;
+    margin-bottom: 0px;
 }
 
 .form-group label {
@@ -1013,7 +1035,7 @@ img.icon {
     background-color: #fff;
     border-radius: 10px;
     box-shadow: 0 0 20px rgba(0, 0, 0, 0.05);
-    padding: 20px;
+    padding: 0 20px;
     height: 100%; /* Karten immer gleich hoch wie die Spalte */
     display: flex;
     flex-direction: column;
@@ -1025,18 +1047,20 @@ img.icon {
     flex-direction: column;
     height: 100%;
     justify-content: space-between;
+    padding-left: 6px;
+    padding-right: 6px;
 }
 
 .form-content {
     flex-grow: 1;
 }
     
-    .management-card h2 {
-        margin-top: 0;
-        margin-bottom: 20px;
-        color: #333;
-        font-size: 1.3rem;
-    }
+.management-card h2 {
+    margin-top: 0;
+    margin-bottom: 20px;
+    color: #333;
+    font-size: 1.3rem;
+}
     
 .management-card form {
         flex-grow: 1;
@@ -1123,33 +1147,6 @@ img.icon {
 
 #storage-path-form .btn-secondary:hover {
     background-color: #5a6268;
-}
-
-/* First-Login-Dialog */
-#first-login-dialog .modal-content {
-    text-align: left;
-}
-
-#first-login-dialog h2 {
-    color: #007BFF;
-    margin-top: 0;
-}
-
-#first-login-dialog .form-info {
-    margin: 15px 0;
-}
-
-#first-login-dialog .form-group {
-    margin-bottom: 20px;
-}
-
-#first-login-dialog input {
-    width: 100%;
-    padding: 10px;
-    border: 1px solid #ddd;
-    border-radius: 6px;
-    font-size: 16px;
-    box-sizing: border-box;
 }
 
 /* Stile für das Input-Feld mit dem Browse-Button */
@@ -1381,6 +1378,7 @@ img.icon {
     cursor: pointer;
     padding: 10px 20px;
     margin: 6px 0;
+    margin-top: auto;
     transition: background 0.2s, color 0.2s;
     color: #fff;
     display: inline-block;
@@ -1403,6 +1401,7 @@ img.icon {
     box-shadow: 0 2px 8px rgba(0,0,0,0.04);
     transition: background 0.2s, color 0.2s;
     text-decoration: none;
+    margin-top: 16px;
 }
 
 .btn-primary:hover {
@@ -1439,9 +1438,6 @@ input, label {
     margin-bottom: 8px;
     color: #222;
 }
-.profile-col h2 {
-    color: #222 !important;
-}
 .profile-col.profile-danger h2 {
     color: #e53935;
 }
@@ -1467,8 +1463,6 @@ input, label {
     width: 100% !important;
     box-sizing: border-box !important;
     /* add small horizontal padding so inputs aren't flush against the colored bar */
-    padding-left: 12px;
-    padding-right: 12px;
 }
 
 /* Ensure selects and buttons inside profile-col use the same sizing and feel */
@@ -1488,6 +1482,7 @@ input, label {
     padding: 12px 14px !important;
     font-size: 1.05rem !important;
     display: block !important;
+;
 }
 
 /* Optional helper to center controls inside smaller containers */
@@ -1565,7 +1560,7 @@ input, label {
 */
 @media (min-width: 900px) {
     :root {
-        --profile-panel-max-height: 600px; /* adjusted default panel height */
+        --profile-panel-max-height: 100%; /* adjusted default panel height */
     }
 
     #profile-columns {
@@ -1594,7 +1589,6 @@ input, label {
     .profile-col.profile-danger .form-content {
         max-height: calc(var(--profile-panel-max-height) - 110px);
         overflow-y: auto;
-        padding-right: 6px; /* avoid hidden scrollbar overlapping content */
     }
 
     /* Reduce accent stripe so it doesn't steal too much width */
