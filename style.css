@@ -187,9 +187,14 @@ nav ul li a {
 
 /* Stile für den Login-Bereich */
 #login {
-    max-width: 400px;
-    margin: 50px auto;
+    min-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
     text-align: center;
+    padding-left: var(--container-padding-desktop);
+    padding-right: var(--container-padding-desktop);
 }
 
 #login h1 {
@@ -250,6 +255,8 @@ nav ul li a {
     align-items: center;
     margin: auto;
     text-align: center;
+    padding-left: var(--container-padding-desktop);
+    padding-right: var(--container-padding-desktop);
 }
 
 #register h1 {
