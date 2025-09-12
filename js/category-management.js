@@ -1,27 +1,23 @@
-// category-management.js - Verwaltung von Kategorien und Gruppen
-
+// category-management.js – Verwaltung von Kategorien und Gruppen
+// Authentifizierung und Userdaten werden zentral über Supabase gehandhabt
 window.logConsole('DEBUG: category-management.js direkt gestartet', 'debug');
-// Supabase-Userverwaltung: Die lokale User-Logik wurde entfernt
-// Die Authentifizierung und Userdaten werden jetzt über Supabase gehandhabt
 
-// Elemente für Kategorie-Formular
+// Elemente für das Kategorie-Formular
 const categoryForm = document.getElementById('category-form');
 const categoryNameInput = document.getElementById('category-name');
 const categoryTree = document.getElementById('category-tree');
 const selectedCategoryId = document.getElementById('selected-category-id');
 
-// Container für Gruppenliste (kann optional sein)
+// Container für die Gruppenliste (optional)
 const groupsList = document.getElementById('groups-list') || null;
 
-// Elemente für Gruppen-Formular
+// Elemente für das Gruppen-Formular
 const groupForm = document.getElementById('group-form');
 const groupCategorySelect = document.getElementById('group-category');
 const groupNameInput = document.getElementById('group-name');
 const filterCategoryInput = document.getElementById('filter-category');
 
-// Hilfsfunktion: aktuellen User holen
-// Verwendet bevorzugt die zentrale Funktion aus app-core (`window.getCurrentUser`),
-// fällt sonst auf den initialisierten Supabase-Client (`window.supabaseClient`) zurück.
+// Hilfsfunktion: Holt die aktuelle User-ID, bevorzugt über window.getCurrentUser, sonst Supabase-Fallback
 async function getCurrentUserId() {
     try {
         if (typeof window.getCurrentUser === 'function') {
@@ -40,10 +36,10 @@ async function getCurrentUserId() {
     return null;
 }
 
-// Initialisierung
+// Initialisierung der Seite
 initializePage();
 
-// Event Listener für das Kategorie-Formular
+// Event Listener für das Kategorie-Formular (Kategorie anlegen)
 if (categoryForm) {
     categoryForm.addEventListener('submit', async function(e) {
         e.preventDefault();
@@ -74,7 +70,7 @@ if (categoryForm) {
     });
 }
 
-// Event Listener für das Gruppen-Formular
+// Event Listener für das Gruppen-Formular (Gruppe anlegen)
 if (groupForm) {
     groupForm.addEventListener('submit', async function(e) {
         e.preventDefault();
@@ -110,7 +106,7 @@ if (groupForm) {
 }
 
 /**
- * Initialisiert die Seite
+ * Initialisiert die Seite: Lädt Kategorien, Gruppen und setzt Breadcrumbs
  */
 async function initializePage() {
     window.logConsole('DEBUG: initializePage wird gestartet', 'debug');
@@ -136,7 +132,7 @@ async function initializePage() {
 async function loadCategoryTree() {
     window.logConsole('DEBUG: loadCategoryTree wird gestartet', 'debug');
     try {
-        // Use safe DOM methods instead of building HTML strings
+    // Nutzt sichere DOM-Methoden statt HTML-Strings
         categoryTree.innerHTML = '';
         const [categories, groups] = await Promise.all([
             window.quizDB.loadCategories(),
@@ -153,7 +149,7 @@ async function loadCategoryTree() {
         }
         userCategories.sort((a, b) => a.name.localeCompare(b.name));
 
-        // Build DOM nodes
+    // Baut DOM-Nodes für Kategorien und Gruppen
         userCategories.forEach(category => {
             const categoryGroups = groups.filter(group => group.categoryId === category.id).sort((a,b)=>a.name.localeCompare(b.name));
 
@@ -244,7 +240,7 @@ async function loadCategoryTree() {
             categoryTree.appendChild(groupContainer);
         });
 
-        // Event delegation for better performance and simpler logic
+    // Event Delegation für bessere Performance und einfachere Logik
         categoryTree.removeEventListener('click', categoryTree._delegatedClickHandler);
         const delegatedClickHandler = function(e) {
             // open edit modal when clicking edit buttons
@@ -295,7 +291,7 @@ async function loadCategoryTree() {
                     if (icon) { icon.classList.remove('fa-chevron-right'); icon.classList.add('fa-chevron-down'); }
                 }
                 selectedCategoryId.value = clickedCategoryId;
-                groupCategorySelect.value = clickedCategoryId;
+                // Entfernt: Automatisches Setzen ins Dropdown
                 try { groupNameInput.focus(); } catch (e) {}
                 return;
             }
@@ -307,12 +303,12 @@ async function loadCategoryTree() {
                 groupClick.classList.add('active');
                 const categoryId = groupClick.dataset.categoryId;
                 selectedCategoryId.value = categoryId;
-                groupCategorySelect.value = categoryId;
+                // Entfernt: Automatisches Setzen ins Dropdown
                 return;
             }
         };
         categoryTree.addEventListener('click', delegatedClickHandler);
-        // keyboard support: Enter/Space on edit buttons
+    // Tastatur-Support: Enter/Space auf Edit-Buttons
         categoryTree.addEventListener('keydown', function(e) {
             const el = e.target.closest && e.target.closest('.tree-item-edit');
             if (!el) return;
@@ -321,7 +317,7 @@ async function loadCategoryTree() {
                 el.click();
             }
         });
-        // keep a reference so we can remove later if needed
+    // Referenz für Event-Handler speichern (späteres Entfernen möglich)
         categoryTree._delegatedClickHandler = delegatedClickHandler;
     } catch (error) {
         console.error('Fehler beim Laden des Kategoriebaums:', error);
@@ -329,7 +325,7 @@ async function loadCategoryTree() {
     }
 }
 
-/* ---------------- Edit modal logic ---------------- */
+/* ---------------- Edit-Modal-Logik ---------------- */
 function openEditModal(type, id, categoryId=null) {
     const modal = document.getElementById('edit-item-modal');
     const title = document.getElementById('edit-item-title');
@@ -342,7 +338,7 @@ function openEditModal(type, id, categoryId=null) {
     inputType.value = type;
     inputId.value = id;
 
-    // populate name and category
+    // Name und Kategorie im Modal befüllen
     if (type === 'category') {
         title.textContent = 'Kategorie bearbeiten';
         categoryRow.style.display = 'none';
@@ -369,10 +365,10 @@ function openEditModal(type, id, categoryId=null) {
         }).catch(() => { categorySelect.innerHTML = ''; });
     }
 
-    // show modal
+    // Modal anzeigen
     modal.style.display = 'block';
     modal.setAttribute('aria-hidden','false');
-    // focus first control for keyboard users
+    // Fokus auf erstes Eingabefeld für Tastatur-Nutzer
     setTimeout(() => {
         try { document.getElementById('edit-item-name').focus(); } catch (e) {}
     }, 30);
@@ -380,7 +376,7 @@ function openEditModal(type, id, categoryId=null) {
 
 function closeEditModal() {
     const modal = document.getElementById('edit-item-modal');
-    // If focus is currently inside the modal, move it to a sensible fallback
+    // Falls Fokus im Modal: auf sinnvolles Element verschieben
     try {
         const active = document.activeElement;
         if (active && modal.contains(active)) {
@@ -400,14 +396,14 @@ function closeEditModal() {
     modal.setAttribute('aria-hidden','true');
 }
 
-// close buttons
+// Schließen-Button für Modal
 document.addEventListener('click', (e) => {
     if (e.target.closest && e.target.closest('#edit-item-modal .modal-close')) {
         closeEditModal();
     }
 });
 
-// close modal on ESC
+// Modal mit ESC schließen
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
         const modal = document.getElementById('edit-item-modal');
@@ -415,7 +411,7 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
-// handle save
+// Speichern-Handler für Modal
 document.getElementById('edit-item-form').addEventListener('submit', async function(e) {
     e.preventDefault();
     const type = document.getElementById('edit-item-type').value;
@@ -423,7 +419,7 @@ document.getElementById('edit-item-form').addEventListener('submit', async funct
     const name = document.getElementById('edit-item-name').value.trim();
     const categoryId = document.getElementById('edit-item-category').value;
     if (!name) { showError('Name darf nicht leer sein.'); return; }
-    // Optimistic UI update with rollback
+    // Optimistisches UI-Update mit Rollback bei Fehler
     try {
         if (type === 'category') {
             const catEl = categoryTree.querySelector(`.tree-item-category[data-id="${id}"]`);
@@ -478,7 +474,7 @@ document.getElementById('edit-item-form').addEventListener('submit', async funct
     }
 });
 
-// handle delete: use delegated click handler so it works even if the button is created later
+// Löschen-Handler: Delegierter Click, funktioniert auch bei dynamisch erzeugten Buttons
 async function handleEditItemDelete() {
     const type = document.getElementById('edit-item-type')?.value;
     const id = document.getElementById('edit-item-id')?.value;
@@ -487,7 +483,7 @@ async function handleEditItemDelete() {
         try { closeEditModal(); } catch (e) { /* ignore */ }
 
         if (!document.getElementById('cascade-delete-modal')) {
-            // full-screen overlay with centered dialog to ensure visibility above all content
+            // Fullscreen-Overlay mit zentriertem Dialog, garantiert Sichtbarkeit
             const modalHtml = `
             <div id="cascade-delete-modal" role="dialog" aria-hidden="true" style="display:none;position:fixed;inset:0;z-index:2147483646;">
                 <div class="modal-backdrop" style="position:absolute;inset:0;background:rgba(0,0,0,0.45);"></div>
@@ -526,7 +522,7 @@ async function handleEditItemDelete() {
     }
 }
 
-// delegated click so it works even if the edit modal button is added later
+// Delegierter Click, funktioniert auch bei dynamisch erzeugtem Delete-Button
 document.addEventListener('click', function(e) {
     const btn = e.target.closest && e.target.closest('#edit-item-delete');
     if (btn) {
@@ -535,7 +531,7 @@ document.addEventListener('click', function(e) {
     }
 });
 
-// delegated handlers for modal confirm/cancel to guarantee responsiveness
+// Delegierte Handler für Modal Confirm/Cancel, garantiert Responsivität
 document.addEventListener('click', function(e) {
     // confirm
     const c = e.target.closest && e.target.closest('#cascade-delete-confirm');
@@ -575,16 +571,16 @@ document.addEventListener('click', function(e) {
     }
 });
 
-// Delegated click handler already ensures the delete button works even if created dynamically.
+// Delegierter Click-Handler stellt sicher, dass Delete-Button immer funktioniert
 
-/* ----------------- Scrollable hint logic ----------------- */
-/** Returns true if the element has overflowed vertical content */
+/* ----------------- Scrollbar-Hinweis-Logik ----------------- */
+/** Gibt true zurück, wenn das Element vertikal gescrollt werden kann */
 function isVerticallyScrollable(el) {
     if (!el) return false;
     return el.scrollHeight > el.clientHeight + 1; // small tolerance
 }
 
-/** Apply or remove .scrollable class on the category-tree container */
+/** Setzt oder entfernt die .scrollable-Klasse am category-tree-Container */
 function markCategoryTreeScrollable() {
     try {
         const container = document.querySelector('.profile-col.profile-info .category-tree-container');
@@ -601,7 +597,7 @@ function markCategoryTreeScrollable() {
     }
 }
 
-// Debounced resize listener
+// Debounced Resize-Listener
 let _resizeTimer = null;
 window.addEventListener('resize', () => {
     if (_resizeTimer) clearTimeout(_resizeTimer);
@@ -610,14 +606,14 @@ window.addEventListener('resize', () => {
     }, 150);
 });
 
-// Run after initial render
+// Nach initialem Rendern ausführen
 document.addEventListener('DOMContentLoaded', () => {
     // small timeout to let layout settle if scripts appended dynamically
     setTimeout(markCategoryTreeScrollable, 100);
 });
 
 /**
- * Aktualisiert die Kategorie-Auswahlfelder
+ * Aktualisiert die Kategorie-Auswahlfelder für Gruppen
  */
 async function updateCategorySelects() {
     try {
@@ -637,7 +633,7 @@ async function updateCategorySelects() {
 }
 
 /**
- * Lädt alle Gruppen und zeigt sie an
+ * Lädt alle Gruppen und zeigt sie in der Gruppenliste an
  */
 async function loadGroups() {
     try {
@@ -696,7 +692,7 @@ async function loadGroups() {
 }
 
 /**
- * Setzt die Breite und Zentrierung für alle Formularelemente nachträglich per JS
+ * Setzt die Breite und Zentrierung für alle Formularelemente per JS
  */
 function setFormElementWidths() {
     const elements = [

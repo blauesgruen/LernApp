@@ -14,21 +14,22 @@
 <body>
     <div id="header-container"></div>
     <main>
-        <section id="profile">
-            <div class="section-header" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: auto; padding-left: 0; margin-top: auto;">
+        <section class="centered-section" id="profil">
+            <div class="section-header">
                 <a href="dashboard.html" class="back-button">
                     <i class="fas fa-arrow-left"></i> Zurück
                 </a>
-                <h1 style="margin: 0; text-align: right; flex-grow: 1;">Mein Profil</h1>
+                <h1>Mein Profil</h1>
             </div>
-            <div class="profile-user-info" style="margin-bottom: 18px;">
+            <!-- fake? -->
+            <!-- <div class="profile-user-info" style="margin-bottom: 18px;">
                 <span id="profile-user-nickname"></span>
                 <span id="profile-user-email"></span>
-            </div>
+            </div> -->
             <div id="profile-columns">
+                <!-- Linke Spalte: Kategorie-Baum -->
                 <div class="profile-col profile-info">
                     <h2>Profil</h2>
-                    <!-- Eingabefelder und Button, keine Anzeige von Nickname/Email mehr hier -->
                     <label for="nickname">Nickname:</label>
                     <input type="text" id="nickname" placeholder="Nickname">
                     <label for="newPassword" style="margin-top:18px;">Neues Passwort:</label>

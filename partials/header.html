@@ -7,38 +7,6 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link rel="stylesheet" href="css/fixed-layout.css">
     <style>
-        .app-logo-button {
-            cursor: pointer; /* Change cursor to pointer to indicate clickability */
-            text-decoration: none; /* Ensure no underline is shown */
-        }
-        .btn {
-            padding: 10px 20px;
-            margin: 10px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-        }
-        .btn-secondary {
-            background-color: #6c757d;
-            color: white;
-        }
-        .app-logo-button i {
-            color: blue; /* Icon immer blau */
-        }
-        .app-logo-button span {
-            color: black; /* Text immer schwarz */
-        }
-        /* Gemeinsame Stile für alle Menübuttons */
-        #user-buttons a, .admin-button {
-            margin-right: 15px; /* Abstand zwischen den Buttons */
-            color: black; /* Textfarbe immer schwarz */
-            text-decoration: none; /* Keine Unterstreichung */
-            transition: color 0.3s ease; /* Weicher Übergang für Hover-Effekt */
-        }
-        #user-buttons a:hover, .admin-button:hover {
-            color: #007bff; /* Dezente Farbänderung beim Hover */
-        }
-
         /* Breadcrumb Navigation Stile */
         .breadcrumb-container {
             padding: 10px 20px;
@@ -117,11 +85,10 @@
         <ul>
             <!-- Admin-Button entfernt -->
             <li id="user-buttons" style="display: none;">
-                <a href="profile.html" class="profile-button" id="profile-button">Profil</a>
-                <a href="#" class="logout-button" id="logout-button" onclick="window.logoutUser()">Ausloggen</a>
+                <a href="profile.html" class="btn-header" id="profile-button">Profil</a>
+                <a href="#" class="btn-header" id="logout-button" onclick="window.logoutUser()">Ausloggen</a>
             </li>
         </ul>
-        <div class="header-right"></div>
     </nav>
 
     <!-- Breadcrumb Navigation -->
