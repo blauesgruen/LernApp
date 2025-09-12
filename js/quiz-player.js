@@ -1,6 +1,102 @@
+    /**
+     * Beendet das Quiz und zeigt die Ergebnisse an
+     */
+    function endQuiz() {
+        // Timer stoppen
+        stopTimer();
+        quizSection.classList.add('hidden');
+        quizResultsSection.classList.remove('hidden');
+        // Quiz-Dauer berechnen
+        quizDuration = Math.floor((Date.now() - startTime) / 1000);
+        // Ergebnisse anzeigen
+        displayResults();
+        // Breadcrumbs aktualisieren, falls verfügbar
+        if (window.breadcrumbs) {
+            window.breadcrumbs.set([
+                { label: 'Quiz', url: 'quiz-player.html' },
+                { label: 'Ergebnis', url: null }
+            ]);
+        }
+    }
+    /**
+     * Lädt die Quiz-Fragen passend zu den gewählten Einstellungen
+     * @param {string} categoryId - Gewählte Kategorie
+     * @param {string} groupId - Gewählte Gruppe (optional)
+     * @param {number} questionCount - Anzahl der Fragen
+     * @returns {Promise<Array>} Gefilterte Fragen
+     */
+    async function loadQuizQuestions(categoryId, groupId, questionCount, quizType) {
+        try {
+            const allQuestions = await window.quizDB.loadQuestions();
+            const allGroups = await window.quizDB.loadGroups();
+            // Alle Gruppen zur Kategorie finden
+            const groupsOfCategory = allGroups.filter(g => String(g.category_id ?? g.categoryId) === String(categoryId));
+            const groupIds = groupsOfCategory.map(g => String(g.id));
+            // Debug: Gruppen zur Kategorie
+            console.log('Gruppen zur Kategorie', categoryId, ':', groupsOfCategory);
+            // Fragen nach Gruppe filtern
+            let questions = allQuestions.filter(q => groupIds.includes(String(q.group_id ?? q.groupId)));
+            // Falls eine Gruppe explizit gewählt wurde, weiter filtern
+            if (groupId) {
+                questions = questions.filter(q => String(q.group_id ?? q.groupId) === String(groupId));
+            }
+            // Nach Quiz-Typ filtern (Text/Bild, beide Varianten prüfen)
+            if (quizType === 'image') {
+                questions = questions.filter(q => (q.imageUrl ?? q.imageurl) && String(q.imageUrl ?? q.imageurl).trim() !== '');
+            } else if (quizType === 'text') {
+                questions = questions.filter(q => (q.text ?? q.question) && String(q.text ?? q.question).trim() !== '');
+            }
+            // Debug: Gefilterte Fragen
+            console.log('Gefilterte Fragen für Kategorie', categoryId, 'und Gruppe', groupId, ':', questions);
+            // Zufällige Auswahl der gewünschten Anzahl
+            if (questions.length > questionCount) {
+                questions = questions.sort(() => Math.random() - 0.5).slice(0, questionCount);
+            }
+            return questions;
+        } catch (error) {
+            console.error('Fehler beim Laden der Quiz-Fragen:', error);
+            showError('Fehler beim Laden der Quiz-Fragen.');
+            return [];
+        }
+    }
 // quiz-player.js - Steuerung des Quiz-Spiels
 
 document.addEventListener('DOMContentLoaded', function() {
+    /**
+     * Stoppt den Timer
+     */
+    function stopTimer() {
+        if (timerInterval) {
+            clearInterval(timerInterval);
+            timerInterval = null;
+        }
+    }
+
+    /**
+     * Beendet das Quiz und zeigt die Ergebnisse an
+     */
+    function endQuiz() {
+        stopTimer();
+        quizSection.classList.add('hidden');
+        quizResultsSection.classList.remove('hidden');
+        quizDuration = Math.floor((Date.now() - startTime) / 1000);
+        displayResults();
+        if (window.breadcrumbs) {
+            window.breadcrumbs.set([
+                { label: 'Quiz', url: 'quiz-player.html' },
+                { label: 'Ergebnis', url: null }
+            ]);
+        }
+    }
+    /**
+     * Stoppt den Timer
+     */
+    function stopTimer() {
+        if (timerInterval) {
+            clearInterval(timerInterval);
+            timerInterval = null;
+        }
+    }
     // Prüfen, ob der Benutzer eingeloggt ist
     const isLoggedIn = (window.storage && typeof window.storage.isLoggedIn === 'function') ? window.storage.isLoggedIn() : (localStorage.getItem('loggedIn') === 'true');
     const username = (window.storage && typeof window.storage.getUsername === 'function') ? window.storage.getUsername() : localStorage.getItem('username');
@@ -91,7 +187,8 @@ document.addEventListener('DOMContentLoaded', function() {
             const loadedQuestions = await loadQuizQuestions(
                 currentSettings.categoryId,
                 currentSettings.groupId,
-                currentSettings.questionCount
+                currentSettings.questionCount,
+                currentSettings.type
             );
             
             if (loadedQuestions.length === 0) {
@@ -163,50 +260,52 @@ document.addEventListener('DOMContentLoaded', function() {
      * Protokolliert einen Überblick über die verfügbaren Fragen zur Fehlerdiagnose
      */
     async function logAvailableQuestions() {
-        try {
-            const questions = await window.quizDB.loadQuestions();
-            const categories = await window.quizDB.loadCategories();
-            
-            // Überblick über alle Fragen
-            console.log(`Gesamtzahl verfügbarer Fragen: ${questions.length}`);
-            
-            // Anzahl der Fragen pro Kategorie
-            const questionsByCategory = {};
-            categories.forEach(category => {
-                questionsByCategory[category.id] = {
-                    name: category.name,
-                    type: category.mainCategory,
-                    totalCount: 0,
-                    textQuestions: 0,
-                    imageQuestions: 0
-                };
-            });
-            
-            // Zählen der Fragen pro Kategorie und Typ
-            questions.forEach(question => {
-                if (questionsByCategory[question.categoryId]) {
-                    questionsByCategory[question.categoryId].totalCount++;
-                    
-                    if (question.imageUrl && question.imageUrl.trim() !== '') {
-                        questionsByCategory[question.categoryId].imageQuestions++;
-                    }
-                    
-                    if (question.text && question.text.trim() !== '') {
-                        questionsByCategory[question.categoryId].textQuestions++;
-                    }
+    // Kategorien und Fragen laden
+    const categories = await window.quizDB.loadCategories();
+    const groups = await window.quizDB.loadGroups();
+    const questions = await window.quizDB.loadQuestions();
+    // Debug: Zeige alle Kategorie-IDs
+    console.log('Alle Kategorien:', categories.map(c => ({ id: c.id, name: c.name })));
+    // Debug: Zeige alle Fragen und deren Gruppe/Kategorie
+    console.log('Alle Fragen:', questions.map(q => ({ id: q.id, groupId: q.group_id ?? q.groupId, text: q.text ?? q.question, imageUrl: q.imageUrl ?? q.imageurl })));
+    try {
+        // Überblick über alle Fragen
+        console.log(`Gesamtzahl verfügbarer Fragen: ${questions.length}`);
+        // Anzahl der Fragen pro Kategorie
+        const questionsByCategory = {};
+        categories.forEach(category => {
+            questionsByCategory[category.id] = {
+                name: category.name,
+                type: category.mainCategory,
+                totalCount: 0,
+                textQuestions: 0,
+                imageQuestions: 0
+            };
+        });
+        // Zählen der Fragen pro Kategorie und Typ
+        questions.forEach(question => {
+            // Gruppe zur Frage finden
+            const group = groups.find(g => String(g.id) === String(question.group_id ?? question.groupId));
+            if (group && questionsByCategory[group.category_id ?? group.categoryId]) {
+                const catId = group.category_id ?? group.categoryId;
+                questionsByCategory[catId].totalCount++;
+                if (question.imageUrl && question.imageUrl.trim() !== '') {
+                    questionsByCategory[catId].imageQuestions++;
                 }
-            });
-            
-            // Überblick ausgeben
-            console.log('Fragen pro Kategorie:');
-            Object.keys(questionsByCategory).forEach(categoryId => {
-                const info = questionsByCategory[categoryId];
-                console.log(`- ${info.name} (${info.type}): ${info.totalCount} Fragen gesamt (${info.textQuestions} mit Text, ${info.imageQuestions} mit Bild)`);
-            });
-            
-        } catch (error) {
-            console.error('Fehler beim Protokollieren der verfügbaren Fragen:', error);
-        }
+                if (question.text && question.text.trim() !== '') {
+                    questionsByCategory[catId].textQuestions++;
+                }
+            }
+        });
+        // Überblick ausgeben
+        console.log('Fragen pro Kategorie:');
+        Object.keys(questionsByCategory).forEach(categoryId => {
+            const info = questionsByCategory[categoryId];
+            console.log(`- ${info.name} (${info.type}): ${info.totalCount} Fragen gesamt (${info.textQuestions} mit Text, ${info.imageQuestions} mit Bild)`);
+        });
+    } catch (error) {
+        console.error('Fehler beim Protokollieren der verfügbaren Fragen (Supabase):', error);
+    }
     }
 
     /**
@@ -215,64 +314,46 @@ document.addEventListener('DOMContentLoaded', function() {
     async function updateCategorySelect() {
         try {
             const quizType = quizTypeSelect.value;
-            
-            // Auswahlfeld leeren
             categorySelect.innerHTML = '<option value="">-- Kategorie wählen --</option>';
-            
             if (!quizType) {
                 categorySelect.innerHTML += '<option value="" disabled>Wähle zuerst einen Quiz-Typ</option>';
                 return;
             }
-            
-            // Kategorien und Fragen laden
-            const [categories, questions] = await Promise.all([
-                window.quizDB.loadCategories(),
-                window.quizDB.loadQuestions()
-            ]);
-            
-            // Kategorien ermitteln, die Fragen mit Bildern haben
+            // Kategorien und Fragen über zentrale DB-Funktionen laden
+            const categories = await window.quizDB.loadCategories();
+            const questions = await window.quizDB.loadQuestions();
+            // Kategorien mit Bildern ermitteln
             const categoriesWithImages = new Set();
-            questions.forEach(question => {
-                if (question.imageUrl && question.imageUrl.trim() !== '') {
-                    categoriesWithImages.add(question.categoryId);
+            questions.forEach(q => {
+                if (q.imageUrl && q.imageUrl.trim() !== '') {
+                    categoriesWithImages.add(q.categoryId);
                 }
             });
-            
-            console.log('Kategorien mit Bildern:', Array.from(categoriesWithImages));
-            
-            // Kategorien filtern basierend auf dem Quiz-Typ
-            let userCategories = categories.filter(category => category.createdBy !== 'system');
-            
-            if (quizType === window.quizDB.MAIN_CATEGORY.IMAGE) {
-                // Für Bilderquiz: Nur Kategorien anzeigen, die Fragen mit Bildern haben
-                userCategories = userCategories.filter(category => 
-                    categoriesWithImages.has(category.id) || category.mainCategory === quizType
+            // Kategorien filtern
+            let userCategories = categories.filter(cat => cat.createdBy !== 'system');
+            if (quizType === 'image') {
+                userCategories = userCategories.filter(cat =>
+                    categoriesWithImages.has(cat.id) || cat.mainCategory === quizType
                 );
-            } else if (quizType === window.quizDB.MAIN_CATEGORY.TEXT) {
-                // Für Textquiz: Alle benutzerdefinierten Kategorien anzeigen oder solche mit mainCategory === 'text'
-                userCategories = userCategories.filter(category => 
-                    category.mainCategory === quizType || !category.mainCategory
+            } else if (quizType === 'text') {
+                userCategories = userCategories.filter(cat =>
+                    cat.mainCategory === quizType || !cat.mainCategory
                 );
             }
-            
-            console.log(`Gefilterte Kategorien für ${quizType}:`, userCategories);
-            
-            // Füge benutzerdefinierte Kategorien hinzu
+            // Auswahlfeld befüllen
             if (userCategories.length > 0) {
-                userCategories.forEach(category => {
+                userCategories.forEach(cat => {
                     const option = document.createElement('option');
-                    option.value = category.id;
-                    option.textContent = category.name;
+                    option.value = cat.id;
+                    option.textContent = cat.name;
                     categorySelect.appendChild(option);
                 });
             } else {
                 categorySelect.innerHTML += '<option value="" disabled>Keine Kategorien für diesen Quiz-Typ vorhanden</option>';
             }
-            
-            // Gruppen aktualisieren
             await updateGroupSelect();
         } catch (error) {
-            console.error('Fehler beim Aktualisieren des Kategorie-Auswahlfelds:', error);
+            console.error('Fehler beim Laden der Kategorien aus Supabase:', error);
             showError('Fehler beim Laden der Kategorien.');
         }
     }
@@ -283,106 +364,52 @@ document.addEventListener('DOMContentLoaded', function() {
     async function updateGroupSelect() {
         try {
             const categoryId = categorySelect.value;
-            
-            // Auswahlfeld leeren
             groupSelect.innerHTML = '<option value="">Alle Gruppen</option>';
-            
             if (!categoryId) {
                 groupSelect.innerHTML += '<option value="" disabled>Wähle zuerst eine Kategorie</option>';
                 return;
             }
-            
-            // Gruppen laden
+            // Gruppen über zentrale DB-Funktion laden
             const groups = await window.quizDB.loadGroups();
-            
             // Gruppen für die gewählte Kategorie filtern
             const filteredGroups = groups.filter(group => group.categoryId === categoryId);
-            
-            if (filteredGroups.length === 0) {
-                groupSelect.innerHTML += '<option value="" disabled>Keine Gruppen für diese Kategorie</option>';
-                return;
+            if (filteredGroups.length > 0) {
+                filteredGroups.forEach(group => {
+                    const option = document.createElement('option');
+                    option.value = group.id;
+                    option.textContent = group.name;
+                    groupSelect.appendChild(option);
+                });
+            } else {
+                groupSelect.innerHTML += '<option value="" disabled>Keine Gruppen für diese Kategorie vorhanden</option>';
             }
-            
-            // Gruppen hinzufügen
-            filteredGroups.forEach(group => {
-                const option = document.createElement('option');
-                option.value = group.id;
-                option.textContent = group.name;
-                groupSelect.appendChild(option);
-            });
         } catch (error) {
-            console.error('Fehler beim Aktualisieren des Gruppen-Auswahlfelds:', error);
+            console.error('Fehler beim Laden der Gruppen aus Supabase:', error);
             showError('Fehler beim Laden der Gruppen.');
         }
     }
-
-    /**
- * Lädt die Quiz-Fragen basierend auf den Einstellungen
- * @param {string} categoryId - ID der Kategorie
- * @param {string} groupId - ID der Gruppe (optional)
- * @param {number} questionCount - Anzahl der Fragen
- * @returns {Promise<Array>} Die geladenen Fragen
- */
-async function loadQuizQuestions(categoryId, groupId, questionCount) {
-    try {
-        if (!categoryId) {
-            showError('Bitte wähle eine Kategorie aus.');
-            return [];
-        }
-        
-        // Den Quiz-Typ aus den aktuellen Einstellungen verwenden
-        const quizType = quizTypeSelect.value;
-        console.log(`Quiz-Typ beim Laden der Fragen: ${quizType}`);
-        
-        // Fragen laden
-        const questions = await window.quizDB.getQuizQuestions(
-            categoryId,
-            groupId || null,
-            questionCount
-        );
-        
-        // Debug-Information
-        console.log(`Geladene Fragen gesamt: ${questions.length}`);
-        
-        // Fragen nach dem Quiz-Typ filtern
-        let filteredQuestions = questions;
-        
-        if (quizType === window.quizDB.MAIN_CATEGORY.IMAGE) {
-            // Für Bilderquiz: Nur Fragen mit Bildern, Text ist optional
-            filteredQuestions = questions.filter(q => q.imageUrl && q.imageUrl.trim() !== '');
-            console.log(`Fragen mit Bildern: ${filteredQuestions.length} von ${questions.length}`);
-        } else if (quizType === window.quizDB.MAIN_CATEGORY.TEXT) {
-            // Für Textquiz: Nur Fragen mit Text
-            filteredQuestions = questions.filter(q => q.text && q.text.trim() !== '');
-            console.log(`Fragen mit Text: ${filteredQuestions.length} von ${questions.length}`);
-        }
-        
-        if (filteredQuestions.length === 0) {
-            if (quizType === window.quizDB.MAIN_CATEGORY.IMAGE) {
-                showWarning('Keine Bildfragen in dieser Kategorie gefunden. Bitte füge Fragen mit Bildern hinzu.');
-            } else {
-                showWarning('Keine Textfragen in dieser Kategorie gefunden. Bitte füge Fragen mit Text hinzu.');
-            }
-            console.warn(`Keine Fragen für Kategorie ${categoryId} und Typ ${quizType} gefunden.`);
-            return [];
-        }
-        
-        if (filteredQuestions.length > 0) {
-            console.log('Beispielfrage:', filteredQuestions[0]);
-        }
-        
-        return filteredQuestions;
-    } catch (error) {
-        console.error('Fehler beim Laden der Quiz-Fragen:', error);
-        showError('Fehler beim Laden der Fragen.');
-        return [];
-    }
-}
 
 /**
  * Startet das Quiz
  */
 async function startQuiz() {
+    // Element-Prüfung
+    const missingElements = {};
+    if (!quizSetupSection) missingElements.quizSetupSection = quizSetupSection;
+    if (!noQuestionsWarning) missingElements.noQuestionsWarning = noQuestionsWarning;
+    if (!quizSection) missingElements.quizSection = quizSection;
+    if (!quizResultsSection) missingElements.quizResultsSection = quizResultsSection;
+    if (Object.keys(missingElements).length > 0) {
+        console.error('Fehler: Ein oder mehrere Quiz-Elemente wurden nicht gefunden!', missingElements);
+        showError('Fehler: Ein oder mehrere Quiz-Elemente fehlen im HTML. Bitte prüfe die IDs.');
+        return;
+    }
+    // Prüfen, ob Fragen vorhanden sind
+    if (!questions || questions.length === 0) {
+        noQuestionsWarning.classList.remove('hidden');
+        showError('Für die gewählte Kategorie und Gruppe sind keine Fragen vorhanden.');
+        return;
+    }
     // Quiz-Setup ausblenden und Quiz-Spieler einblenden
     quizSetupSection.classList.add('hidden');
     noQuestionsWarning.classList.add('hidden');
@@ -444,11 +471,29 @@ async function displayCurrentQuestion() {
             questionImage.src = question.imageUrl;
             questionImageContainer.classList.remove('hidden');
             questionImageContainer.classList.add('main-question-image');
-            console.log("Bildquelle gesetzt:", question.imageUrl);
+            // Bucket-Namen aus imageUrl extrahieren und anzeigen
+            let bucketName = '';
+            try {
+                const match = question.imageUrl.match(/\/object\/public\/([^\/]+)\//);
+                if (match && match[1]) bucketName = match[1];
+            } catch(e) {}
+            let bucketInfo = document.getElementById('bucket-info');
+            if (!bucketInfo) {
+                bucketInfo = document.createElement('div');
+                bucketInfo.id = 'bucket-info';
+                bucketInfo.style.fontSize = '0.95em';
+                bucketInfo.style.color = '#888';
+                bucketInfo.style.marginTop = '6px';
+                questionImageContainer.appendChild(bucketInfo);
+            }
+            bucketInfo.textContent = bucketName ? `Bucket: ${bucketName}` : '';
+            console.log("Bildquelle gesetzt:", question.imageUrl, "Bucket:", bucketName);
         } else {
             // Fehler: Bildfrage ohne Bild
             questionImageContainer.classList.add('hidden');
             questionText.textContent = "Fehler: Bildfrage ohne Bild!";
+            const bucketInfo = document.getElementById('bucket-info');
+            if (bucketInfo) bucketInfo.textContent = '';
             console.error("Bildfrage ohne Bild gefunden:", question);
         }
     }
@@ -494,7 +539,7 @@ async function displayCurrentQuestion() {
      * @param {HTMLElement} selectedButton - Der ausgewählte Antwort-Button
      * @param {Array} allOptions - Alle Antwortoptionen
      */
-    function handleAnswer(selectedOption, question, selectedButton, allOptions) {
+    async function handleAnswer(selectedOption, question, selectedButton, allOptions) {
         // Alle Antwort-Buttons deaktivieren
         const answerButtons = answersContainer.querySelectorAll('.answer-button');
         answerButtons.forEach(button => {
@@ -521,8 +566,22 @@ async function displayCurrentQuestion() {
             correctAnswers++;
         }
         
-        // Statistik speichern
-        window.quizDB.saveStatistics(username, question.id, selectedOption.isCorrect);
+        // Supabase-User-UUID holen
+        let userId = null;
+        if (window.supabase && window.supabase.auth && typeof window.supabase.auth.getUser === 'function') {
+            const { data } = await window.supabase.auth.getUser();
+            userId = data?.user?.id ?? null;
+        }
+        if (!userId && window.supabaseClient && window.supabaseClient.auth && typeof window.supabaseClient.auth.getUser === 'function') {
+            const { data } = await window.supabaseClient.auth.getUser();
+            userId = data?.user?.id ?? null;
+        }
+        if (!userId) {
+            console.error('Supabase-User-ID (UUID) konnte nicht ermittelt werden!');
+            showError('Fehler: Benutzer-ID konnte nicht ermittelt werden.');
+            return;
+        }
+        window.quizDB.saveStatistics(userId, question.id, selectedOption.isCorrect);
         
         // Nächste-Frage-Button oder Quiz-Beenden-Button anzeigen
         if (currentQuestionIndex < questions.length - 1) {
@@ -557,37 +616,34 @@ async function nextQuestion() {
             }
         }
     } else {
-        endQuiz();
-    }
-}    /**
-     * Beendet das Quiz und zeigt die Ergebnisse an
-     */
-    function endQuiz() {
-        // Timer stoppen
-        stopTimer();
-        
-        // Quiz-Dauer berechnen
-        quizDuration = (Date.now() - startTime) / 1000; // in Sekunden
-        
-        // Quiz-Ergebnis speichern
-        window.quizDB.saveQuizResult(
-            username,
-            currentSettings.categoryId,
-            questions.length,
-            correctAnswers,
-            quizDuration
-        );
-        
-        // Quiz-Spieler ausblenden und Ergebnisansicht einblenden
-        quizSection.classList.add('hidden');
-        quizResultsSection.classList.remove('hidden');
-        
-        // Ergebnisse anzeigen
-        displayResults();
-        
-        // Breadcrumbs aktualisieren, falls verfügbar
-        if (window.breadcrumbs) {
-            const currentPath = window.breadcrumbs.path.slice(0, -1); // Letzte Frage entfernen
+        try {
+            const categoryId = categorySelect.value;
+            groupSelect.innerHTML = '<option value="">Alle Gruppen</option>';
+            if (!categoryId) {
+                groupSelect.innerHTML += '<option value="" disabled>Wähle zuerst eine Kategorie</option>';
+                return;
+            }
+            // Gruppen aus Supabase laden
+            const { data: groups, error: groupError } = await supabase
+                .from('groups')
+                .select('*')
+                .eq('categoryId', categoryId)
+                .eq('active', true);
+            if (groupError) throw groupError;
+            if (groups && groups.length > 0) {
+                groups.forEach(group => {
+                    const option = document.createElement('option');
+                    option.value = group.id;
+                    option.textContent = group.name;
+                    groupSelect.appendChild(option);
+                });
+            } else {
+                groupSelect.innerHTML += '<option value="" disabled>Keine Gruppen für diese Kategorie vorhanden</option>';
+            }
+        } catch (error) {
+            console.error('Fehler beim Laden der Gruppen aus Supabase:', error);
+            showError('Fehler beim Laden der Gruppen.');
+        }
             
             // Ergebnis-Eintrag hinzufügen
             currentPath.push({ label: 'Ergebnis', url: null });
@@ -679,7 +735,8 @@ async function nextQuestion() {
             timerInterval = null;
         }
     }
-});
+// Datei-Ende: keine überflüssige schließende Klammer
 
 // Die lokale Speicherung und JSON-Logik wurde entfernt.
 // Die Quiz-Player-Logik nutzt jetzt Supabase für alle Datenoperationen.
+});

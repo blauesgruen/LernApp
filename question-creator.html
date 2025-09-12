@@ -50,9 +50,12 @@
                                 <div class="form-group">
                                     <!-- <h1 for="question-image">Frage-Bild hinzufügen:</h1> -->
                                     <div class="form-actions">
-                                        <button type="file" id="question-image" accept="image/*" class="btn-primary"><i class="fas fa-upload"></i> Frage-Bild</button>
+                                        <input type="file" id="question-image" accept="image/*" style="position:absolute;left:-9999px;" disabled>
+                                        <label for="question-image" class="btn-primary" id="question-image-label" style="cursor:not-allowed;display:inline-block;opacity:0.6;">
+                                            <i class="fas fa-upload"></i> Frage-Bild
+                                        </label>
+                                        <span id="image-upload-hint" style="color:#888;font-size:0.95em;margin-left:8px;">Bitte zuerst eine Gruppe wählen</span>
                                     </div>
-                                    <!-- <input type="file" id="question-image" accept="image/*" style="display:none;"> -->
                                     <div id="image-preview" class="image-preview"></div>
                                     <div id="image-name" class="image-name"></div>
                                 </div>

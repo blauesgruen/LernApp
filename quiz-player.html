@@ -8,6 +8,7 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.7/dist/umd/supabase.min.js"></script>
     <script src="js/app-core.js"></script>
+    <script src="js/quiz-db.js"></script>
     <script src="js/notification.js"></script>
     <script src="js/logger.js"></script>
 </head>
@@ -15,65 +16,22 @@
     <div id="header-container"></div>
 
     <main>
-        <div class="section-header" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: auto; padding-left: 0; margin-top: auto;">
-                <button onclick="history.back()" class="back-button">
+        <section class="centered-section" id="category-management-section">
+            <div class="section-header">
+                <a href="dashboard.html" class="back-button">
                     <i class="fas fa-arrow-left"></i> Zurück
-                </button>
-            <h1 style="margin: 0; text-align: right; flex-grow: 1;">Quiz spielen</h1>
-        </div>
-        
-        <section id="quiz-section" class="hidden">
-            <div class="quiz-header">
-                <h1 id="quiz-title">Quiz</h1>
-                <div class="quiz-info">
-                    <span id="quiz-progress">Frage 1/10</span>
-                    <span id="quiz-timer">00:00</span>
-                </div>
+                </a>
+                <h1>Quiz starten</h1>
             </div>
-            
-            <div class="quiz-container">
-                <div class="quiz-question-container">
-                    <div class="quiz-question">
-                        <h2 id="question-text">Fragetext wird geladen...</h2>
-                    </div>
-                    
-                    <div id="question-image-container" class="quiz-image-container hidden">
-                        <img id="question-image" src="" alt="Fragebild">
-                    </div>
-                    
-                    <div id="answers-container" class="quiz-answers">
-                        <!-- Antworten werden dynamisch eingefügt -->
-                    </div>
-                    
-                    <div id="explanation-container" class="quiz-explanation hidden">
-                        <h3>Erklärung</h3>
-                        <p id="explanation-text"></p>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="quiz-footer">
-                <button id="next-question-btn" class="btn-primary hidden">
-                    Nächste Frage <i class="fas fa-chevron-right"></i>
-                </button>
-                <button id="finish-quiz-btn" class="btn-primary hidden">
-                    Quiz beenden <i class="fas fa-check"></i>
-                </button>
-            </div>
-        </section>
-        
-        <section id="quiz-setup-section">
-            <h1>Quiz starten</h1>
-            
-            <div class="quiz-setup-card">
-                <form id="quiz-setup-form">
-                    <div class="form-group">
-                        <label for="quiz-type">Quiz-Typ:</label>
-                        <select id="quiz-type" required>
-                            <option value="">-- Quiz-Typ wählen --</option>
-                            <option value="text">Textfragen</option>
-                            <option value="image">Bilderquiz</option>
-                        </select>
+            <div class="profile-col profile-info" id="quiz-setup-section">
+                <form id="quiz-setup-form" class="full-height-form">
+                        <div class="form-group">
+                            <label for="quiz-type">Quiz-Typ:</label>
+                            <select id="quiz-type" required>
+                                <option value="">-- Quiz-Typ wählen --</option>
+                                <option value="text">Textfragen</option>
+                                <option value="image">Bilderquiz</option>
+                            </select>
                     </div>
                     
                     <div class="form-group">
@@ -102,13 +60,29 @@
                     </button>
                 </form>
             </div>
+        </section>
             
-            <div id="no-questions-warning" class="warning-box hidden">
-                <i class="fas fa-exclamation-triangle"></i>
-                <p>Es sind keine Fragen für die gewählte Kategorie/Gruppe verfügbar.</p>
-                <p>Bitte erstelle zuerst Fragen oder wähle eine andere Kategorie.</p>
-                <a href="question-creator.html" class="btn-primary">Fragen erstellen</a>
+        <div id="no-questions-warning" class="warning-box hidden">
+            <i class="fas fa-exclamation-triangle"></i>
+            <p>Es sind keine Fragen für die gewählte Kategorie/Gruppe verfügbar.</p>
+            <p>Bitte erstelle zuerst Fragen oder wähle eine andere Kategorie.</p>
+            <a href="question-creator.html" class="btn-primary">Fragen erstellen</a>
+        </div>
+
+        <section id="quiz-section" class="hidden">
+            <div id="quiz-title"></div>
+            <div id="quiz-progress"></div>
+            <div id="quiz-timer">00:00</div>
+            <div id="question-text"></div>
+            <div id="question-image-container" class="hidden">
+                <img id="question-image" src="" alt="Fragebild">
             </div>
+            <div id="answers-container"></div>
+            <div id="explanation-container" class="hidden">
+                <div id="explanation-text"></div>
+            </div>
+            <button id="next-question-btn" class="btn-primary hidden">Nächste Frage</button>
+            <button id="finish-quiz-btn" class="btn-secondary hidden">Quiz beenden</button>
         </section>
         
         <section id="quiz-results-section" class="hidden">

@@ -579,7 +579,34 @@ async function loadQuestions() {
         console.error('Fehler beim Laden der Fragen:', error);
         return [];
     }
-    return data;
+    // Mapping: snake_case zu camelCase
+    const mappedQuestions = data.map(q => ({
+        ...q,
+        text: q.text ?? q.question ?? null,
+        categoryId: q.category_id ?? q.categoryId ?? null,
+        groupId: q.group_id ?? q.groupId ?? null,
+        imageUrl: q.imageurl ?? q.imageUrl ?? null,
+        answer: q.answer ?? null,
+    }));
+
+    // Alle richtigen Antworten sammeln
+    const allAnswers = mappedQuestions.map(q => q.answer).filter(a => !!a);
+
+    // Für jede Frage: options-Array generieren
+    mappedQuestions.forEach(q => {
+        // Richtige Antwort
+        const correct = {
+            text: q.answer,
+            isCorrect: true
+        };
+        // Falsche Antworten: 3 zufällig aus anderen Antworten
+        const wrongAnswers = allAnswers.filter(a => a !== q.answer);
+        const selectedWrong = shuffleArray(wrongAnswers).slice(0, 3).map(a => ({ text: a, isCorrect: false }));
+        // Optionen mischen
+        q.options = shuffleArray([correct, ...selectedWrong]);
+    });
+
+    return mappedQuestions;
 }
 
 /**
@@ -883,22 +910,14 @@ async function saveStatistics(userId, questionId, isCorrect) {
         return false;
     }
     try {
-        // Hole aktuelle Statistik
-        const { data, error } = await window.supabase.from('statistics').select('*').eq('user_id', userId).single();
-        let stats = data || { user_id: userId, question_stats: {}, quiz_stats: [] };
-        // Initialisiere Frage-Statistik
-        if (!stats.question_stats) stats.question_stats = {};
-        if (!stats.question_stats[questionId]) {
-            stats.question_stats[questionId] = { correct: 0, incorrect: 0, lastAnswered: 0 };
-        }
-        if (isCorrect) {
-            stats.question_stats[questionId].correct++;
-        } else {
-            stats.question_stats[questionId].incorrect++;
-        }
-        stats.question_stats[questionId].lastAnswered = Date.now();
-        // Speichere Statistik
-    const { error: upsertError } = await window.supabase.from('statistics').upsert(window.mapToDb('statistics', [stats]));
+        // Speichere nur die aktuelle Antwort als Statistik-Eintrag
+        const stats = {
+            user_id: userId,
+            question_id: questionId,
+            is_correct: isCorrect,
+            created_at: new Date().toISOString()
+        };
+        const { error: upsertError } = await window.supabase.from('statistics').upsert([stats]);
         if (upsertError) {
             console.error("Fehler beim Speichern der Statistik:", upsertError);
             return false;

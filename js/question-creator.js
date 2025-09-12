@@ -21,6 +21,65 @@
   let _currentExpandedQuestion = null;
   let _currentExpandedToggle = null;
 
+    // File upload preview & Supabase upload
+    const fileInput = document.getElementById('question-image');
+    const imagePreview = document.getElementById('image-preview');
+    const imageName = document.getElementById('image-name');
+    const imageLabel = document.getElementById('question-image-label');
+    const imageHint = document.getElementById('image-upload-hint');
+    let uploadedImageUrl = null;
+
+    // Enable/disable file input based on group selection
+    function updateImageInputState() {
+      if (groupSelect && groupSelect.value) {
+        fileInput.disabled = false;
+        imageLabel.style.cursor = 'pointer';
+        imageLabel.style.opacity = '1';
+        if (imageHint) imageHint.style.display = 'none';
+      } else {
+        fileInput.disabled = true;
+        imageLabel.style.cursor = 'not-allowed';
+        imageLabel.style.opacity = '0.6';
+        if (imageHint) imageHint.style.display = 'inline';
+      }
+    }
+    if (groupSelect) {
+      groupSelect.addEventListener('change', updateImageInputState);
+      updateImageInputState();
+    }
+
+    if (fileInput) {
+      fileInput.addEventListener('change', async function (e) {
+        const file = fileInput.files[0];
+        if (!file) {
+          imagePreview.innerHTML = '';
+          imageName.textContent = '';
+          uploadedImageUrl = null;
+          return;
+        }
+        imageName.textContent = file.name;
+        // Preview
+        const reader = new FileReader();
+        reader.onload = function (ev) {
+          imagePreview.innerHTML = `<img src="${ev.target.result}" alt="Vorschau" style="max-width:180px;max-height:180px;border-radius:8px;">`;
+        };
+        reader.readAsDataURL(file);
+
+        // Upload to Supabase Storage
+        if (window.supabase) {
+          const filePath = `question-images/${Date.now()}_${file.name}`;
+          const { data, error } = await window.supabase.storage.from('question-images').upload(filePath, file, { upsert: false });
+          if (error) {
+            window.notification?.showError ? window.notification.showError('Bild-Upload fehlgeschlagen: ' + error.message) : alert('Bild-Upload fehlgeschlagen: ' + error.message);
+            uploadedImageUrl = null;
+          } else {
+            // Get public URL
+            const { data: urlData } = window.supabase.storage.from('question-images').getPublicUrl(filePath);
+            uploadedImageUrl = urlData?.publicUrl || null;
+          }
+        }
+      });
+    }
   const notifyError = (m) => { if (window.notification?.showError) return window.notification.showError(m); console.error(m); };
   const notifySuccess = (m) => { if (window.notification?.showSuccess) return window.notification.showSuccess(m); console.log(m); };
 
@@ -206,6 +265,8 @@
         document.querySelectorAll('.tree-item-category, .tree-item-group').forEach(el => el.classList.remove('active'));
         document.querySelector('.tree-item-category[data-id="' + cid + '"]')?.classList.add('active'); this.classList.add('active');
         if (categorySelect) categorySelect.value = cid; if (groupSelect) groupSelect.value = gid; loadQuestionsForGroup(gid);
+        // Upload-Button aktivieren
+        if (typeof updateImageInputState === 'function') updateImageInputState();
       }));
 
       // Edit icon handlers (category/group edit)
@@ -249,6 +310,54 @@
   await renderCategoryTree();
       if (groupSelect?.value) await loadQuestionsForGroup(groupSelect.value);
       window.addEventListener('resize', () => { /* optional adjust heights */ });
+
+        // Form submit handler for question creation
+        const questionForm = document.getElementById('question-form');
+        if (questionForm) {
+          questionForm.addEventListener('submit', async function (ev) {
+            ev.preventDefault();
+            const text = document.getElementById('question-text')?.value?.trim();
+            const explanation = document.getElementById('question-explanation')?.value?.trim();
+            const answer = document.getElementById('answer-0')?.value?.trim();
+            const categoryId = categorySelect?.value;
+            const groupId = groupSelect?.value;
+            if (!text || !answer || !categoryId || !groupId) {
+              notifyError('Bitte fülle alle Pflichtfelder aus und wähle Kategorie & Gruppe.');
+              return;
+            }
+            let imageUrl = uploadedImageUrl;
+            // Fallback: falls kein Upload, aber Preview vorhanden, nimm Base64
+            if (!imageUrl && fileInput && fileInput.files[0]) {
+              imageUrl = imagePreview.querySelector('img')?.src || null;
+            }
+            const questionData = {
+              text,
+              answer,
+              additionalinfo: explanation,
+              imageUrl,
+              categoryId,
+              groupId,
+              difficulty: 1,
+              createdBy: window.supabase?.auth?.getUser?.()?.id || null
+            };
+            // Supabase DB insert
+            try {
+              const created = await window.quizDB.createQuestion(questionData);
+              if (created && created.id) {
+                notifySuccess('Frage erfolgreich gespeichert!');
+                questionForm.reset();
+                imagePreview.innerHTML = '';
+                imageName.textContent = '';
+                uploadedImageUrl = null;
+                await loadQuestionsForGroup(groupId);
+              } else {
+                notifyError('Fehler beim Speichern der Frage.');
+              }
+            } catch (err) {
+              notifyError('Fehler beim Speichern: ' + (err.message || err));
+            }
+          });
+        }
     } catch (err) {
       console.error('Fehler beim Initialisieren:', err);
       notifyError('Fehler beim Laden der Daten. Bitte Seite neu laden.');

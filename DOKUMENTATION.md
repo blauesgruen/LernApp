@@ -1,3 +1,38 @@
+-- ===============================
+-- Tabelle und Policies für statistics
+-- ===============================
+
+create table public.statistics (
+   id uuid default gen_random_uuid() primary key,
+   user_id uuid not null,
+   question_id text not null,
+   is_correct boolean not null,
+   created_at timestamp with time zone default now()
+);
+
+alter table public.statistics enable row level security;
+
+create policy "Allow insert for authenticated users"
+   on public.statistics
+   for insert
+   with check (auth.uid() = user_id);
+
+create policy "Allow select for authenticated users"
+   on public.statistics
+   for select
+   using (auth.uid() = user_id);
+
+create policy "Allow update for authenticated users"
+   on public.statistics
+   for update
+   using (auth.uid() = user_id);
+
+create policy "Allow delete for authenticated users"
+   on public.statistics
+   for delete
+   using (auth.uid() = user_id);
+
+Hinweis: Die Spalte user_id muss als uuid angelegt werden, damit die Policy funktioniert (auth.uid() liefert uuid).
 # LernApp - Dokumentation und Aufbau
 
 ## Ziel der Anwendung
@@ -7,13 +42,9 @@ Die LernApp ist eine interaktive Plattform, die Benutzern ermöglicht, Wissen du
 
 ## Änderungen und neue Funktionen
 
-### Registrierung
+```markdown
 - Nach der Registrierung wird eine neutrale, gelbe Meldung angezeigt: "Bitte bestätigen Sie Ihre E-Mail-Adresse oder loggen Sie sich ein." Die Erfolgsmeldung wurde entfernt, um das Supabase-Auth-Verhalten korrekt abzubilden.
-- Ein "Passwort vergessen?"-Link wurde unterhalb des Registrierungsformulars ergänzt. Nach Klick wird eine E-Mail zum Zurücksetzen des Passworts über Supabase versendet und eine gelbe Benachrichtigung angezeigt.
-
-### Navigation
 - Der Menüpunkt "Startseite" wurde entfernt.
-- Der Menüpunkt "Dashboard" wurde aus dem Header entfernt, da die Navigation zum Dashboard über den App-Logo-Button erfolgt.
 - Das Icon und der Text "LernApp" führen jetzt zur Startseite oder zum Dashboard (abhängig vom Login-Status) und sind linksbündig ausgerichtet.
 - Der Admin-Button-Text wurde schwarz gefärbt.
 
@@ -22,37 +53,29 @@ Die LernApp ist eine interaktive Plattform, die Benutzern ermöglicht, Wissen du
 - Der Text ist in einer blasseren Farbe (#666) und etwas kleiner als der Willkommen-Text.
 
 ---
-
 ## Anforderungen
 ### Registrierung: E-Mail-Existenz-Check
-
 Vor der Registrierung prüft die App, ob die E-Mail-Adresse bereits existiert. Dazu wird die Tabelle `auth.users` per Supabase-Query abgefragt:
 
 ```js
 const { data: existingUsers, error: checkError } = await supabase
    .from('users')
-   .select('email')
    .eq('email', email);
 ```
 
 Ist die E-Mail bereits vergeben, erscheint eine passende Fehlermeldung und die Registrierung wird nicht ausgeführt.
 
-**Hinweis:** Damit diese Abfrage funktioniert, muss in Supabase eine RLS-Policy für die Tabelle `auth.users` gesetzt werden:
 
 ```sql
 CREATE POLICY "Allow anon email check for registration" ON auth.users
 FOR SELECT
 USING (true);
-
 ALTER TABLE auth.users ENABLE ROW LEVEL SECURITY;
 ```
 
 **Achtung:** Diese Policy ermöglicht User Enumeration. Optional mit Rate-Limit oder Captcha absichern!
 
 ### Kernfunktionen
-1. **Login/Logout-System**: 
-   - Benutzer können sich registrieren, einloggen und ausloggen.
-   - Authentifizierung erfolgt sicher (z. B. mit bcrypt und JWT).
 
 2. **Benutzerdatenbank**:
    - Speicherung von Benutzerinformationen und Fortschritten.
