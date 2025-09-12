@@ -255,6 +255,26 @@ Anmerkung: Diese Änderungen beheben ein kritisches Problem, bei dem die Seite a
 Letzte Änderung: Automatische Bereinigung und Umstellung auf Supabase-only (10.09.2025)
 
 # LernApp - Projekt-spezifische Anweisungen (Stand: 11.09.2025)
+## Supabase Storage — Bucket Einrichtung und Rechte
+
+### Bucket für Bilder
+- Name: `question-images` (exakt so, ohne Leerzeichen/Bindestrich)
+- Muss im Supabase-Dashboard unter Storage angelegt werden
+- Ohne diesen Bucket schlägt der Upload fehl ("Bucket not found")
+
+### Zugriffsrechte
+- Beim Erstellen des Buckets kann eingestellt werden:
+   - **public**: Bilder sind für alle sichtbar (empfohlen für Quiz-Bilder)
+   - **private**: Nur authentifizierte Nutzer können lesen/schreiben
+- Die Rechte werden direkt im Storage-Bucket konfiguriert, nicht per SQL/RLS
+
+### Öffentliche Bild-URL
+- Format: `https://<projekt>.supabase.co/storage/v1/object/public/question-images/<dateiname>`
+- Die URL wird im Feld `imageurl` der Tabelle `questions` gespeichert
+
+### Hinweise
+- Storage-Buckets und deren Rechte sind im Dashboard sichtbar und verwaltbar
+- Es ist kein RLS-SQL-Skript für Storage nötig
 
 ## Supabase Tabellenstruktur (aktualisiert)
 
