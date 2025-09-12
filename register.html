@@ -17,25 +17,27 @@
     <div id="header-container"></div>
 
     <main>
-        <section id="register">
-            <div class="section-header" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: auto; padding-left: 0; margin-top: auto;">
-                <a href="login.html" class="back-button">
-                    <i class="fas fa-arrow-left"></i> Zurück
-                </a>
-                <h1 style="margin: 0; text-align: right; flex-grow: 1;">Registrieren</h1>
+    <section id="register">
+            <div style="width:100%; max-width:400px;">
+                <div class="section-header" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: auto; padding-left: 0; margin-top: auto;">
+                    <a href="login.html" class="back-button">
+                        <i class="fas fa-arrow-left"></i> Zurück
+                    </a>
+                    <h1 style="margin: 0; text-align: right; flex-grow: 1;">Registrieren</h1>
+                </div>
+                <form id="registerForm">
+                    <input type="email" id="registerEmail" placeholder="E-Mail" required>
+                    <input type="password" id="registerPassword" placeholder="Passwort" required>
+                    <input type="password" id="registerPasswordRepeat" placeholder="Passwort wiederholen" required>
+                    <input type="text" id="registerNickname" placeholder="Nickname" required>
+                    <button type="submit" class="btn-primary">Registrieren</button>
+                </form>
+                <div style="margin-top:10px;">
+                    <a href="#" id="forgotPasswordLink" style="color: #e6b800; font-weight: bold;">Passwort vergessen?</a>
+                </div>
+                <div id="registerMessage"></div>
+                <p>Bereits registriert? <a href="login.html">Zum Login</a></p>
             </div>
-            <form id="registerForm">
-                <input type="email" id="registerEmail" placeholder="E-Mail" required>
-                <input type="password" id="registerPassword" placeholder="Passwort" required>
-                <input type="password" id="registerPasswordRepeat" placeholder="Passwort wiederholen" required>
-                <input type="text" id="registerNickname" placeholder="Nickname" required>
-                <button type="submit" class="btn-primary">Registrieren</button>
-            </form>
-            <div style="margin-top:10px;">
-                <a href="#" id="forgotPasswordLink" style="color: #e6b800; font-weight: bold;">Passwort vergessen?</a>
-            </div>
-            <div id="registerMessage"></div>
-            <p>Bereits registriert? <a href="login.html">Zum Login</a></p>
         </section>
     </main>
 

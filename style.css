@@ -243,8 +243,12 @@ nav ul li a {
 
 /* Stile für den Registrieren-Bereich */
 #register {
-    max-width: 400px;
-    margin: 50px auto;
+    min-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    margin: auto;
     text-align: center;
 }
 
