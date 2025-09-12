@@ -12,9 +12,8 @@ if (typeof window.logMessage !== 'function') {
 }
 
 // Supabase-Client nur hier initialisieren!
-// Entfernt: const supabase = window.supabase || window.createClient?.(SUPABASE_URL, SUPABASE_KEY);
-// Verwende nur die globale Instanz:
-const supabase = window.supabase;
+// Verwende die globale Instanz, egal ob window.supabaseClient oder window.supabase:
+const supabase = window.supabaseClient || window.supabase;
 
 /**
  * Gibt den aktuell eingeloggten User zurück
@@ -75,21 +74,29 @@ window.logout = async function() {
  */
 window.register = async function(email, password, nickname) {
     try {
-        const { data, error } = await supabase.auth.signUp({ email, password });
+        const client = window.supabaseClient;
+        if (!client || !client.auth) {
+            logMessage('❌ Supabase-Client nicht initialisiert!', 'error');
+            showError('Supabase-Client nicht initialisiert!');
+            return null;
+        }
+        const { data, error } = await client.auth.signUp({ email, password });
+        console.log('Supabase signUp response:', { data, error });
         if (error) {
             logMessage('❌ Registrierung fehlgeschlagen: ' + error.message, 'error');
             showError('Registrierung fehlgeschlagen: ' + error.message);
             return null;
         }
         // Nickname nach erfolgreichem SignUp speichern
-        if (data.user && nickname) {
-            // Nickname im Profil speichern (Supabase v2: updateUser)
-            await supabase.auth.updateUser({ data: { nickname } });
+        if (data?.user && nickname) {
+            const updateResp = await client.auth.updateUser({ data: { nickname } });
+            console.log('Supabase updateUser response:', updateResp);
         }
         logMessage('✅ Registrierung erfolgreich für: ' + email);
         showSuccess('Registrierung erfolgreich! Bitte bestätigen Sie Ihre E-Mail.');
-        return data.user;
+        return data?.user;
     } catch (error) {
+        console.error('Register catch:', error);
         logMessage('❌ Fehler bei der Registrierung: ' + error.message, 'error');
         showError('Ein Fehler ist aufgetreten.');
         return null;

@@ -7,6 +7,10 @@ Die LernApp ist eine interaktive Plattform, die Benutzern ermöglicht, Wissen du
 
 ## Änderungen und neue Funktionen
 
+### Registrierung
+- Nach der Registrierung wird eine neutrale, gelbe Meldung angezeigt: "Bitte bestätigen Sie Ihre E-Mail-Adresse oder loggen Sie sich ein." Die Erfolgsmeldung wurde entfernt, um das Supabase-Auth-Verhalten korrekt abzubilden.
+- Ein "Passwort vergessen?"-Link wurde unterhalb des Registrierungsformulars ergänzt. Nach Klick wird eine E-Mail zum Zurücksetzen des Passworts über Supabase versendet und eine gelbe Benachrichtigung angezeigt.
+
 ### Navigation
 - Der Menüpunkt "Startseite" wurde entfernt.
 - Der Menüpunkt "Dashboard" wurde aus dem Header entfernt, da die Navigation zum Dashboard über den App-Logo-Button erfolgt.
@@ -20,6 +24,30 @@ Die LernApp ist eine interaktive Plattform, die Benutzern ermöglicht, Wissen du
 ---
 
 ## Anforderungen
+### Registrierung: E-Mail-Existenz-Check
+
+Vor der Registrierung prüft die App, ob die E-Mail-Adresse bereits existiert. Dazu wird die Tabelle `auth.users` per Supabase-Query abgefragt:
+
+```js
+const { data: existingUsers, error: checkError } = await supabase
+   .from('users')
+   .select('email')
+   .eq('email', email);
+```
+
+Ist die E-Mail bereits vergeben, erscheint eine passende Fehlermeldung und die Registrierung wird nicht ausgeführt.
+
+**Hinweis:** Damit diese Abfrage funktioniert, muss in Supabase eine RLS-Policy für die Tabelle `auth.users` gesetzt werden:
+
+```sql
+CREATE POLICY "Allow anon email check for registration" ON auth.users
+FOR SELECT
+USING (true);
+
+ALTER TABLE auth.users ENABLE ROW LEVEL SECURITY;
+```
+
+**Achtung:** Diese Policy ermöglicht User Enumeration. Optional mit Rate-Limit oder Captcha absichern!
 
 ### Kernfunktionen
 1. **Login/Logout-System**: 

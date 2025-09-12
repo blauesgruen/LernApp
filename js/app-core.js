@@ -233,8 +233,17 @@ window.checkLoginAndRedirect = function() {
 };
 window.getCurrentUser = async function() {
     if (!window.supabaseClient) return null;
-    const { data } = await window.supabaseClient.auth.getUser();
-    return data?.user || null;
+    try {
+        const { data, error } = await window.supabaseClient.auth.getUser();
+        if (error && error.status === 403) {
+            // Kein Token vorhanden, kein User eingeloggt – ignoriere diesen Fehler
+            return null;
+        }
+        return data?.user || null;
+    } catch (err) {
+        // Unerwarteter Fehler, ignoriere
+        return null;
+    }
 };
 window.logoutUser = async function() {
     if (!window.supabaseClient) return;
@@ -401,14 +410,14 @@ window.loadGroups.displayName = 'loadGroups';
 // Zentrale Supabase-Client-Debugfunktion
 if (window.checkSupabaseClient === undefined) {
     window.checkSupabaseClient = function() {
-        // Prüft Supabase-Client und gibt Status nur in die Konsole aus
+        // Prüft nur, ob Supabase-Bibliothek und Client geladen sind – keine API-Requests!
         try {
             if (typeof window.SupabaseClient === 'undefined' && typeof window.supabase === 'undefined') {
                 window.showError('Supabase-Client ist nicht verfügbar! Bitte Script-Tag und Netzwerk prüfen.');
             } else {
                 window.logConsole('Supabase-Client geladen!', 'info');
             }
-            // Avoid serializing large or circular objects (Supabase client). Log lightweight type info instead.
+            // Typ-Infos für Debugging
             try {
                 window.logConsole('window.SupabaseClient type: ' + typeof window.SupabaseClient, 'debug');
             } catch (e) { /* ignore */ }
@@ -419,7 +428,7 @@ if (window.checkSupabaseClient === undefined) {
             // Non-fatal: ensure this function never throws
             try { window.logConsole('checkSupabaseClient error: ' + e.message, 'error'); } catch (e2) {}
         }
-    // mark as checked so pages won't call this repeatedly
-    window._supabaseChecked = true;
+        // mark as checked so pages won't call this repeatedly
+        window._supabaseChecked = true;
     };
 }

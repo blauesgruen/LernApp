@@ -10,6 +10,7 @@
     <script src="js/app-core.js"></script>
     <script src="js/notification.js"></script>
     <script src="js/logger.js"></script>
+    <script src="js/register-auth.js"></script>
 </head>
 <body>
     <!-- Einbindung des zentralen Headers -->
@@ -18,7 +19,7 @@
     <main>
         <section id="register">
             <div class="section-header" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: auto; padding-left: 0; margin-top: auto;">
-                <a href="login.html" class="back-button" style="margin-right: margin-top: auto;">
+                <a href="login.html" class="back-button">
                     <i class="fas fa-arrow-left"></i> Zurück
                 </a>
                 <h1 style="margin: 0; text-align: right; flex-grow: 1;">Registrieren</h1>
@@ -30,6 +31,9 @@
                 <input type="text" id="registerNickname" placeholder="Nickname" required>
                 <button type="submit" class="btn-primary">Registrieren</button>
             </form>
+            <div style="margin-top:10px;">
+                <a href="#" id="forgotPasswordLink" style="color: #e6b800; font-weight: bold;">Passwort vergessen?</a>
+            </div>
             <div id="registerMessage"></div>
             <p>Bereits registriert? <a href="login.html">Zum Login</a></p>
         </section>
@@ -39,10 +43,32 @@
     <div id="footer-container"></div>
 
     <script>
-        // Load header/footer via centralized helper
+        // Passwort-Reset-Logik
+        document.getElementById('forgotPasswordLink').addEventListener('click', function(e) {
+            e.preventDefault();
+            const email = document.getElementById('registerEmail').value;
+            if (!email || email.trim().length < 5) {
+                window.showError('Bitte geben Sie Ihre E-Mail-Adresse ein, um das Passwort zurückzusetzen.');
+                return;
+            }
+            if (window.supabaseClient && window.supabaseClient.auth && typeof window.supabaseClient.auth.resetPasswordForEmail === 'function') {
+                window.supabaseClient.auth.resetPasswordForEmail(email)
+                    .then(({ error }) => {
+                        if (error) {
+                            window.showError('Fehler beim Zurücksetzen des Passworts: ' + error.message);
+                        } else if (window.notification && typeof window.notification.showNeutral === 'function') {
+                            window.notification.showNeutral('Eine E-Mail zum Zurücksetzen des Passworts wurde versendet.');
+                        } else {
+                            alert('Eine E-Mail zum Zurücksetzen des Passworts wurde versendet.');
+                        }
+                    });
+            } else {
+                window.showError('Passwort-Reset-Funktion nicht verfügbar.');
+            }
+        });
+        // Header und Footer laden
         if (window.loadHeaderFooter) window.loadHeaderFooter();
-        if (window.checkSupabaseClient) window.checkSupabaseClient();
-    </script>
+
         // Registrierung-Handler mit Passwort-Vergleich
         document.getElementById('registerForm').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -64,8 +90,6 @@
                 window.showError('Fehler: Registrierungsfunktion nicht verfügbar.');
             }
         });
-        // Zentraler Supabase-Client-Check
-        window.checkSupabaseClient();
     </script>
 </body>
 </html>
