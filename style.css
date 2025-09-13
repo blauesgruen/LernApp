@@ -513,7 +513,6 @@ img.icon {
     padding-top: var(--container-padding-desktop);
     padding-bottom: var(--container-padding-desktop);
 }
-
 .profile-col {
     flex: 1 1 0;
     background: linear-gradient(145deg, var(--color-white-clean), var(--color-white-dirty));
@@ -1092,6 +1091,7 @@ img.icon {
     display: flex;
     flex-direction: column;
     height: 100%;
+    gap: 6px;
     justify-content: space-between;
     padding-left: 6px;
     padding-right: 6px;

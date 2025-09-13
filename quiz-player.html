@@ -23,8 +23,9 @@
                 </a>
                 <h1>Quiz starten</h1>
             </div>
-            <div class="profile-col profile-info" id="quiz-setup-section">
-                <form id="quiz-setup-form" class="full-height-form">
+            <div id="profile-columns">
+                <div class="profile-col" id="quiz-setup-section">
+                    <form id="quiz-setup-form" class="full-height-form">
                         <div class="form-group">
                             <label for="quiz-type">Quiz-Typ:</label>
                             <select id="quiz-type" required>
@@ -32,33 +33,34 @@
                                 <option value="text">Textfragen</option>
                                 <option value="image">Bilderquiz</option>
                             </select>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="quiz-category">Kategorie:</label>
-                        <select id="quiz-category" required>
-                            <option value="">-- Kategorie wählen --</option>
-                            <option value="" disabled>Wähle zuerst einen Quiz-Typ</option>
-                        </select>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="quiz-group">Gruppe (optional):</label>
-                        <select id="quiz-group">
-                            <option value="">Alle Gruppen</option>
-                            <option value="" disabled>Wähle zuerst eine Kategorie</option>
-                        </select>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="quiz-question-count">Anzahl der Fragen:</label>
-                        <input type="number" id="quiz-question-count" min="5" max="20" value="10" required>
-                    </div>
-                    
-                    <button type="submit" class="btn-primary">
-                        <i class="fas fa-play"></i> Quiz starten
-                    </button>
-                </form>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="quiz-category">Kategorie:</label>
+                            <select id="quiz-category" required>
+                                <option value="">-- Kategorie wählen --</option>
+                                <option value="" disabled>Wähle zuerst einen Quiz-Typ</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="quiz-group">Gruppe (optional):</label>
+                            <select id="quiz-group">
+                                <option value="">Alle Gruppen</option>
+                                <option value="" disabled>Wähle zuerst eine Kategorie</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="quiz-question-count">Anzahl der Fragen:</label>
+                            <input type="number" id="quiz-question-count" min="5" max="20" value="10" required>
+                        </div>
+                        
+                        <button type="submit" class="btn-primary">
+                            <i class="fas fa-play"></i> Quiz starten
+                        </button>
+                    </form>
+                </div>
             </div>
         </section>
             
