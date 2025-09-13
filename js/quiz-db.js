@@ -656,7 +656,7 @@ async function createQuestion(questionData) {
         console.error('Supabase-Client ist nicht verfügbar.');
         return null;
     }
-    if (!questionData || !questionData.text || !questionData.categoryId || !questionData.groupId) {
+    if (!questionData || !questionData.text || !questionData.groupId) {
         console.error("Unvollständige Fragendaten.");
         return null;
     }
@@ -669,14 +669,7 @@ async function createQuestion(questionData) {
 
     try {
         const questions = await loadQuestions();
-        const categories = await loadCategories();
-        
-        // Kategorie finden, um den Fragetyp automatisch zu bestimmen
-        const category = categories.find(cat => cat.id === questionData.categoryId);
-        if (!category) {
-            console.error("Kategorie nicht gefunden");
-            return null;
-        }
+        // Kategorie-Prüfung entfernt, da für Fragen nur groupId relevant ist
         
         
         // Prüfe und optimiere das Bild
@@ -696,16 +689,13 @@ async function createQuestion(questionData) {
         
         // Build DB payload and let the DB assign an id
         const payload = {
-            text: questionData.text,
+            question: questionData.text,
+            answer: questionData.answer,
+            additionalinfo: questionData.additionalinfo || null,
             imageurl: imageUrl || null,
-            options: questionData.options ?? null,
-            explanation: questionData.explanation || null,
-            // canonical DB columns
-            category_id: questionData.categoryId,
             group_id: questionData.groupId,
-            difficulty: questionData.difficulty || 1,
-            created_by: questionData.createdBy || null,
-            created_at: new Date().toISOString()
+            owner: questionData.createdBy || null,
+            collaborators: questionData.collaborators || null
         };
 
     const { data: insertData, error: insertErr } = await window.supabase.from('questions').insert(window.mapToDb('questions', payload)).select();

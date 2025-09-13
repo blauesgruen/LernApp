@@ -1100,6 +1100,9 @@ img.icon {
     background: var(--color-blue-plastic) !important;
     box-sizing: border-box !important;
 }
+#question-image-label.btn-primary:hover {
+    background: var(--color-blue-plastic-darker) !important;
+}
 /* Einheitliche Button-Stile für die gesamte App */
 .btn-primary, .btn-secondary, .btn-danger {
     min-height: 44px; /* meet mobile touch target guidelines */
@@ -1271,6 +1274,14 @@ input, label {
     display: block !important;
     font-size: 1.05rem;
     padding: 10px 12px;
+}
+
+.image-preview {
+    max-width: 100%;
+    max-height: 200px;
+    margin-top: 10px;
+    border-radius: 8px;
+    object-fit: contain;
 }
 
 /* Mobile: stacked columns. The 'Kategorie' and 'Gruppe' cards should be only

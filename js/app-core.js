@@ -1,3 +1,19 @@
+// Gibt die aktuelle Supabase User-ID (uuid) zurück oder null, falls nicht eingeloggt
+window.getCurrentUserId = async function() {
+    try {
+        // Supabase v2: getUser() liefert ein Promise mit { data: { user: { id } } }
+        if (window.supabase && window.supabase.auth && typeof window.supabase.auth.getUser === 'function') {
+            const result = await window.supabase.auth.getUser();
+            if (result && result.data && result.data.user && result.data.user.id) return result.data.user.id;
+        }
+        // Supabase v1: user direkt in session
+        if (window.supabase && window.supabase.auth && typeof window.supabase.auth.user === 'function') {
+            const userObj = window.supabase.auth.user();
+            if (userObj && userObj.id) return userObj.id;
+        }
+    } catch (e) { /* ignore */ }
+    return null;
+};
 // Zentrale Funktionen für die LernApp
 // Lightweight, non-blocking debugLog implementation used during startup.
 // This deliberately avoids touching the DOM (to prevent blocking when

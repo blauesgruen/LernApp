@@ -319,10 +319,9 @@
             const text = document.getElementById('question-text')?.value?.trim();
             const explanation = document.getElementById('question-explanation')?.value?.trim();
             const answer = document.getElementById('answer-0')?.value?.trim();
-            const categoryId = categorySelect?.value;
             const groupId = groupSelect?.value;
-            if (!text || !answer || !categoryId || !groupId) {
-              notifyError('Bitte fülle alle Pflichtfelder aus und wähle Kategorie & Gruppe.');
+            if (!text || !answer || !groupId) {
+              notifyError('Bitte fülle alle Pflichtfelder aus und wähle eine Gruppe.');
               return;
             }
             let imageUrl = uploadedImageUrl;
@@ -330,29 +329,57 @@
             if (!imageUrl && fileInput && fileInput.files[0]) {
               imageUrl = imagePreview.querySelector('img')?.src || null;
             }
+            // Option-Array für die Validierung erzeugen
+            const options = [{ text: answer, isCorrect: true }];
+            // User-ID asynchron abfragen
+            const ownerId = await window.getCurrentUserId();
+            if (!ownerId) {
+              notifyError('Fehler: Keine User-ID gefunden. Bitte neu einloggen.');
+              return;
+            }
             const questionData = {
               text,
               answer,
               additionalinfo: explanation,
               imageUrl,
-              categoryId,
               groupId,
               difficulty: 1,
-              createdBy: window.supabase?.auth?.getUser?.()?.id || null
+              owner: ownerId,
+              options
             };
+            // Debug: User-ID und Payload ausgeben
+            console.log('Insert owner:', ownerId);
+            console.log('Insert payload:', questionData);
             // Supabase DB insert
             try {
-              const created = await window.quizDB.createQuestion(questionData);
-              if (created && created.id) {
-                notifySuccess('Frage erfolgreich gespeichert!');
-                questionForm.reset();
-                imagePreview.innerHTML = '';
-                imageName.textContent = '';
-                uploadedImageUrl = null;
-                await loadQuestionsForGroup(groupId);
-              } else {
-                notifyError('Fehler beim Speichern der Frage.');
-              }
+                  // Insert mit nur den existierenden Spalten
+                  const { data, error } = await window.supabase
+                    .from('questions')
+                    .insert([
+                      {
+                        question: text,
+                        answer,
+                        additionalinfo: explanation,
+                        imageurl: imageUrl,
+                        group_id: groupId,
+                        owner: ownerId
+                      }
+                    ])
+                    .select();
+                if (error) {
+                  notifyError('Fehler beim Speichern: ' + (error.message || error));
+                  return;
+                }
+                if (data && data.length && data[0].id) {
+                  notifySuccess('Frage erfolgreich gespeichert!');
+                  questionForm.reset();
+                  imagePreview.innerHTML = '';
+                  imageName.textContent = '';
+                  uploadedImageUrl = null;
+                  await loadQuestionsForGroup(groupId);
+                } else {
+                  notifyError('Fehler: Keine Rückgabe der neuen Frage.');
+                }
             } catch (err) {
               notifyError('Fehler beim Speichern: ' + (err.message || err));
             }

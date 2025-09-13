@@ -364,6 +364,31 @@ Letzte Änderung: Automatische Bereinigung und Umstellung auf Supabase-only (10.
 - owner (uuid, Pflichtfeld)
 - collaborators (uuid[] oder Text[], optional)
 
+**Frontend-Insert-Logik (Stand: 13.09.2025):**
+Beim Erstellen einer neuen Frage werden ausschließlich die existierenden Felder der Tabelle `questions` verwendet:
+
+```js
+const { data, error } = await supabase
+   .from('questions')
+   .insert([
+      {
+         question: text,
+         answer,
+         additionalinfo: explanation,
+         imageurl: imageUrl,
+         group_id: groupId,
+         owner: ownerId
+      }
+   ])
+   .select();
+```
+
+Pflichtfelder: `question`, `answer`, `group_id`, `owner` müssen gesetzt sein. Optional: `additionalinfo`, `imageurl`, `collaborators`.
+Das Feld `id` wird automatisch generiert und nicht gesetzt.
+
+**Hinweis:**
+Die Insert-Logik und das Mapping im Frontend sind immer mit der Supabase-Tabellenstruktur abzugleichen. Nicht existierende Felder dürfen nicht verwendet werden (z. B. `difficulty`).
+
 **Hinweis:**
 - Nur diese Felder dürfen beim Import/Export verwendet werden.
 - Die Import-Logik muss alle Felder korrekt abbilden und keine anderen Felder senden.
