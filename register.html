@@ -17,24 +17,28 @@
     <div id="header-container"></div>
 
     <main>
-    <section class="centered-section" id="register">
-            <div style="width:100%; max-width:400px;">
-                    <div class="section-header" style="display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 16px;">
-                        <button type="button" class="btn-back" style="margin-right: auto;" onclick="window.history.back()">Zurück</button>
-                        <h1 style="margin-left: auto; text-align: right;">Registrieren</h1>
+        <section class="centered-section" id="register">
+            <div class="section-header">
+                <a href="index.html" class="back-button btn-secondary">
+                    <i class="fas fa-arrow-left"></i>Zurück
+                </a>
+            </div>
+            <div id="profile-columns">
+                <div class="profile-col" style="flex: 1; min-height: 0;">
+                    <h2>Gib deine Registrierungs-Daten ein:</h2>
+                    <form id="registerForm" class="full-height-form">
+                        <input type="email" id="registerEmail" placeholder="E-Mail" required>
+                        <input type="password" id="registerPassword" placeholder="Passwort" required>
+                        <input type="password" id="registerPasswordRepeat" placeholder="Passwort wiederholen" required>
+                        <input type="text" id="registerNickname" placeholder="Nickname" required>
+                        <button type="submit" class="btn-primary"><i class="fas fa-user-plus"></i> Registrieren</button>
+                    </form>
+                    <div class="forgot-password-link">
+                        <a href="#" id="forgotPasswordLink">Passwort vergessen?</a>
                     </div>
-                <form id="registerForm">
-                    <input type="email" id="registerEmail" placeholder="E-Mail" required>
-                    <input type="password" id="registerPassword" placeholder="Passwort" required>
-                    <input type="password" id="registerPasswordRepeat" placeholder="Passwort wiederholen" required>
-                    <input type="text" id="registerNickname" placeholder="Nickname" required>
-                    <button type="submit" class="btn-primary"><i class="fas fa-user-plus"></i> Registrieren</button>
-                </form>
-                <div class="forgot-password-link">
-                    <a href="#" id="forgotPasswordLink">Passwort vergessen?</a>
+                    <div id="registerMessage"></div>
+                    <p>Bereits registriert? <a href="login.html">Zum Login</a></p>
                 </div>
-                <div id="registerMessage"></div>
-                <p>Bereits registriert? <a href="login.html">Zum Login</a></p>
             </div>
         </section>
     </main>
