@@ -322,22 +322,31 @@ document.addEventListener('DOMContentLoaded', function() {
             // Kategorien und Fragen über zentrale DB-Funktionen laden
             const categories = await window.quizDB.loadCategories();
             const questions = await window.quizDB.loadQuestions();
-            // Kategorien mit Bildern ermitteln
+            // Gruppen einmal laden
+            const groups = await window.quizDB.loadGroups();
             const categoriesWithImages = new Set();
             questions.forEach(q => {
-                if (q.imageUrl && q.imageUrl.trim() !== '') {
-                    categoriesWithImages.add(q.categoryId);
+                const imageUrl = q.imageUrl ?? q.imageurl;
+                const groupId = q.group_id ?? q.groupId;
+                if (imageUrl && String(imageUrl).trim() !== '') {
+                    const group = groups.find(g => String(g.id) === String(groupId));
+                    if (group && group.category_id) {
+                        categoriesWithImages.add(group.category_id);
+                    }
                 }
             });
-            // Kategorien filtern
             let userCategories = categories.filter(cat => cat.createdBy !== 'system');
             if (quizType === 'image') {
                 userCategories = userCategories.filter(cat =>
-                    categoriesWithImages.has(cat.id) || cat.mainCategory === quizType
+                    categoriesWithImages.has(cat.id)
                 );
             } else if (quizType === 'text') {
                 userCategories = userCategories.filter(cat =>
-                    cat.mainCategory === quizType || !cat.mainCategory
+                    questions.some(q => {
+                        const groupId = q.group_id ?? q.groupId;
+                        const group = groups.find(g => String(g.id) === String(groupId));
+                        return group && group.category_id === cat.id && (q.text ?? q.question);
+                    })
                 );
             }
             // Auswahlfeld befüllen
