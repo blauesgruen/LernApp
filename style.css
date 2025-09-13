@@ -491,6 +491,9 @@ img.icon {
 .profile-col.profile-db::before {
     background: var(--color-grey-border-light);
 }
+.profile-col.profile-category::before {
+    background: var(--color-green-plastic-darker) !important; /* Hellgrün für rechte Spalte */
+}
 .profile-col.profile-group::before {
     background: var(--color-green-plastic) !important; /* Hellgrün für rechte Spalte */
 }
@@ -562,91 +565,6 @@ img.icon {
     box-sizing: border-box !important;
 }
 
-.category-card {
-    flex: 1 1 360px;
-    max-width: 400px;
-    min-width: 320px;
-    background: var(--color-white-clean);
-    border-radius: 20px;
-    box-shadow: var(--shadow-color);
-    border-left: 12px solid var(--color-grey-border-light);
-    padding: 32px 28px 32px 0;
-    margin: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    min-height: 420px;
-    width: 100% !important;
-    max-width: 100% !important;
-    margin: 0 !important;
-    box-sizing: border-box !important;
-    padding-left: var(--container-padding-desktop);
-    padding-right: var(--container-padding-desktop);
-}
-
-.category-card .card-title {
-    font-size: 2rem;
-    font-weight: 700;
-    margin-bottom: 32px;
-    text-align: center;
-}
-.category-card .category-tree {
-    width: 100% !important;
-    max-width: 100% !important;
-    margin: 0 !important;
-    padding: 18px 0 !important;
-    box-sizing: border-box !important;
-    background: var(--color-white-dirty);
-    border-radius: 14px;
-    border: 1.5px solid var(--color-white-dirty);
-    min-height: 180px;
-    transition: all 0.3s ease;
-}
-.category-card .category-tree > * {
-    width: 100% !important;
-    max-width: 100% !important;
-    margin: 0 !important;
-    box-sizing: border-box !important;
-}
-.category-card .tree-item {
-    font-size: 1.15rem;
-    padding: 8px 0 8px 8px;
-    margin-bottom: 4px;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: background 0.15s;
-    display: flex !important;
-    align-items: center;
-    justify-content: flex-start;
-    min-width: 0;
-}
-.category-card .tree-item.active {
-    background: var(--color-blue-plastic-light);
-}
-.category-card .tree-item-category {
-    font-weight: 600;
-}
-.category-card .tree-item-group {
-    color: var(--color-blue-plastic);
-}
-.category-card .tree-item-empty {
-    color: var(--color-grey-blue);
-    font-size: 1rem;
-    padding-left: 24px;
-}
-.category-card .form-group input,
-.category-card .form-group select,
-.category-card .form-actions button {
-    width: 100% !important;
-    max-width: 100% !important;
-    margin-left: 0 !important;
-    margin-right: 0 !important;
-    box-sizing: border-box !important;
-    display: block !important;
-    font-size: 1.05rem;
-    padding: 10px 12px;
-}
-
 .btn-header {
     border: none;
     border-radius: 5px;
@@ -711,33 +629,6 @@ img.icon {
 .tree-item-toggle:focus {
     outline: 3px solid rgba(25,118,210,0.18);
     outline-offset: 2px;
-}
-.category-card .form-actions {
-    width: 100% !important;
-    box-sizing: border-box !important;
-}
-.category-card .form-group {
-    width: 100% !important;
-    box-sizing: border-box !important;
-}
-@media (max-width: 1100px) {
-    .category-management-row {
-        flex-direction: column;
-        gap: 24px;
-    }
-    .category-card {
-        max-width: 98vw !important;
-        min-width: 0 !important;
-        width: 100% !important;
-        padding: 18px 4px 18px 0 !important;
-        padding-left: var(--container-padding-mobile) !important;
-        padding-right: var(--container-padding-mobile) !important;
-    }
-    .category-card .category-tree {
-        width: 100% !important;
-        max-width: 100% !important;
-        padding: 10px 4px !important;
-    }
 }
 
 /* Form Styles für Kategorie und Gruppe */
@@ -1023,10 +914,6 @@ img.icon {
     padding-left: 6px;
     padding-right: 6px;
 }
-
-.form-content {
-    flex-grow: 1;
-}
     
 .management-card h2 {
     margin-top: 0;
@@ -1206,7 +1093,13 @@ img.icon {
         grid-template-columns: 1fr;
     }
 }
-
+#question-image-label.btn-primary {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    background: var(--color-blue-plastic) !important;
+    box-sizing: border-box !important;
+}
 /* Einheitliche Button-Stile für die gesamte App */
 .btn-primary, .btn-secondary, .btn-danger {
     min-height: 44px; /* meet mobile touch target guidelines */
@@ -1223,7 +1116,6 @@ img.icon {
     text-decoration: none;
     box-shadow: var(--shadow-color);
     min-width: 140px;
-    height: 38px;
     text-align: center;
     justify-content: center;
     display: inline-flex;

@@ -691,26 +691,3 @@ async function loadGroups() {
     }
 }
 
-/**
- * Setzt die Breite und Zentrierung für alle Formularelemente per JS
- */
-function setFormElementWidths() {
-    const elements = [
-        ...document.querySelectorAll('.profile-col .form-group input'),
-        ...document.querySelectorAll('.profile-col .form-group select'),
-        ...document.querySelectorAll('.profile-col .form-actions button'),
-        ...document.querySelectorAll('.category-card .form-group input'),
-        ...document.querySelectorAll('.category-card .form-group select'),
-        ...document.querySelectorAll('.category-card .form-actions button')
-    ];
-    elements.forEach(el => {
-    // Use full width and let CSS handle spacing; avoid forcing 90% which conflicts with stylesheet
-    el.style.width = '100%';
-    el.style.marginLeft = '0';
-    el.style.marginRight = '0';
-    el.style.display = 'block';
-    el.style.boxSizing = 'border-box';
-    });
-}
-
-document.addEventListener('DOMContentLoaded', setFormElementWidths);

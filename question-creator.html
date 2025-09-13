@@ -39,51 +39,39 @@
                 <!-- mittlere Spalte: Datenbank -->
                 <div class="profile-col profile-question">
                     <h2>Neue Frage erstellen</h2>
-                    <div class="management-card">
-                        <form id="question-form">
-                            <div class="form-content">
-                                <div class="form-group">
-                                    <!-- <h1 for="question-text">Fragetext:</h1> -->
-                                    <textarea id="question-text" rows="4" required placeholder="Gib hier deine Frage ein..."></textarea>
-                                </div>
-
-                                <div class="form-group">
-                                    <!-- <h1 for="question-image">Frage-Bild hinzufügen:</h1> -->
-                                    <div class="form-actions">
-                                        <input type="file" id="question-image" accept="image/*" style="position:absolute;left:-9999px;" disabled>
-                                        <label for="question-image" class="btn-primary" id="question-image-label" style="cursor:not-allowed;display:inline-block;opacity:0.6;">
-                                            <i class="fas fa-upload"></i> Frage-Bild
-                                        </label>
-                                        <span id="image-upload-hint" style="color:#888;font-size:0.95em;margin-left:8px;">Bitte zuerst eine Gruppe wählen</span>
-                                    </div>
-                                    <div id="image-preview" class="image-preview"></div>
-                                    <div id="image-name" class="image-name"></div>
-                                </div>
-
-                                <div class="form-group">
-                                    <label for="question-explanation">Erklärung (optional):</label>
-                                    <textarea id="question-explanation" rows="3" placeholder="Erkläre die richtige Antwort..."></textarea>
-                                </div>
-                                <h1>Antwort:</h1>
-                                <div id="answers-container">
-                                    <div class="answer-option">
-                                        <textarea id="answer-0" class="answer-text" rows="2" required placeholder="Die richtige Antwort..."></textarea>
-                                    </div>
-                                </div>
-                                <div class="form-actions">
-                                    <button type="submit" class="btn-primary"><i class="fas fa-save"></i> Frage speichern</button>
+                    <form id="question-form" class="full-height-form">
+                        <div class="form-content">
+                            <textarea id="question-text" rows="4" required placeholder="Gib hier deine Frage ein..."></textarea>
+                            <div class="form-actions">
+                                <input type="file" id="question-image" accept="image/*" style="position:absolute;left:-9999px;" disabled>
+                                <label for="question-image" class="btn-primary" id="question-image-label" style="color: var(--color-white-clean)">
+                                    <i class="fas fa-upload"></i> Frage-Bild
+                                </label>
+                                <span id="image-upload-hint" style="color:#888;font-size:0.95em;margin-left:8px;">Bitte zuerst eine Gruppe wählen</span>
+                            </div>
+                            <div id="image-preview" class="image-preview"></div>
+                            <div id="image-name" class="image-name"></div>
+                            <div class="form-group">
+                                <label for="question-explanation">Erklärung (optional):</label>
+                                <textarea id="question-explanation" rows="3" placeholder="Erkläre die richtige Antwort..."></textarea>
+                            </div>
+                            <h1>Antwort:</h1>
+                            <div id="answers-container">
+                                <div class="answer-option">
+                                    <textarea id="answer-0" class="answer-text" rows="2" required placeholder="Die richtige Antwort..."></textarea>
                                 </div>
                             </div>
-                        </form>
-                    </div>
+                            <div class="form-actions">
+                                <button type="submit" class="btn-primary"><i class="fas fa-save"></i> Frage speichern</button>
+                            </div>
+                        </div>
+                    </form>
                 </div>
                 <!-- rechte Spalte: Danger -->
                 <div class="profile-col profile-question">
                     <h2>Fragen in dieser Gruppe</h2>
-                    <div class="management-card">
-                        <div id="group-questions-list" class="items-list">
-                            <p class="info-text">Wähle eine Gruppe aus, um deren Fragen zu sehen</p>
-                        </div>
+                    <div id="group-questions-list" class="items-list">
+                        <p class="info-text">Wähle eine Gruppe aus, um deren Fragen zu sehen</p>
                     </div>
                 </div>
             </div>
