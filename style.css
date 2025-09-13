@@ -27,6 +27,7 @@
     flex: 0 0 auto;
     display: flex;
     align-items: center;
+    min-height: auto;
 }
 .section-header h1 {
     flex: 0 1 auto;
@@ -35,6 +36,16 @@
     font-size: 2rem;
     align-self: flex-end;
 }
+.back-button i {
+    margin-right: 7px !important;
+}
+
+.login-box {
+    max-width: 400px !important;
+    max-height: 100px !important;
+    overflow-y: auto !important;
+}
+
 /* Zentrale Farbdefinition */
 :root {
     --primary-bg-color: #c5ccd1;
@@ -241,99 +252,6 @@ nav ul li a {
     font-weight: bold;
 }
 
-/* Stile für den Login-Bereich */
-
-
-#login h1 {
-    font-size: 32px;
-    margin-bottom: 20px;
-}
-
-#login form {
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
-}
-
-#login input {
-    padding: 10px;
-    font-size: 16px;
-    border: 1px solid var(--color-grey-border-light);
-    border-radius: 5px;
-}
-
-#login .btn-primary {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    background-color: var(--color-blue-plastic);
-    color: var(--color-white-clean);
-    border: none;
-    border-radius: 4px;
-    padding: 6px 24px;
-    font-size: 1.1rem;
-    font-weight: 500;
-    text-align: center;
-    cursor: pointer;
-    height: 38px;
-    min-width: 140px;
-    box-shadow: var(--shadow-color);
-    transition: background 0.2s, color 0.2s;
-    text-decoration: none;
-}
-
-#login .btn-primary:hover {
-    background-color: var(--color-blue-plastic-darker);
-    color: var(--color-white-clean);
-}
-
-#login p {
-    margin-top: 20px;
-    font-size: 14px;
-    color: var(--color-black-light);
-}
-
-/* Stile für den Registrieren-Bereich */
-
-
-#register h1 {
-    font-size: 32px;
-    margin-bottom: 20px;
-}
-
-#register form {
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
-}
-
-#register input {
-    padding: 10px;
-    font-size: 16px;
-    border: 1px solid var(--color-grey-border-light);
-    border-radius: 5px;
-}
-
-#register .btn-primary {
-    padding: 10px 20px;
-    font-size: 18px;
-    background-color: var(--color-blue-plastic);
-    color: white;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-}
-
-#register .btn-primary:hover {
-    background-color: var(--color-blue-plastic-darker);
-}
-
-#register p {
-    margin-top: 20px;
-    font-size: 14px;
-    color: var(--color-black-light);
-}
-
 /* Stile für Icons */
 img.icon {
     object-fit: contain; /* Ensures the icon is not stretched or cropped */
@@ -452,6 +370,7 @@ img.icon {
     width: 100vw;
     max-width: none;
     box-sizing: border-box;
+    margin-bottom: var(--container-padding-desktop);
     padding-top: var(--container-padding-desktop);
     padding-bottom: var(--container-padding-desktop);
     padding-left: var(--container-padding-desktop);
@@ -517,29 +436,6 @@ img.icon {
 }
 .profile-question::before {
     background: var(--color-violet-question); /* Lila */
-}
-@media (max-width: 900px) {
-    #profile-columns {
-        flex-direction: column;
-        gap: 18px;
-        align-items: stretch;
-    }
-    .profile-col {
-        max-width: 98vw;
-        min-height: 0;
-        height: auto; /* Für mobile Ansicht, damit die Karten flexibel sind */
-        padding-top: var(--container-padding-mobile) !important;
-        padding-bottom: var(--container-padding-mobile) !important;
-        padding-left: var(--container-padding-mobile) !important;
-        padding-right: var(--container-padding-mobile) !important;
-    }
-    .section-header h1 {
-        flex: 0 1 auto;
-        margin: 0;
-        text-align: right;
-        font-size: 1.5rem;
-        align-self: flex-end;
-    }
 }
 
 /* Verbesserte Stile für das Kategoriemanagement */
@@ -610,14 +506,6 @@ img.icon {
     }
     .tree-item-toggle {
         padding: 8px !important;
-    }
-}
-
-/* Medium screens: allow a bit more breathing room */
-@media (min-width: 481px) and (max-width: 899px) {
-    .profile-col {
-        max-width: 720px;
-        padding: 18px !important;
     }
 }
 
@@ -1143,6 +1031,12 @@ img.icon {
 .btn-danger:hover {
     background-color: var(--color-red-danger-darker);
 }
+.btn-primary i,
+.btn-secondary i,
+.btn-danger i {
+    margin-right: 8px;
+}
+
 /* Einheitliche Schriftfarbe für Inputs und Labels */
 input, label {
     color: var(--color-black-light);
@@ -1284,36 +1178,6 @@ input, label {
     object-fit: contain;
 }
 
-/* Mobile: stacked columns. The 'Kategorie' and 'Gruppe' cards should be only
-   as tall as their content (do not force equal height), the tree may be
-   taller but still bounded to a reasonable limit to avoid infinite pages. */
-@media (max-width: 899px) {
-    /* Remove desktop panel height constraints */
-    #profile-columns {
-        min-height: 0;
-    }
-    .profile-col {
-        max-height: none;
-        min-height: auto;
-        height: auto;
-        overflow: visible;
-    }
-
-    /* Left column tree can be taller but still limited to avoid extremely long pages */
-    .profile-col.profile-info .category-tree-container,
-    .profile-col.profile-info .category-tree {
-        max-height: 720px; /* generous but bounded */
-        overflow-y: auto;
-        -webkit-overflow-scrolling: touch;
-    }
-
-    /* The create-category and create-group cards should fit their content */
-    .profile-col.profile-db .form-content,
-    .profile-col.profile-danger .form-content {
-        max-height: none;
-        overflow: visible;
-    }
-}
 
 /* Optional: small visual hint for scrollable tree (subtle shadow at bottom) */
 .profile-col.profile-info .category-tree-container.scrollable::after {

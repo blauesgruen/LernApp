@@ -17,19 +17,26 @@
 
     <main>
         <section class="centered-section" id="login">
-            <div style="width:100%; max-width:400px;">
-                <div class="section-header" style="display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 16px;">
-                    <button type="button" class="btn-back" style="margin-right: auto;" onclick="window.history.back()">Zurück</button>
-                    <h1 style="margin-left: auto; text-align: right;">Einloggen</h1>
+            <div class="section-header">
+                <a href="index.html" class="back-button btn-secondary">
+                    <i class="fas fa-arrow-left"></i>Zurück
+                </a>
+            </div>
+            <div id="profile-columns">
+                <div class="profile-col" style="flex: 1; min-height: 0;">
+                    <h2>Gib deine Login-Daten ein:</h2>
+                    <form id="loginForm" class="full-height-form">
+                        <input type="email" id="loginEmail" placeholder="E-Mail" required>
+                        <input type="password" id="loginPassword" placeholder="Passwort" required>
+                        <button type="submit" class="btn-primary">
+                            <i class="fas fa-sign-in-alt"></i>Einloggen
+                        </button>
+                    </form>
+                    <p>Noch keinen Account? <a href="register.html">Registrieren</a></p>
+                    <div id="message-field"></div>
+                    <div id="loginMessage"></div>
                 </div>
-                <form id="loginForm">
-                    <input type="email" id="loginEmail" placeholder="E-Mail" required>
-                    <input type="password" id="loginPassword" placeholder="Passwort" required>
-                    <button type="submit" class="btn-primary">Einloggen</button>
-                </form>
-                <p>Noch keinen Account? <a href="register.html">Registrieren</a></p>
-                <div id="message-field"></div>
-            <div id="loginMessage"></div>
+            </div>
         </section>
     </main>
 
