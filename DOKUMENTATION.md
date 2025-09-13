@@ -1,3 +1,21 @@
+- Policies sind additiv: Neue Policies für einen Bucket oder eine Tabelle überschreiben keine bestehenden Policies für andere Bereiche.
+- Policies gelten immer nur für die jeweilige Tabelle/Bucket.
+- Bestehende Policies bleiben erhalten, solange sie nicht explizit gelöscht oder deaktiviert werden.
+
+### Wichtiger Hinweis zu RLS-Policies für INSERT
+- Bei Supabase/Postgres darf eine Policy für INSERT **nur** die `WITH CHECK`-Klausel verwenden, nicht `USING`.
+- Beispiel (korrekt):
+   ```sql
+   CREATE POLICY "Allow insert for authenticated users"
+   ON public.questions
+   FOR INSERT
+   WITH CHECK (owner = auth.uid());
+   ```
+- Beispiel (falsch, führt zu Fehler):
+   ```sql
+   CREATE POLICY ... FOR INSERT USING (...); -- Fehler!
+   ```
+- Für SELECT, UPDATE, DELETE wird `USING` verwendet, für INSERT ausschließlich `WITH CHECK`.
 -- ===============================
 -- Tabelle und Policies für statistics (Supabase, produktiv genutzt)
 -- ===============================
@@ -46,6 +64,11 @@ Die LernApp ist eine interaktive Plattform, die Benutzern ermöglicht, Wissen du
 ## Änderungen und neue Funktionen
 
 ```markdown
+
+### Willkommensbereich
+
+## Änderungen und neue Funktionen (Stand: 13.09.2025)
+
 - Nach der Registrierung wird eine neutrale, gelbe Meldung angezeigt: "Bitte bestätigen Sie Ihre E-Mail-Adresse oder loggen Sie sich ein." Die Erfolgsmeldung wurde entfernt, um das Supabase-Auth-Verhalten korrekt abzubilden.
 - Der Menüpunkt "Startseite" wurde entfernt.
 - Das Icon und der Text "LernApp" führen jetzt zur Startseite oder zum Dashboard (abhängig vom Login-Status) und sind linksbündig ausgerichtet.
@@ -55,8 +78,44 @@ Die LernApp ist eine interaktive Plattform, die Benutzern ermöglicht, Wissen du
 - Ein erklärender Text wurde unterhalb des Login-Buttons hinzugefügt, der die Hauptfunktionen der LernApp beschreibt.
 - Der Text ist in einer blasseren Farbe (#666) und etwas kleiner als der Willkommen-Text.
 
----
-## Anforderungen
+### Supabase Storage & RLS
+- Storage-Bucket `question-images` muss im Dashboard angelegt werden.
+- Zugriffsrechte werden im Dashboard gesetzt (public/private). Für private Buckets ist eine RLS-Policy nötig:
+   ```sql
+   CREATE POLICY "Allow upload for authenticated users"
+   ON storage.objects
+   FOR INSERT
+   USING (auth.role() = 'authenticated');
+   ```
+- Policies sind additiv und überschreiben keine anderen Regeln für andere Bereiche/Tables.
+- Policies gelten immer nur für die jeweilige Tabelle/Bucket.
+
+### Styling: Buttons und Labels
+- Die Klasse `.btn-primary` wird für Buttons und Labels verwendet. Für Labels mit voller Breite und Höhe:
+   ```css
+   #question-image-label.btn-primary {
+      display: block !important;
+      width: 100% !important;
+      min-width: 180px !important;
+      max-width: 100% !important;
+      min-height: 44px !important;
+      height: 56px !important;
+      padding: 12px 24px !important;
+      font-size: 1.1rem !important;
+      background: var(--color-blue-plastic) !important;
+      box-sizing: border-box !important;
+      text-align: center !important;
+      align-items: center !important;
+      justify-content: center !important;
+   }
+   ```
+- Die Regel muss nach der allgemeinen `.btn-primary`-Definition stehen.
+- Elterncontainer wie `.form-actions` sollten ebenfalls `width: 100%` haben.
+
+### Fehlerbehebung: Supabase Storage Upload
+- Fehler "new row violates row-level security policy" bedeutet, dass die RLS-Policy für den Bucket fehlt oder zu restriktiv ist.
+- Policies für Storage-Buckets sind unabhängig von Policies für andere Tabellen.
+
 ### Registrierung: E-Mail-Existenz-Check
 Vor der Registrierung prüft die App, ob die E-Mail-Adresse bereits existiert. Dazu wird die Tabelle `auth.users` per Supabase-Query abgefragt:
 
