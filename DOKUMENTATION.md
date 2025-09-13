@@ -1,38 +1,41 @@
 -- ===============================
--- Tabelle und Policies für statistics
+-- Tabelle und Policies für statistics (Supabase, produktiv genutzt)
 -- ===============================
 
-create table public.statistics (
-   id uuid default gen_random_uuid() primary key,
-   user_id uuid not null,
-   question_id text not null,
-   is_correct boolean not null,
-   created_at timestamp with time zone default now()
+CREATE TABLE public.statistics (
+   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+   user_id uuid NOT NULL,
+   question_id text NOT NULL,
+   is_correct boolean NOT NULL,
+   created_at timestamp with time zone DEFAULT now()
 );
 
-alter table public.statistics enable row level security;
+ALTER TABLE public.statistics ENABLE ROW LEVEL SECURITY;
 
-create policy "Allow insert for authenticated users"
-   on public.statistics
-   for insert
-   with check (auth.uid() = user_id);
+-- Policies für die Tabelle statistics
+CREATE POLICY "Allow insert for authenticated users"
+   ON public.statistics
+   FOR INSERT
+   WITH CHECK (auth.uid() = user_id);
 
-create policy "Allow select for authenticated users"
-   on public.statistics
-   for select
-   using (auth.uid() = user_id);
+CREATE POLICY "Allow select for authenticated users"
+   ON public.statistics
+   FOR SELECT
+   USING (auth.uid() = user_id);
 
-create policy "Allow update for authenticated users"
-   on public.statistics
-   for update
-   using (auth.uid() = user_id);
+CREATE POLICY "Allow update for authenticated users"
+   ON public.statistics
+   FOR UPDATE
+   USING (auth.uid() = user_id);
 
-create policy "Allow delete for authenticated users"
-   on public.statistics
-   for delete
-   using (auth.uid() = user_id);
+CREATE POLICY "Allow delete for authenticated users"
+   ON public.statistics
+   FOR DELETE
+   USING (auth.uid() = user_id);
 
 Hinweis: Die Spalte user_id muss als uuid angelegt werden, damit die Policy funktioniert (auth.uid() liefert uuid).
+Wichtig: Im gesamten Code und Mapping wird die Tabelle als 'statistics' angesprochen, nicht als 'statistik'.
+Die Löschfunktion und alle Queries müssen auf 'statistics' laufen, Spaltennamen: user_id, question_id, is_correct, created_at.
 # LernApp - Dokumentation und Aufbau
 
 ## Ziel der Anwendung

@@ -10,6 +10,7 @@
     <script src="js/app-core.js"></script>
     <script src="js/notification.js"></script>
     <script src="js/logger.js"></script>
+    <script src="js/helpers.js"></script>
 </head>
 <body>
     <div id="header-container"></div>
@@ -21,15 +22,14 @@
                 </a>
                 <h1>Mein Profil</h1>
             </div>
-            <!-- fake? -->
-            <!-- <div class="profile-user-info" style="margin-bottom: 18px;">
-                <span id="profile-user-nickname"></span>
-                <span id="profile-user-email"></span>
-            </div> -->
             <div id="profile-columns">
                 <!-- Linke Spalte: Kategorie-Baum -->
                 <div class="profile-col profile-info">
                     <h2>Profil</h2>
+                    <div class="profile-user-info">
+                        <span id="profile-user-nickname"></span>
+                        <span id="profile-user-email"></span>
+                    </div>
                     <label for="nickname">Nickname:</label>
                     <input type="text" id="nickname" placeholder="Nickname">
                     <label for="newPassword" style="margin-top:18px;">Neues Passwort:</label>
@@ -41,29 +41,16 @@
                 </div>
                 <div class="profile-col profile-db">
                     <h2>Datenbank</h2>
-                    <button id="exportDb" class="btn-secondary" style="margin-top:18px;">Exportieren</button>
-                    <input type="file" id="importDbFile" style="display:none">
+                    <button id="exportDb" class="btn-secondary" >Exportieren</button>
+                    <input type="file" id="importDbFile" style="display:none" accept=".json">
                     <button id="importDb" class="btn-secondary">Importieren</button>
+                    <button id="exportStats" class="btn-secondary">Statistik exportieren</button>
                     <div id="importExportMessage"></div>
-                    <!-- Gruppen-Importbereich direkt hier integriert -->
-                    <div class="import-section" style="margin-top:24px;">
-                        <h3>Gruppen importieren</h3>
-                        <label for="importCategorySelect">Kategorie auswählen:</label>
-                        <select id="importCategorySelect"></select>
-                        <input type="file" id="importGroupsFile" accept=".json">
-                        <button id="importGroupsBtn" class="btn-secondary">Gruppen importieren</button>
-                        <div id="importGroupsStatus"></div>
-                    </div>
-                    <!-- Fragen-Importbereich: Gruppenauswahl entfernt, nur noch Datei-Upload und Button -->
-                    <div class="import-section" style="margin-top:24px;">
-                        <h3>Fragen importieren</h3>
-                        <input type="file" id="importQuestionsFile" accept=".json">
-                        <button id="importQuestionsBtn" class="btn-secondary">Fragen importieren</button>
-                        <div id="importQuestionsStatus"></div>
-                    </div>
                 </div>
                 <div class="profile-col profile-danger">
                     <h2>Gefahrenbereich</h2>
+                    <button id="deleteStats" class="btn-danger">Statistik löschen</button>
+                    <div id="deleteStatsMessage"></div>
                     <button id="deleteDb" class="btn-danger">Datenbank löschen</button>
                     <div id="deleteDbMessage"></div>
                     <button id="deleteAccount" class="btn-danger">Account löschen</button>
@@ -75,9 +62,10 @@
         <div id="footer-container"></div>
         <script>
             // Use centralized header/footer loader
-                if (window.loadHeaderFooter) window.loadHeaderFooter();
-                // Central supabase client check (one-time)
-                if (window.checkSupabaseClient && !window._supabaseChecked) { window._supabaseChecked = true; window.checkSupabaseClient(); }
+            if (window.loadHeaderFooter) window.loadHeaderFooter();
+            // Central supabase client check (one-time)
+            if (window.checkSupabaseClient && !window._supabaseChecked) { window._supabaseChecked = true; window.checkSupabaseClient(); }
         </script>
+        <script src="js/profile.js"></script>
 </body>
 </html>
